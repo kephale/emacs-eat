@@ -2422,6 +2422,10 @@ event."
                 0))
               (t last-command-event))
            last-command-event)))
+  (when (memq (event-basic-type e)
+              '( mouse-1 mouse-2 mouse-3 mouse-4 mouse-5 mouse-6
+                 mouse-7))
+    (select-window (posn-window (event-start e))))
   (when eat--terminal
     (unless (mouse-movement-p e)
       (funcall eat--synchronize-scroll-function))
@@ -3201,8 +3205,7 @@ PROGRAM can be a shell command."
 
 (defun eat--eshell-synchronize-scroll ()
   "Synchronize scrolling and point between terminal and window."
-  (when-let ((window (get-buffer-window
-                      (current-buffer))))
+  (when-let ((window (get-buffer-window (current-buffer))))
     (set-window-start
      window
      (if (eat-term-in-alternative-framebuffer-p eat--terminal)
