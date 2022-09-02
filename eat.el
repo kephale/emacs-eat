@@ -519,7 +519,8 @@ OS's."
 
 Nil when not in alternative display mode.")
   (face (eat--make-face) :documentation "Display attributes.")
-  (cur-state t :documentation "Current state (type) of cursor.")
+  (cur-state :default :documentation "Current state) of cursor.")
+  (cur-blinking-p nil :documentation "Is the cursor blinking?")
   (saved-face (eat--make-face) :documentation "Saved SGR attributes.")
   (bracketed-yank nil :documentation "State of bracketed yank mode.")
   (mouse-mode t :documentation "Current mouse mode.")
@@ -547,6 +548,7 @@ Don't `set' it, bind it to a value with `let'.")
     (setf (eat--term-saved-face eat--term) (eat--make-face))
     (setf (eat--term-bracketed-yank eat--term) nil)
     (setf (eat--term-cur-state eat--term) :default)
+    (setf (eat--term-cur-blinking-p eat--term) nil)
     (setf (eat--term-title eat--term) "")
     (setf (eat--term-mouse-mode eat--term) nil)
     (setf (eat--term-focus-event-mode eat--term) nil)
@@ -966,15 +968,24 @@ STATE one of the `:default', `:invisible', `:very-visible'."
 
 (defun eat--default-cursor ()
   "Set the cursor to its default state."
-  (eat--set-cursor-state :default))
+  (eat--set-cursor-state
+   (if (eat--term-cur-blinking-p eat--term) :very-visible :default)))
 
 (defun eat--invisible-cursor ()
   "Make the cursor invisible."
   (eat--set-cursor-state :invisible))
 
-(defun eat--very-visible-cursor ()
-  "Make the cursor very visible."
-  (eat--set-cursor-state :very-visible))
+(defun eat--blinking-cursor ()
+  "Make the cursor blink."
+  (setf (eat--term-cur-blinking-p eat--term) t)
+  (when (eq (eat--term-cur-state eat--term) :default)
+    (eat--set-cursor-state :very-visible)))
+
+(defun eat--non-blinking-cursor ()
+  "Make the cursor blink."
+  (setf (eat--term-cur-blinking-p eat--term) nil)
+  (when (eq (eat--term-cur-state eat--term) :very-visible)
+    (eat--set-cursor-state :default)))
 
 (defun eat--enable-bracketed-yank ()
   "Enable bracketed yank mode."
@@ -1340,6 +1351,54 @@ MODE should be one of nil and `x10', `normal', `button-event',
   (setf (eat--term-title eat--term) title)
   (funcall (eat--term-set-title-fn eat--term) eat--term title))
 
+(defun eat--set-modes (params format)
+  "Set modes according to PARAMS in format FORMAT."
+  (pcase format
+    ('dec-private
+     (while params
+       (pcase (pop params)
+         ('(12)
+          (eat--blinking-cursor))
+         ('(25)
+          (eat--default-cursor))
+         ('(1049)
+          (eat--enable-alt-disp))
+         ('(2004)
+          (eat--enable-bracketed-yank))
+         ('(9)
+          (eat--enable-x10-mouse))
+         ('(1000)
+          (eat--enable-normal-mouse))
+         ('(1002)
+          (eat--enable-button-event-mouse))
+         ('(1003)
+          (eat--enable-any-event-mouse))
+         ('(1004)
+          (eat--enable-focus-event))
+         ('(1006)
+          (eat--enable-sgr-mouse-encoding)))))))
+
+(defun eat--reset-modes (params format)
+  "Reset modes according to PARAMS in format FORMAT."
+  (pcase format
+    ('dec-private
+     (while params
+       (pcase (pop params)
+         ('(12)
+          (eat--non-blinking-cursor))
+         ('(25)
+          (eat--invisible-cursor))
+         ('(1049)
+          (eat--disable-alt-disp))
+         ('(2004)
+          (eat--disable-bracketed-yank))
+         (`(,(or 9 1000 1002 1003))
+          (eat--disable-mouse))
+         ('(1004)
+          (eat--disable-focus-event))
+         ('(1006)
+          (eat--disable-sgr-mouse-encoding)))))))
+
 (defun eat--handle-output (output)
   "Parse and evaluate OUTPUT."
   (let ((index 0))
@@ -1438,6 +1497,7 @@ MODE should be one of nil and `x10', `normal', `button-event',
              (pcase
                  (let ((str (concat buf (substring output index
                                                    match)))
+                       (format nil)
                        (intermediate-bytes ""))
                    (save-match-data
                      (when (string-match
@@ -1448,10 +1508,15 @@ MODE should be one of nil and `x10', `normal', `button-event',
                                   str 0 (match-beginning 0)))
                        (setq intermediate-bytes
                              (match-string 0 str))))
+                   (when (and (not (string-empty-p str))
+                              (= (aref str 0) ??))
+                     (setq format 'dec-private)
+                     (setq str (substring str 1)))
                    (setq index (match-end 0))
-                   (cons
+                   (list
                     (concat intermediate-bytes
                             (match-string 0 output))
+                    format
                     (cond
                      ((string-empty-p str) nil)
                      ((<= #x30 (aref str 0) #x3b)
@@ -1463,124 +1528,79 @@ MODE should be one of nil and `x10', `normal', `button-event',
                               (split-string str ";")))
                      (t str))))
                ;; CSI <n> @.
-               (`("@" . ,(and (pred listp) params))
+               (`("@" nil ,(and (pred listp) params))
                 (eat--insert-char (caar params)))
                ;; CSI <n> A.
-               (`("A" . ,(and (pred listp) params))
+               (`("A" nil ,(and (pred listp) params))
                 (eat--cur-up (caar params)))
                ;; CSI <n> B.
-               (`("B" . ,(and (pred listp) params))
+               (`("B" nil ,(and (pred listp) params))
                 (eat--cur-down (caar params)))
                ;; CSI <n> C.
-               (`("C" . ,(and (pred listp) params))
+               (`("C" nil ,(and (pred listp) params))
                 (eat--cur-right (caar params)))
                ;; CSI <n> D.
-               (`("D" . ,(and (pred listp) params))
+               (`("D" nil ,(and (pred listp) params))
                 (eat--cur-left (caar params)))
                ;; CSI <n> E.
-               (`("E" . ,(and (pred listp) params))
+               (`("E" nil ,(and (pred listp) params))
                 (eat--beg-of-prev-line (caar params)))
                ;; CSI <n> F.
-               (`("F" . ,(and (pred listp) params))
+               (`("F" nil ,(and (pred listp) params))
                 (eat--beg-of-next-line (caar params)))
                ;; CSI <n> G.
-               (`("G" . ,(and (pred listp) params))
+               (`("G" nil ,(and (pred listp) params))
                 (eat--cur-horizontal-abs (caar params)))
                ;; CSI <n> ; <m> H
                ;; CSI <n> ; <m> f
-               (`(,(or "H" "f") . ,(and (pred listp) params))
+               (`(,(or "H" "f") nil ,(and (pred listp) params))
                 (eat--goto (caar params) (caadr params)))
                ;; CSI <n> J.
-               (`("J" . ,(and (pred listp) params))
+               (`("J" nil ,(and (pred listp) params))
                 (eat--erase-in-disp (caar params)))
                ;; CSI <n> K.
-               (`("K" . ,(and (pred listp) params))
+               (`("K" nil ,(and (pred listp) params))
                 (eat--erase-in-line (caar params)))
                ;; CSI <n> L.
-               (`("L" . ,(and (pred listp) params))
+               (`("L" nil ,(and (pred listp) params))
                 (eat--insert-line (caar params)))
                ;; CSI <n> M.
-               (`("M" . ,(and (pred listp) params))
+               (`("M" nil ,(and (pred listp) params))
                 (eat--delete-line (caar params)))
                ;; CSI <n> P.
-               (`("P" . ,(and (pred listp) params))
+               (`("P" nil ,(and (pred listp) params))
                 (eat--delete-char (caar params)))
                ;; CSI <n> S.
-               (`("S" . ,(and (pred listp) params))
+               (`("S" nil ,(and (pred listp) params))
                 (eat--scroll-up (caar params)))
                ;; CSI <n> T.
-               (`("T" . ,(and (pred listp) params))
+               (`("T" nil ,(and (pred listp) params))
                 (eat--scroll-down (caar params)))
                ;; CSI <n> X.
-               (`("X" . ,(and (pred listp) params))
+               (`("X" nil ,(and (pred listp) params))
                 (eat--erase-char (caar params)))
                ;; CSI <n> Z.
-               (`("Z" . ,(and (pred listp) params))
+               (`("Z" nil ,(and (pred listp) params))
                 (eat--horizontal-backtab (caar params)))
                ;; CSI <n> d.
-               (`("d" . ,(and (pred listp) params))
+               (`("d" nil ,(and (pred listp) params))
                 (eat--cur-vertical-abs (caar params)))
+               ;; CSI ... h
+               (`("h" ,format ,(and (pred listp) params))
+                (eat--set-modes params format))
+               ;; CSI ... l
+               (`("l" ,format ,(and (pred listp) params))
+                (eat--reset-modes params format))
                ;; CSI ... m
-               (`("m" . ,(and (pred listp) params))
+               (`("m" nil ,(and (pred listp) params))
                 (eat--set-sgr-params params))
                ;; CSI 6 n
-               ('("n" . ((6)))
+               ('("n" nil ((6)))
                 (eat--device-status-report))
                ;; CSI <n> ; <n> r
-               (`("r" . ,(and (pred listp) params))
+               (`("r" nil ,(and (pred listp) params))
                 (eat--change-scroll-region (caar params)
-                                           (caadr params)))
-               ;; CSI ? 2 5 h
-               ('("h" . "?25")
-                (eat--default-cursor))
-               ;; CSI ? 1 2 ; 2 5 h
-               ('("h" . "?12;25")
-                (eat--very-visible-cursor))
-               ;; CSI ? 2 5 l
-               ('("l" . "?25")
-                (eat--invisible-cursor))
-               ;; CSI ? 1 0 4 9 h
-               ('("h" . "?1049")
-                (eat--enable-alt-disp))
-               ;; CSI ? 1 0 4 9 l
-               ('("l" . "?1049")
-                (eat--disable-alt-disp))
-               ;; CSI ? 2 0 0 4 l
-               ('("l" . "?2004")
-                (eat--disable-bracketed-yank))
-               ;; CSI ? 2 0 0 4 h
-               ('("h" . "?2004")
-                (eat--enable-bracketed-yank))
-               ;; CSI ? 9 h
-               ('("h" . "?9")
-                (eat--enable-x10-mouse))
-               ;; CSI ? 1 0 0 0 h
-               ('("h" . "?1000")
-                (eat--enable-normal-mouse))
-               ;; CSI ? 1 0 0 2 h
-               ('("h" . "?1002")
-                (eat--enable-button-event-mouse))
-               ;; CSI ? 1 0 0 3 h
-               ('("h" . "?1003")
-                (eat--enable-any-event-mouse))
-               ;; CSI ? 1 0 0 4 h
-               ('("h" . "?1004")
-                (eat--enable-focus-event))
-               ;; CSI ? 1 0 0 6 h
-               ('("h" . "?1006")
-                (eat--enable-sgr-mouse-encoding))
-               ;; CSI ? 9 l
-               ;; CSI ? 1 0 0 0 l
-               ;; CSI ? 1 0 0 2 l
-               ;; CSI ? 1 0 0 3 l
-               (`("l" . ,(or "?9" "?1000" "?1002" "?1003"))
-                (eat--disable-mouse))
-               ;; CSI ? 1 0 0 4 l
-               ('("l" . "?1004")
-                (eat--disable-focus-event))
-               ;; CSI ? 1 0 0 6 l
-               ('("l" . "?1006")
-                (eat--disable-sgr-mouse-encoding))))))
+                                           (caadr params)))))))
         (`(,(and (or 'read-dcs 'read-osc 'read-pm 'read-apc)
                  state)
            ,buf)
