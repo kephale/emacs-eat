@@ -1,0 +1,252 @@
+* How developers contribute to Eat
+
+Here is how software developers can contribute to Eat.
+
+** Documenting your changes
+
+Any change that matters to end-users should have an entry in etc/NEWS.
+Try to start each NEWS entry with a sentence that summarizes the entry
+and takes just one line -- this will allow to read NEWS in Outline
+mode after hiding the body of each entry.
+
+Doc-strings should be updated together with the code.
+
+Think about whether your change requires updating the manuals.  If you
+know it does not, mark the NEWS entry with "---".  If you know
+that *all* the necessary documentation updates have been made as part
+of your changes or those by others, mark the entry with "+++".
+Otherwise do not mark it.
+
+If your change requires updating the manuals to document new
+functions/commands/variables/faces, then use the proper Texinfo
+command to index them; for instance, use @vindex for variables and
+@findex for functions/commands.  For the full list of predefined indices, see
+https://www.gnu.org/software/texinfo/manual/texinfo/html_node/Predefined-Indices.html
+or run the shell command 'info "(texinfo)Predefined Indices"'.
+
+We prefer American English both in doc strings and in the manuals,
+just like Emacs.  That includes both spelling (e.g., "behavior", not
+"behaviour") and the convention of leaving 2 spaces between sentences.
+
+Eat follows Emacs doc style.  For more specific tips on Emacs's doc style, see
+https://www.gnu.org/software/emacs/manual/html_node/elisp/Documentation-Tips.html
+Use 'checkdoc' to check for documentation errors before submitting a
+patch.
+
+** Testing your changes
+
+Please test your changes before committing them or sending them to the
+list.  "make check" runs all the tests.  If possible, add a new test
+along with any bug fix or new functionality you commit (of course,
+some changes cannot be easily tested, but the terminal emulator part
+should be as much tested as possible).
+
+Eat uses ERT, Emacs Lisp Regression Testing, for testing.  See
+https://www.gnu.org/software/emacs/manual/html_node/ert/ or run
+'info "(ert)"' for more information on writing and running tests.
+
+If your test lasts longer than some few seconds, mark it in its
+'ert-deftest' definition with ":tags '(:expensive-test)".
+
+** Commit messages
+
+Ordinarily, a change you commit should contain a log entry in its
+commit message and should not touch the repository's ChangeLog files.
+Here is an example commit message (indented):
+
+	Deactivate shifted region
+
+	Do not silently extend a region that is not highlighted;
+	this can happen after a shift (Bug#19003).
+	* doc/emacs/mark.texi (Shift Selection): Document the change.
+	* lisp/window.el (handle-select-window):
+	* src/frame.c (Fhandle_switch_frame, Fselected_frame):
+	Deactivate the mark.
+
+Here are guidelines for formatting commit message:
+
+- Start with a single unindented summary line explaining the change;
+  do not end this line with a period.  If possible, try to keep the
+  summary line to 50 characters or fewer; this is for compatibility
+  with certain Git commands that print that line in width-constrained
+  contexts.
+
+  If the summary line starts with a semicolon and a space "; ", the
+  commit message will be ignored when generating the ChangeLog file.
+  Use this for minor commits that do not need separate ChangeLog
+  entries, such as changes in etc/NEWS.
+
+- After the summary line, there should be an empty line.
+
+- Unindented ChangeLog entries normally come next.  However, if the
+  commit couldn't be properly summarized in the brief summary line,
+  you can put a paragraph (after the empty line and before the
+  individual ChangeLog entries) that further describes the commit.
+
+- Lines in ChangeLog entries should preferably be not longer than 63
+  characters, and must not exceed 78 characters, unless they consist
+  of a single word of at most 140 characters; this 78/140 limit is
+  enforced by a commit hook.
+
+- If only a single file is changed, the summary line can be the normal
+  file first line (starting with the asterisk).  Then there is no
+  individual files section.
+
+- If the commit has more than one author, the commit message should
+  contain separate lines to mention the other authors, like the
+  following:
+
+	Co-authored-by: Joe Schmoe <j.schmoe@example.org>
+
+- If the commit is a tiny change that is exempt from copyright paperwork,
+  the commit message should contain a separate line like the following:
+
+	Copyright-paperwork-exempt: yes
+
+- The commit message should not contain any reference to any Codeberg
+  issue.
+
+- The commit message should contain "Bug#NNNNN" if it is related to
+  bug number NNNNN in the debbugs database.  This string is often
+  parenthesized, as in "(Bug#19003)".
+
+- When citing URLs, prefer https: to http: when either will do.
+
+- Commit messages should contain only printable UTF-8 characters.
+
+- Commit messages should not contain the "Signed-off-by:" lines that
+  are used in some other projects.
+
+- Any lines of the commit message that start with "; " are omitted
+  from the generated ChangeLog.
+
+- Explaining the rationale for a design choice is best done in comments
+  in the source code.  However, sometimes it is useful to describe just
+  the rationale for a change; that can be done in the commit message
+  between the summary line and the file entries.
+
+- Eat follows the GNU coding standards for ChangeLogs: see
+  https://www.gnu.org/prep/standards/html_node/Change-Logs.html
+  or run 'info "(standards)Change Logs"'.
+
+- Some commenting rules in the GNU coding standards also apply
+  to ChangeLog entries: they must be in English, and be complete
+  sentences starting with a capital and ending with a period (except
+  the summary line should not end in a period).  See
+  https://www.gnu.org/prep/standards/html_node/Comments.html
+  or run 'info "(standards)Comments"'.  American English is preferred
+  in Eat, just like Emacs; that includes spelling and leaving 2 blanks
+  between sentences.
+
+  They are preserved indefinitely, and have a reasonable chance of
+  being read in the future, so it's better that they have good
+  presentation.
+
+- Use the present tense; describe "what the change does", not "what
+  the change did".
+
+- Preferred form for several entries with the same content:
+
+	* lisp/menu-bar.el (clipboard-yank, clipboard-kill-ring-save)
+	(clipboard-kill-region):
+	* lisp/eshell/esh-io.el (eshell-virtual-targets)
+	(eshell-clipboard-append):
+	Replace option gui-select-enable-clipboard with
+	select-enable-clipboard; renamed October 2014.  (Bug#25145)
+
+  (Rather than anything involving "ditto" and suchlike.)
+
+- There is no standard or recommended way to identify revisions in
+  ChangeLog entries.  Using Git SHA1 values limits the usability of
+  the references to Git, and will become much less useful if Eat.
+  switches to a different VCS.  So we recommend against doing only that.
+
+  One way to identify revisions is by quoting their summary line.
+  Prefixing the summary with the commit date can give useful context
+  (use 'git show -s "--pretty=format:%cd \"%s\"" --date=short HASH' to
+  produce that).  Often, "my previous commit" will suffice.
+
+- There is no need to mention files such as NEWS and MAINTAINERS, or
+  to indicate regeneration of files such as 'lib/gnulib.mk', in the
+  ChangeLog entry.  "There is no need" means you don't have to, but
+  you can if you want to.
+
+** Committing your changes.
+
+Your commit message must meet the following critiria:
+
+- commit log message must not be empty;
+- the first line of the commit log message doesn't start with
+  whitespace characters;
+- the second line of the commit log message must be empty;
+- commit log message should include only valid printable ASCII and
+  UTF-8 characters;
+- commit log message lines must be shorter than 79 characters, unless
+  a line consists of a single long word, in which case that word can
+  be up to 140 characters long;
+- there shouldn't be any "Signed-off-by:" tags in the commit log
+  message, and "git commit" should not be invoked with the '-s' option
+  (which automatically adds "Signed-off-by:");
+- if the commit adds new files, the file names must not begin with
+  '-' and must consist of ASCII letters, digits, and characters of the
+  set [-+./_];
+- the changes don't include unresolved merge conflict markers;
+- the changes don't introduce whitespace errors: trailing whitespace,
+  lines that include nothing but whitespace characters, and indented
+  lines where a SPC character is immediately followed by a TAB in the
+  line's initial indentation
+
+This is not enforced right now, but it'll happen eventually.
+
+** Committing changes by others
+
+If committing changes written by someone else, commit in their name,
+not yours.  You can use 'git commit --author="AUTHOR"' to specify a
+change's author.  When using Emacs VC to commit, the author can be
+specified in the log-edit buffer by adding an "Author: AUTHOR" header
+line (set 'log-edit-setup-add-author' non-nil to have this header line
+added automatically).  Note that the validity checks described in the
+previous section are still applied, so you will have to correct any
+problems they uncover in the changes submitted by others.
+
+** git vs rename
+
+Git does not explicitly represent a file renaming; it uses a percent
+changed heuristic to deduce that a file was renamed.  So if you are
+planning to make extensive changes to a file after renaming it (or
+moving it to another directory), you should:
+
+- Create a feature branch.
+
+- Commit the rename without any changes.
+
+- Make other changes.
+
+- Merge the feature branch to the master branch, instead of squashing
+  the commits into one.  The commit message on this merge should
+  summarize the renames and all the changes.
+
+
+
+Adapted from CONTRIBUTE in Emacs source tree.
+
+This file is part of Eat and is not part of GNU Emacs.
+
+Eat is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Eat is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
+
+Local variables:
+mode: outline
+paragraph-separate: "[ 	]*$"
+coding: utf-8
+end:
