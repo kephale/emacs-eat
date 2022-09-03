@@ -161,6 +161,24 @@ display."
           (function :tag "Function"))
   :group 'eat-term)
 
+(defcustom eat-minimum-latency 0.008
+  "Minimum display latency in seconds.
+
+Lowering it too much may cause (or increase) flickering and decrease
+performance due to too many redisplay.  Try to increase this value if
+the terminal flickers."
+  :type 'number
+  :group 'eat-ui)
+
+(defcustom eat-maximum-latency 0.033
+  "Minimum display latency in seconds.
+
+Increasing it too much may make the terminal feel less responsive.
+Try to increase this value if the terminal flickers.  Try to lower the
+value if the terminal feels less responsive."
+  :type 'number
+  :group 'eat-ui)
+
 (defcustom eat-term-terminfo-directory
   (file-name-directory (or load-file-name buffer-file-name))
   "Directory where Terminfo database of variable `eat-term-name'."
@@ -2175,6 +2193,7 @@ EXCEPTIONS is a list of event, which won't be bound."
        for i from ?\C-@ to ?\C-_
        do (unless (= i ?\e)
             (define-key map `[,i] input-command)))
+      (define-key map [?\C--] input-command)
       (define-key map [?\C-?] input-command))
     (when (memq :control-meta-ascii categories)
       (cl-loop
@@ -2398,6 +2417,17 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 
 (defvar eat--synchronize-scroll-function nil
   "Function to synchronize scrolling between terminal and window.")
+
+(defvar eat--pending-output-chunks nil
+  "The list of pending output chunks.
+
+The output chunks are pushed, so last output appears first.")
+
+(defvar eat--output-queue-first-chunk-time nil
+  "Time when the first chunk in the current output queue was pushed.")
+
+(defvar eat--process-output-queue-timer nil
+  "Timer to process output queue.")
 
 (defun eat-self-input (n &optional e)
   "Send E as input N times.
@@ -2661,6 +2691,9 @@ ARG is passed to `yank-pop', which see."
   (make-local-variable 'eat--process)
   (make-local-variable 'eat--synchronize-scroll-function)
   (make-local-variable 'eat--mouse-grabbing-type)
+  (make-local-variable 'eat--pending-output-chunks)
+  (make-local-variable 'eat--output-queue-first-chunk-time)
+  (make-local-variable 'eat--process-output-queue-timer)
   ;; This is intended; input methods don't work on read-only buffers.
   (setq buffer-read-only nil)
   (setq buffer-undo-list t)
@@ -2740,7 +2773,8 @@ ARG is passed to `yank-pop', which see."
 
 (defun eat--send-input (_ input)
   "Send INPUT to subprocess."
-  (eat--send-string eat--process input))
+  (when eat--process
+    (eat--send-string eat--process input)))
 
 (defvar eat--cursor-blink-state nil
   "Current state of slowly blinking text, non-nil means invisible.")
@@ -2878,14 +2912,21 @@ MODE should one of:
      (eat--mouse-modifier-click-mode -1)
      (eat--mouse-movement-mode -1))))
 
-(defun eat--filter (process output)
-  "Handle OUTPUT from PROCESS."
-  (when (buffer-live-p (process-buffer process))
-    (with-current-buffer (process-buffer process)
-      (let ((inhibit-read-only t)
+(defun eat--process-output-queue (buffer)
+  "Process the output queue on BUFFER."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((inhibit-quit t)            ; Don't disturb!
+            (inhibit-read-only t)
             (set-cursor (= (eat-term-display-cursor eat--terminal)
                            (point))))
-        (eat-term-process-output eat--terminal output)
+        (when eat--process-output-queue-timer
+          (cancel-timer eat--process-output-queue-timer))
+        (let ((queue eat--pending-output-chunks))
+          (setq eat--pending-output-chunks nil)
+          (setq eat--output-queue-first-chunk-time nil)
+          (dolist (output (nreverse queue))
+            (eat-term-process-output eat--terminal output)))
         (eat-term-redisplay eat--terminal)
         ;; Truncate output of previous dead processes.
         (delete-region
@@ -2895,6 +2936,27 @@ MODE should one of:
                  eat-term-scrollback-size)))
         (when set-cursor
           (funcall eat--synchronize-scroll-function))))))
+
+(defun eat--filter (process output)
+  "Handle OUTPUT from PROCESS."
+  (when (buffer-live-p (process-buffer process))
+    (with-current-buffer (process-buffer process)
+      (when eat--process-output-queue-timer
+        (cancel-timer eat--process-output-queue-timer))
+      (unless eat--output-queue-first-chunk-time
+        (setq eat--output-queue-first-chunk-time (current-time)))
+      (push output eat--pending-output-chunks)
+      (let ((time-left
+             (- eat-maximum-latency
+                (float-time
+                 (time-subtract
+                  nil eat--output-queue-first-chunk-time)))))
+        (if (<= time-left 0)
+            (eat--process-output-queue (current-buffer))
+          (setq eat--process-output-queue-timer
+                (run-with-timer
+                 (min time-left eat-minimum-latency) nil
+                 #'eat--process-output-queue (current-buffer))))))))
 
 (defun eat--sentinel (process message)
   "Sentinel for Eat buffers.
@@ -2908,6 +2970,7 @@ MODE should one of:
               (kill-buffer buffer)
             (with-current-buffer buffer
               (let ((inhibit-read-only t))
+                (eat--process-output-queue (current-buffer))
                 (eat-emacs-mode)
                 (setq eat--process nil)
                 (delete-process process)
