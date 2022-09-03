@@ -2514,7 +2514,8 @@ ARG is passed to `yank-pop', which see."
   "Perform a terminal reset."
   (interactive)
   (when eat--terminal
-    (eat-term-reset eat--terminal)))
+    (let ((inhibit-read-only t))
+      (eat-term-reset eat--terminal))))
 
 (defun eat-kill-process ()
   "Kill Eat process in current buffer."
