@@ -1280,14 +1280,18 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
          (setf (eat--face-bg face) (aref eat-color-palette
                                          (- color 92))))))
     (setf (eat--face-face face)
-          `(,@(when-let ((fg (if (eat--face-conceal face)
-                                 (eat--face-bg face)
-                               (eat--face-fg face))))
+          `(,@(when-let ((fg (or (if (eat--face-conceal face)
+                                     (eat--face-bg face)
+                                   (eat--face-fg face))
+                                 (and (eat--face-inverse face)
+                                      (face-foreground 'default)))))
                 (list (if (eat--face-inverse face)
                           :background
                         :foreground)
                       fg))
-            ,@(when-let ((bg (eat--face-bg face)))
+            ,@(when-let ((bg (or (eat--face-bg face)
+                                 (and (eat--face-inverse face)
+                                      (face-background 'default)))))
                 (list (if (eat--face-inverse face)
                           :foreground
                         :background)
