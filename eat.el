@@ -2560,12 +2560,12 @@ ARG is passed to `yank-pop', which see."
 (defvar eat-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?\C-c ?\C-j] #'eat-char-mode)
-    (define-key map [?\C-c ?\C-l] #'eat-line-mode)
+    (define-key map [?\C-c ?\C-l] #'eat-semi-char-mode)
     (define-key map [?\C-c ?\C-k] #'eat-kill-process)
     map)
   "Keymap for Eat mode.")
 
-(defvar eat-line-mode-map
+(defvar eat-semi-char-mode-map
   (let ((map (eat-term-make-keymap
               #'eat-self-input
               '( :ascii :meta-ascii :control-ascii :control-meta-ascii
@@ -2578,7 +2578,7 @@ ARG is passed to `yank-pop', which see."
     (define-key map [?\C-c ?\C-c] #'eat-self-input)
     (define-key map [?\C-c ?\C-e] #'eat-emacs-mode)
     map)
-  "Keymap for Eat line mode.")
+  "Keymap for Eat semi-char mode.")
 
 (defvar eat-char-mode-map
   (let ((map (eat-term-make-keymap
@@ -2586,7 +2586,7 @@ ARG is passed to `yank-pop', which see."
               '( :ascii :meta-ascii :control-ascii :control-meta-ascii
                  :arrow :control-arrow :navigation :function)
               nil)))
-    (define-key map [?\C-\M-m] #'eat-line-mode)
+    (define-key map [?\C-\M-m] #'eat-semi-char-mode)
     map)
   "Keymap for Eat char mode.")
 
@@ -2605,10 +2605,10 @@ ARG is passed to `yank-pop', which see."
 (defvar eat--mouse-grabbing-type nil
   "Current mouse grabbing type/mode.")
 
-(define-minor-mode eat--line-mode
-  "Minor mode for line mode keymap."
+(define-minor-mode eat--semi-char-mode
+  "Minor mode for semi-char mode keymap."
   :interactive nil
-  :keymap eat-line-mode-map)
+  :keymap eat-semi-char-mode-map)
 
 (define-minor-mode eat--char-mode
   "Minor mode for char mode keymap."
@@ -2630,20 +2630,20 @@ ARG is passed to `yank-pop', which see."
 (defun eat-emacs-mode ()
   "Switch to Emacs keybindings mode."
   (interactive)
-  (eat--line-mode -1)
+  (eat--semi-char-mode -1)
   (eat--char-mode -1)
   (setq buffer-read-only t)
   (eat--grab-mouse nil eat--mouse-grabbing-type)
   (force-mode-line-update))
 
-(defun eat-line-mode ()
-  "Switch to line mode."
+(defun eat-semi-char-mode ()
+  "Switch to semi-char mode."
   (interactive)
   (if (not (or eat--process eat--terminal))
       (error "Process not running")
     (setq buffer-read-only nil)
     (eat--char-mode -1)
-    (eat--line-mode +1)
+    (eat--semi-char-mode +1)
     (eat--grab-mouse nil eat--mouse-grabbing-type)
     (force-mode-line-update)))
 
@@ -2653,7 +2653,7 @@ ARG is passed to `yank-pop', which see."
   (if (not (or eat--process eat--terminal))
       (error "Process not running")
     (setq buffer-read-only nil)
-    (eat--line-mode -1)
+    (eat--semi-char-mode -1)
     (eat--char-mode +1)
     (eat--grab-mouse nil eat--mouse-grabbing-type)
     (force-mode-line-update)))
@@ -2708,10 +2708,10 @@ ARG is passed to `yank-pop', which see."
           (:eval
            (when eat--process
              (cond
-              (eat--line-mode
+              (eat--semi-char-mode
                `("["
                  (:propertize
-                  "line"
+                  "semi-char"
                   help-echo
                   ,(concat "mouse-1: Switch to char mode, "
                            "mouse-3: Switch to emacs mode")
@@ -2728,14 +2728,14 @@ ARG is passed to `yank-pop', which see."
                  (:propertize
                   "char"
                   help-echo
-                  ,(concat "mouse-1: Switch to line mode, "
+                  ,(concat "mouse-1: Switch to semi-char mode, "
                            "mouse-3: Switch to emacs mode")
                   mouse-face mode-line-highlight
                   local-map
                   (keymap
                    (mode-line
                     . (keymap
-                       (down-mouse-1 . eat-line-mode)
+                       (down-mouse-1 . eat-semi-char-mode)
                        (down-mouse-3 . eat-emacs-mode)))))
                  "]"))
               (t
@@ -2743,14 +2743,14 @@ ARG is passed to `yank-pop', which see."
                  (:propertize
                   "emacs"
                   help-echo
-                  ,(concat "mouse-1: Switch to line mode, "
+                  ,(concat "mouse-1: Switch to semi char mode, "
                            "mouse-3: Switch to char mode")
                   mouse-face mode-line-highlight
                   local-map
                   (keymap
                    (mode-line
                     . (keymap
-                       (down-mouse-1 . eat-line-mode)
+                       (down-mouse-1 . eat-semi-char-mode)
                        (down-mouse-3 . eat-char-mode)))))
                  "]")))))
           ":%s"))
@@ -2841,7 +2841,7 @@ ARG is passed to `yank-pop', which see."
     (kill-local-variable 'eat--cursor-blink-state)
     (kill-local-variable 'eat--cursor-blink-timer))))
 
-(defvar eat--eshell-line-mode)
+(defvar eat--eshell-semi-char-mode)
 (defvar eat--eshell-char-mode)
 
 (defun eat--set-cursor (_ state)
@@ -2890,9 +2890,9 @@ MODE should one of:
   Any other value    Disable mouse."
   (setq eat--mouse-grabbing-type mode)
   (pcase (and eat-enable-mouse
-              (or eat--line-mode
+              (or eat--semi-char-mode
                   eat--char-mode
-                  eat--eshell-line-mode
+                  eat--eshell-semi-char-mode
                   eat--eshell-char-mode)
               mode)
     (:all
@@ -3009,7 +3009,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
       (unless (= (point-min) (point-max))
         (insert "\n\n"))
       (setq eat--terminal (eat-term-make (current-buffer) (point)))
-      (eat-line-mode)
+      (eat-semi-char-mode)
       (when-let ((window (get-buffer-window nil t)))
         (with-selected-window window
           (eat-term-resize eat--terminal (window-max-chars-per-line)
@@ -3119,12 +3119,12 @@ PROGRAM can be a shell command."
 
 (defvar eat-eshell-emacs-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?\C-c ?\C-l] #'eat-eshell-line-mode)
+    (define-key map [?\C-c ?\C-l] #'eat-eshell-semi-char-mode)
     (define-key map [?\C-c ?\C-j] #'eat-eshell-char-mode)
     map)
   "Keymap for Eat Eshell when no process is running.")
 
-(defvar eat-eshell-line-mode-map
+(defvar eat-eshell-semi-char-mode-map
   (let ((map (eat-term-make-keymap
               #'eat-self-input
               '( :ascii :meta-ascii :control-ascii :control-meta-ascii
@@ -3137,7 +3137,7 @@ PROGRAM can be a shell command."
     (define-key map [?\C-c ?\C-e] #'eat-eshell-emacs-mode)
     (define-key map [?\C-c ?\C-j] #'eat-eshell-char-mode)
     map)
-  "Keymap for Eat Eshell line mode.")
+  "Keymap for Eat Eshell semi-char mode.")
 
 (defvar eat-eshell-char-mode-map
   (let ((map (eat-term-make-keymap
@@ -3145,24 +3145,25 @@ PROGRAM can be a shell command."
               '( :ascii :meta-ascii :control-ascii :control-meta-ascii
                  :arrow :control-arrow :navigation :function)
               nil)))
-    (define-key map [?\C-\M-m] #'eat-eshell-line-mode)
+    (define-key map [?\C-\M-m] #'eat-eshell-semi-char-mode)
     map)
   "Keymap for Eat Eshell char mode.")
 
-(define-minor-mode eat--eshell-line-mode
-  "Minor mode for line mode keymap."
+(define-minor-mode eat--eshell-semi-char-mode
+  "Minor mode for semi-char mode keymap."
   :interactive nil
-  :keymap eat-eshell-line-mode-map
+  :keymap eat-eshell-semi-char-mode-map
   ;; HACK: Some keys like `C-c' are overriden by other keymaps
   ;; (possibly by the keymaps of other minor modes), so we also put
   ;; the keymap to `minor-mode-overriding-map-alist' to make Emacs
   ;; prioritize us.
   (setq minor-mode-overriding-map-alist
-        (delete (cons #'eat--eshell-line-mode
-                      eat-eshell-line-mode-map)
+        (delete (cons #'eat--eshell-semi-char-mode
+                      eat-eshell-semi-char-mode-map)
                 minor-mode-overriding-map-alist))
-  (when eat--eshell-line-mode
-    (push (cons #'eat--eshell-line-mode eat-eshell-line-mode-map)
+  (when eat--eshell-semi-char-mode
+    (push (cons #'eat--eshell-semi-char-mode
+                eat-eshell-semi-char-mode-map)
           minor-mode-overriding-map-alist)))
 
 (define-minor-mode eat--eshell-char-mode
@@ -3184,19 +3185,19 @@ PROGRAM can be a shell command."
 (defun eat-eshell-emacs-mode ()
   "Switch to Emacs keybindings mode."
   (interactive)
-  (eat--eshell-line-mode -1)
+  (eat--eshell-semi-char-mode -1)
   (eat--eshell-char-mode -1)
   (setq buffer-read-only t)
   (eat--grab-mouse nil eat--mouse-grabbing-type)
   (force-mode-line-update))
 
-(defun eat-eshell-line-mode ()
-  "Switch to line mode."
+(defun eat-eshell-semi-char-mode ()
+  "Switch to semi-char mode."
   (interactive)
   (when eat--terminal
     (setq buffer-read-only nil)
     (eat--eshell-char-mode -1)
-    (eat--eshell-line-mode +1)
+    (eat--eshell-semi-char-mode +1)
     (eat--grab-mouse nil eat--mouse-grabbing-type)
     (force-mode-line-update)))
 
@@ -3205,7 +3206,7 @@ PROGRAM can be a shell command."
   (interactive)
   (when eat--terminal
     (setq buffer-read-only nil)
-    (eat--eshell-line-mode -1)
+    (eat--eshell-semi-char-mode -1)
     (eat--eshell-char-mode +1)
     (eat--grab-mouse nil eat--mouse-grabbing-type)
     (force-mode-line-update)))
@@ -3270,7 +3271,7 @@ PROGRAM can be a shell command."
                          (window-text-height))))
     (make-local-variable 'eshell-output-filter-functions)
     (setq eshell-output-filter-functions '(eat--eshell-output-filter))
-    (eat-eshell-line-mode)
+    (eat-eshell-semi-char-mode)
     (eat--cursor-blink-mode -1)))
 
 (defun eat--eshell-cleanup ()
@@ -3289,7 +3290,7 @@ PROGRAM can be a shell command."
       (setq eat--terminal nil)
       (setq eat--process nil)
       (kill-local-variable 'eshell-output-filter-functions)
-      (eat--eshell-line-mode -1)
+      (eat--eshell-semi-char-mode -1)
       (eat--eshell-char-mode -1))))
 
 (defun eat--eshell-process-output-queue (process buffer)
@@ -3431,10 +3432,10 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
              (:eval
               (when eat--terminal
                 (cond
-                 (eat--eshell-line-mode
+                 (eat--eshell-semi-char-mode
                   `("["
                     (:propertize
-                     "line"
+                     "semi-char"
                      help-echo
                      ,(concat "mouse-1: Switch to char mode, "
                               "mouse-3: Switch to emacs mode")
@@ -3451,14 +3452,14 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                     (:propertize
                      "char"
                      help-echo
-                     ,(concat "mouse-1: Switch to line mode, "
+                     ,(concat "mouse-1: Switch to semi-char mode, "
                               "mouse-3: Switch to emacs mode")
                      mouse-face mode-line-highlight
                      local-map
                      (keymap
                       (mode-line
                        . (keymap
-                          (down-mouse-1 . eat-eshell-line-mode)
+                          (down-mouse-1 . eat-eshell-semi-char-mode)
                           (down-mouse-3 . eat-eshell-emacs-mode)))))
                     "]"))
                  (t
@@ -3466,14 +3467,14 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                     (:propertize
                      "emacs"
                      help-echo
-                     ,(concat "mouse-1: Switch to line mode, "
+                     ,(concat "mouse-1: Switch to semi-char mode, "
                               "mouse-3: Switch to char mode")
                      mouse-face mode-line-highlight
                      local-map
                      (keymap
                       (mode-line
                        . (keymap
-                          (down-mouse-1 . eat-eshell-line-mode)
+                          (down-mouse-1 . eat-eshell-semi-char-mode)
                           (down-mouse-3 . eat-eshell-char-mode)))))
                     "]")))))))
   (defvar eshell-variable-aliases-list) ; In `esh-var'.
@@ -3591,7 +3592,7 @@ allowed."
                              #'eat--eshell-visual-sentinel)
               (set-process-sentinel proc sentinel))
           (error "Failed to invoke visual command")))
-      (eat-line-mode)))
+      (eat-semi-char-mode)))
   nil)
 
 ;;;###autoload
