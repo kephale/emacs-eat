@@ -163,7 +163,6 @@ eat-color|Emacs Eat with eight colors,
   colors#0x8,
   pairs#0x40,
   op=\e[39;49m,
-  oc=\e[39;49;59m,
   setab=\e[4%p1%dm,
   setaf=\e[3%p1%dm,
 
