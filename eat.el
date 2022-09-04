@@ -3305,23 +3305,26 @@ PROGRAM can be a shell command."
   "Process output STRING from PROCESS."
   (when (buffer-live-p (process-buffer process))
     (with-current-buffer (process-buffer process)
-      (when eat--process-output-queue-timer
-        (cancel-timer eat--process-output-queue-timer))
-      (unless eat--output-queue-first-chunk-time
-        (setq eat--output-queue-first-chunk-time (current-time)))
-      (push string eat--pending-output-chunks)
-      (let ((time-left
-             (- eat-maximum-latency
-                (float-time
-                 (time-subtract
-                  nil eat--output-queue-first-chunk-time)))))
-        (if (<= time-left 0)
-            (eat--eshell-process-output-queue
-             process (current-buffer))
-          (setq eat--process-output-queue-timer
-                (run-with-timer (min time-left eat-minimum-latency)
-                                nil #'eat--eshell-process-output-queue
-                                process (current-buffer))))))))
+      (if (not eat--terminal)
+          (eshell-output-filter process string)
+        (when eat--process-output-queue-timer
+          (cancel-timer eat--process-output-queue-timer))
+        (unless eat--output-queue-first-chunk-time
+          (setq eat--output-queue-first-chunk-time (current-time)))
+        (push string eat--pending-output-chunks)
+        (let ((time-left
+               (- eat-maximum-latency
+                  (float-time
+                   (time-subtract
+                    nil eat--output-queue-first-chunk-time)))))
+          (if (<= time-left 0)
+              (eat--eshell-process-output-queue
+               process (current-buffer))
+            (setq eat--process-output-queue-timer
+                  (run-with-timer
+                   (min time-left eat-minimum-latency) nil
+                   #'eat--eshell-process-output-queue process
+                   (current-buffer)))))))))
 
 (defun eat--eshell-sentinel (process message)
   "Process status message MESSAGE from PROCESS."
