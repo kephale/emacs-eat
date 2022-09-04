@@ -1999,10 +1999,10 @@ client process may get confused."
            (when (numberp char)
              (let ((base (event-basic-type char))
                    (mods (event-modifiers char)))
-               (if (and (memq 'control mods) (memq 'meta mods))
-                   (setq mods (delq 'shift mods)))
+               (when (memq 'control mods)
+                 (setq mods (delq 'shift mods)))
                (let ((ch (event-convert-list
-                          (append (delq 'meta mods) (list base)))))
+                          (append (remq 'meta mods) (list base)))))
                  (send (cond
                         ((and (memq 'meta mods) (memq ch '(?\[ ?O)))
                          "\e\e")
