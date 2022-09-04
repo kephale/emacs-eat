@@ -26,7 +26,52 @@
 
 ;;; Commentary:
 
-;; TODO.
+;; Eat's name self-explainary, it stands "Emulate A Terminal".  Eat is
+;; a terminal emulator.  It can run most (if not all) full-screen
+;; terminal programs, including Emacs.
+
+;; It is pretty fast, almost twice as fast as Term, despite being
+;; implemented entirely in Emacs Lisp.  So fast that you can
+;; comfortably run Emacs inside Eat, or even use your Emacs as a
+;; terminal multiplexer.
+
+;; It has many feature that other Emacs terminal emulator still don't
+;; have, for example complete mouse support.
+
+;; It flickers less than other Emacs terminal emulator, so you get
+;; more performance and a smooth experience.
+
+;; To start Eat, run M-x eat.  Eat has three keybinding modes:
+
+;;   * "emacs" mode: No special keybinding, except the following:
+
+;;       * `C-c' `C-s': Switch to semi-char mode.
+;;       * `C-c' `C-j': Switch to char mode.
+;;       * `C-c' `C-k': Kill process.
+
+;;   * "semi-char" mode: Most keys are bound to send the key to the
+;;     terminal, except the following keys: `C-\' `C-c' `C-x' `C-g'
+;;     `C-h' `C-M-c' `C-u' `M-x' `M-:' `M-!' `M-&'.  The following
+;;     special keybinding are available:
+
+;;       * `C-q': Send next key to the terminal.
+;;       * `C-y': Like `yank', but send the text to the terminal.
+;;       * `M-y': Like `yank-pop', but send the text to the terminal.
+;;       * `C-c' `C-k': Kill process.
+
+;;   * "char" mode: All supported keys are bound to send the key to
+;;     the terminal, except `C-M-m' or `M-RET', which is bound to
+;;     switch to semi-char mode.
+
+;; If you like Eshell, then there is a good news for you.  Eat
+;; integrates with Eshell.  Eat has two global minor modes for Eshell:
+
+;;   * `eat-eshell-visual-command-mode': Run visual commands with Eat
+;;     instead of Term.
+
+;;   * `eat-eshell-mode': Run Eat inside Eshell.  After enabling this,
+;;     you can run full-screen terminal programs directly in Eshell.
+;;     You have three keybinding modes here too.
 
 ;;; Code:
 
@@ -2560,7 +2605,7 @@ ARG is passed to `yank-pop', which see."
 (defvar eat-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?\C-c ?\C-j] #'eat-char-mode)
-    (define-key map [?\C-c ?\C-l] #'eat-semi-char-mode)
+    (define-key map [?\C-c ?\C-s] #'eat-semi-char-mode)
     (define-key map [?\C-c ?\C-k] #'eat-kill-process)
     map)
   "Keymap for Eat mode.")
@@ -3119,7 +3164,7 @@ PROGRAM can be a shell command."
 
 (defvar eat-eshell-emacs-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?\C-c ?\C-l] #'eat-eshell-semi-char-mode)
+    (define-key map [?\C-c ?\C-s] #'eat-eshell-semi-char-mode)
     (define-key map [?\C-c ?\C-j] #'eat-eshell-char-mode)
     map)
   "Keymap for Eat Eshell when no process is running.")
