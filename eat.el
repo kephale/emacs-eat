@@ -2922,9 +2922,9 @@ MODE should one of:
                            (point))))
         (when eat--process-output-queue-timer
           (cancel-timer eat--process-output-queue-timer))
+        (setq eat--output-queue-first-chunk-time nil)
         (let ((queue eat--pending-output-chunks))
           (setq eat--pending-output-chunks nil)
-          (setq eat--output-queue-first-chunk-time nil)
           (dolist (output (nreverse queue))
             (eat-term-process-output eat--terminal output)))
         (eat-term-redisplay eat--terminal)
@@ -3113,7 +3113,7 @@ PROGRAM can be a shell command."
 
 ;;;; Eshell integration.
 
-(defvar eat-eshell-mode-map
+(defvar eat-eshell-emacs-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?\C-c ?\C-l] #'eat-eshell-line-mode)
     (define-key map [?\C-c ?\C-j] #'eat-eshell-char-mode)
@@ -3206,52 +3206,12 @@ PROGRAM can be a shell command."
     (eat--grab-mouse nil eat--mouse-grabbing-type)
     (force-mode-line-update)))
 
-(defun eat--eshell-setup-proc-and-term (proc)
-  "Setup a PROC and a new terminal for it."
-  (setq eat--process proc)
-  (setq eat--terminal (eat-term-make (current-buffer)
-                                     (process-mark proc)))
-  (set-marker (process-mark proc) (eat-term-end eat--terminal))
-  (setf (eat-term-input-function eat--terminal) #'eat--send-input)
-  (setf (eat-term-set-cursor-function eat--terminal)
-        #'eat--set-cursor)
-  (setf (eat-term-grab-mouse-function eat--terminal)
-        #'eat--grab-mouse)
-  (when-let ((window (get-buffer-window nil t)))
-    (with-selected-window window
-      (eat-term-resize eat--terminal (window-max-chars-per-line)
-                       (window-text-height))))
-  (eat-eshell-line-mode)
-  (set (make-local-variable 'eshell-output-filter-functions)
-       '(eat--eshell-output-filter))
-  (kill-local-variable 'cursor-type)
-  (eat--cursor-blink-mode -1))
-
-(defun eat--eshell-cleanup ()
-  "Cleanup everything."
-  (defvar eshell-last-output-start) ; In `esh-mode'.
-  (defvar eshell-last-output-end) ; In `esh-mode'.
-  (when eat--terminal
-    (let ((inhibit-read-only t))
-      (goto-char (eat-term-end eat--terminal))
-      (unless (bolp)
-        (insert ?\n))
-      (set-marker eshell-last-output-start (point))
-      (set-marker eshell-last-output-end (point))
-      (eat-term-delete eat--terminal)
-      (kill-local-variable 'eshell-output-filter-functions)
-      (kill-local-variable 'cursor-type)
-      (eat--cursor-blink-mode -1)
-      (setq eat--terminal nil)
-      (setq eat--process nil)
-      (eat--eshell-line-mode -1)
-      (eat--eshell-char-mode -1))))
-
 (defun eat--eshell-output-filter ()
   "Handle output from subprocess."
   (defvar eshell-last-output-start) ; In `esh-mode'.
   (defvar eshell-last-output-end) ; In `esh-mode'.
-  (let ((inhibit-read-only t)
+  (let ((inhibit-quit t)            ; Don't disturb!
+        (inhibit-read-only t)
         (str (buffer-substring-no-properties
               eshell-last-output-start
               eshell-last-output-end)))
@@ -3288,144 +3248,284 @@ PROGRAM can be a shell command."
              (point)))))))
   (goto-char (eat-term-display-cursor eat--terminal)))
 
-(defvar eat-eshell-mode)
+(defun eat--eshell-setup-proc-and-term (proc)
+  "Setup a PROC and a new terminal for it."
+  (unless (or eat--terminal eat--process)
+    (setq eat--process proc)
+    (setq eat--terminal (eat-term-make (current-buffer)
+                                       (process-mark proc)))
+    (set-marker (process-mark proc) (eat-term-end eat--terminal))
+    (setf (eat-term-input-function eat--terminal) #'eat--send-input)
+    (setf (eat-term-set-cursor-function eat--terminal)
+          #'eat--set-cursor)
+    (setf (eat-term-grab-mouse-function eat--terminal)
+          #'eat--grab-mouse)
+    (when-let ((window (get-buffer-window nil t)))
+      (with-selected-window window
+        (eat-term-resize eat--terminal (window-max-chars-per-line)
+                         (window-text-height))))
+    (make-local-variable 'eshell-output-filter-functions)
+    (setq eshell-output-filter-functions '(eat--eshell-output-filter))
+    (eat-eshell-line-mode)
+    (eat--cursor-blink-mode -1)))
+
+(defun eat--eshell-cleanup ()
+  "Cleanup everything."
+  (defvar eshell-last-output-start) ; In `esh-mode'.
+  (defvar eshell-last-output-end) ; In `esh-mode'.
+  (when eat--terminal
+    (let ((inhibit-read-only t))
+      (goto-char (eat-term-end eat--terminal))
+      (unless (bolp)
+        (insert ?\n))
+      (set-marker eshell-last-output-start (point))
+      (set-marker eshell-last-output-end (point))
+      (eat-term-delete eat--terminal)
+      (eat--cursor-blink-mode -1)
+      (setq eat--terminal nil)
+      (setq eat--process nil)
+      (kill-local-variable 'eshell-output-filter-functions)
+      (eat--eshell-line-mode -1)
+      (eat--eshell-char-mode -1))))
+
+(defun eat--eshell-process-output-queue (process buffer)
+  "Process the output queue on BUFFER from PROCESS."
+  (declare-function eshell-output-filter "esh-mode")
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when eat--process-output-queue-timer
+        (cancel-timer eat--process-output-queue-timer))
+      (setq eat--output-queue-first-chunk-time nil)
+      (let ((queue eat--pending-output-chunks))
+        (setq eat--pending-output-chunks nil)
+        (eshell-output-filter
+         process (string-join (nreverse queue)))))))
+
+(defun eat--eshell-filter (process string)
+  "Process output STRING from PROCESS."
+  (when (buffer-live-p (process-buffer process))
+    (with-current-buffer (process-buffer process)
+      (when eat--process-output-queue-timer
+        (cancel-timer eat--process-output-queue-timer))
+      (unless eat--output-queue-first-chunk-time
+        (setq eat--output-queue-first-chunk-time (current-time)))
+      (push string eat--pending-output-chunks)
+      (let ((time-left
+             (- eat-maximum-latency
+                (float-time
+                 (time-subtract
+                  nil eat--output-queue-first-chunk-time)))))
+        (if (<= time-left 0)
+            (eat--eshell-process-output-queue
+             process (current-buffer))
+          (setq eat--process-output-queue-timer
+                (run-with-timer (min time-left eat-minimum-latency)
+                                nil #'eat--eshell-process-output-queue
+                                process (current-buffer))))))))
+
+(defun eat--eshell-sentinel (process message)
+  "Process status message MESSAGE from PROCESS."
+  (declare-function eshell-sentinel "esh-proc")
+  (when (buffer-live-p (process-buffer process))
+    (cl-letf* ((process-send-string
+                (symbol-function #'process-send-string))
+               ((symbol-function #'process-send-string)
+                (lambda (proc string)
+                  (when (or (not (eq proc process))
+                            (process-live-p proc))
+                    (funcall process-send-string proc string)))))
+      (eat--eshell-process-output-queue process (current-buffer)))
+    (when (memq (process-status process) '(signal exit))
+      (with-current-buffer (process-buffer process)
+        (eat--eshell-cleanup))))
+  (eshell-sentinel process message))
 
 ;; HACK: This is a dirty hack, it can break easily.
-(defun eat--adjust-process-command (fn command args)
-  "Setup an environment to invoke `stty' on start.
+(defun eat--adjust-make-process-args (fn command args)
+  "Setup an environment to adjust `make-process' arguments.
 
 Call FN with COMMAND and ARGS, and whenever `make-process' is called,
-modify its argument to invoke `stty' first."
-  ;; Make sure to check if the mode is enabled, because the mode never
-  ;; removes this advice.
-  (if (not eat-eshell-mode)
-      (funcall fn command args)
-    (cl-letf*
-        ((make-process (symbol-function #'make-process))
-         ((symbol-function #'make-process)
-          (lambda (&rest plist)
-            ;; Make sure we don't attack wrong process.
-            (when (equal (plist-get plist :command)
-                         (cons (file-local-name
-                                (expand-file-name command))
-                               args))
-              (plist-put
-               plist :command
-               `("/usr/bin/env" "sh" "-c"
-                 ,(format "stty -nl echo rows %d columns %d \
+modify its argument to change the filter, the sentinel and invoke
+`stty' from the new process."
+  (cl-letf*
+      ((make-process (symbol-function #'make-process))
+       ((symbol-function #'make-process)
+        (lambda (&rest plist)
+          ;; Make sure we don't attack wrong process.
+          (when (and (eq (plist-get plist :filter)
+                         #'eshell-output-filter)
+                     (eq (plist-get plist :sentinel)
+                         #'eshell-sentinel)
+                     (equal (plist-get plist :command)
+                            (cons (file-local-name
+                                   (expand-file-name command))
+                                  args)))
+            (plist-put plist :filter #'eat--eshell-filter)
+            (plist-put plist :sentinel #'eat--eshell-sentinel)
+            (plist-put
+             plist :command
+             `("/usr/bin/env" "sh" "-c"
+               ,(format "stty -nl echo rows %d columns %d \
 sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
-                          (window-text-height)
-                          (window-max-chars-per-line) null-device)
-                 ".."
-                 ,@(plist-get plist :command))))
-            (apply make-process plist))))
-      (funcall fn command args))))
+                        (window-text-height)
+                        (window-max-chars-per-line) null-device)
+               ".."
+               ,@(plist-get plist :command))))
+          (let ((process (apply make-process plist)))
+            (eat--eshell-setup-proc-and-term process)
+            process))))
+    (funcall fn command args)))
+
+(define-minor-mode eat--eshell-local-mode
+  "Toggle Eat terminal emulation is Eshell."
+  :interactive nil
+  :keymap eat-eshell-emacs-mode-map
+  (cond
+   (eat--eshell-local-mode
+    (make-local-variable 'glyphless-char-display)
+    (make-local-variable 'track-mouse)
+    (make-local-variable 'cursor-type)
+    (make-local-variable 'eat--terminal)
+    (make-local-variable 'eat--process)
+    (make-local-variable 'eat--synchronize-scroll-function)
+    (make-local-variable 'eat--mouse-grabbing-type)
+    (make-local-variable 'eat--pending-output-chunks)
+    (make-local-variable 'eat--output-queue-first-chunk-time)
+    (make-local-variable 'eat--process-output-queue-timer)
+    (setq eat--synchronize-scroll-function
+          #'eat--eshell-synchronize-scroll)
+    (add-function :filter-return
+                  (local 'window-adjust-process-window-size-function)
+                  #'eat--resize-maybe)
+    ;; Make sure glyphless character don't display a huge box glyph,
+    ;; that would break the display.
+    (eat--setup-glyphless-chars))
+   (t
+    (remove-function
+     (local 'window-adjust-process-window-size-function)
+     #'eat--resize-maybe)
+    (kill-local-variable 'cursor-type)
+    (kill-local-variable 'glyphless-char-display)
+    (kill-local-variable 'track-mouse)
+    (kill-local-variable 'eat--terminal)
+    (kill-local-variable 'eat--process)
+    (kill-local-variable 'eat--synchronize-scroll-function)
+    (kill-local-variable 'eat--mouse-grabbing-type)
+    (kill-local-variable 'eat--pending-output-chunks)
+    (kill-local-variable 'eat--output-queue-first-chunk-time)
+    (kill-local-variable 'eat--process-output-queue-timer))))
 
 ;;;###autoload
 (define-minor-mode eat-eshell-mode
   "Toggle Eat terminal emulation is Eshell."
-  :group 'eat-eshell
-  :lighter (" Eat-Eshell"
-            (:eval
-             (when eat--terminal
-               (cond
-                (eat--eshell-line-mode
-                 `("["
-                   (:propertize
-                    "line"
-                    help-echo
-                    ,(concat "mouse-1: Switch to char mode, "
-                             "mouse-3: Switch to emacs mode")
-                    mouse-face mode-line-highlight
-                    local-map
-                    (keymap
-                     (mode-line
-                      . (keymap
-                         (down-mouse-1 . eat-eshell-char-mode)
-                         (down-mouse-3 . eat-eshell-emacs-mode)))))
-                   "]"))
-                (eat--eshell-char-mode
-                 '("["
-                   (:propertize
-                    "char"
-                    help-echo
-                    ,(concat "mouse-1: Switch to line mode, "
-                             "mouse-3: Switch to emacs mode")
-                    mouse-face mode-line-highlight
-                    local-map
-                    (keymap
-                     (mode-line
-                      . (keymap
-                         (down-mouse-1 . eat-eshell-line-mode)
-                         (down-mouse-3 . eat-eshell-emacs-mode)))))
-                   "]"))
-                (t
-                 `("["
-                   (:propertize
-                    "emacs"
-                    help-echo
-                    ,(concat "mouse-1: Switch to line mode, "
-                             "mouse-3: Switch to char mode")
-                    mouse-face mode-line-highlight
-                    local-map
-                    (keymap
-                     (mode-line
-                      . (keymap
-                         (down-mouse-1 . eat-eshell-line-mode)
-                         (down-mouse-3 . eat-eshell-char-mode)))))
-                   "]"))))))
+  :global t
+  :lighter (eat--eshell-local-mode
+            (" Eat-Eshell"
+             (:eval
+              (when eat--terminal
+                (cond
+                 (eat--eshell-line-mode
+                  `("["
+                    (:propertize
+                     "line"
+                     help-echo
+                     ,(concat "mouse-1: Switch to char mode, "
+                              "mouse-3: Switch to emacs mode")
+                     mouse-face mode-line-highlight
+                     local-map
+                     (keymap
+                      (mode-line
+                       . (keymap
+                          (down-mouse-1 . eat-eshell-char-mode)
+                          (down-mouse-3 . eat-eshell-emacs-mode)))))
+                    "]"))
+                 (eat--eshell-char-mode
+                  '("["
+                    (:propertize
+                     "char"
+                     help-echo
+                     ,(concat "mouse-1: Switch to line mode, "
+                              "mouse-3: Switch to emacs mode")
+                     mouse-face mode-line-highlight
+                     local-map
+                     (keymap
+                      (mode-line
+                       . (keymap
+                          (down-mouse-1 . eat-eshell-line-mode)
+                          (down-mouse-3 . eat-eshell-emacs-mode)))))
+                    "]"))
+                 (t
+                  `("["
+                    (:propertize
+                     "emacs"
+                     help-echo
+                     ,(concat "mouse-1: Switch to line mode, "
+                              "mouse-3: Switch to char mode")
+                     mouse-face mode-line-highlight
+                     local-map
+                     (keymap
+                      (mode-line
+                       . (keymap
+                          (down-mouse-1 . eat-eshell-line-mode)
+                          (down-mouse-3 . eat-eshell-char-mode)))))
+                    "]")))))))
   (defvar eshell-variable-aliases-list) ; In `esh-var'.
+  (defvar eshell-last-async-procs) ; In `esh-cmd'.
   (declare-function eshell-gather-process-output "esh-proc")
   (cond
    (eat-eshell-mode
-    (setq eat-eshell-mode nil)
-    (require 'esh-mode)
-    (require 'esh-var)
-    (setq eat-eshell-mode t)
-    (make-local-variable 'eshell-variable-aliases-list)
-    (make-local-variable 'glyphless-char-display)
-    (make-local-variable 'track-mouse)
-    (make-local-variable 'eat--terminal)
-    (make-local-variable 'eat--process)
-    (make-local-variable 'eat--synchronize-scroll-function)
-    (setq eat--synchronize-scroll-function
-          #'eat--eshell-synchronize-scroll)
-    (add-hook 'eshell-exec-hook #'eat--eshell-setup-proc-and-term nil
-              t)
-    (add-hook 'eshell-post-command-hook #'eat--eshell-cleanup
-              -90 t)
+    (let ((buffers nil))
+      (setq eat-eshell-mode nil)
+      (require 'esh-mode)
+      (require 'esh-proc)
+      (require 'esh-var)
+      (require 'esh-cmd)
+      (dolist (buffer (buffer-list))
+        (with-current-buffer buffer
+          (when (eq major-mode #'eshell-mode)
+            (when eshell-last-async-procs
+              (user-error
+               (concat "Can't toggle Eat Eshell mode while"
+                       " any Eshell process is running")))
+            (push buffer buffers))))
+      (setq eat-eshell-mode t)
+      (dolist (buffer buffers)
+        (with-current-buffer buffer
+          (eat--eshell-local-mode +1))))
+    (add-hook 'eshell-mode-hook #'eat--eshell-local-mode)
     (setq eshell-variable-aliases-list
           `(("TERM" eat-term-name t t)
             ("TERMINFO" eat-term-terminfo-directory t)
             ("INSIDE_EMACS" eat-term-inside-emacs t)
             ,@eshell-variable-aliases-list))
-    (add-function :filter-return
-                  (local 'window-adjust-process-window-size-function)
-                  #'eat--resize-maybe)
-    ;; We don't remove this advice, because other Eshell buffer might
-    ;; depend on this.
     (advice-add #'eshell-gather-process-output :around
-                #'eat--adjust-process-command)
-    ;; Make sure glyphless character don't display a huge box glyph,
-    ;; that would break the display.
-    (eat--setup-glyphless-chars))
+                #'eat--adjust-make-process-args))
    (t
-    (when eat--terminal
+    (let ((buffers nil))
       (setq eat-eshell-mode t)
-      (user-error
-       "Can't disable Eat Eshell mode while process in running"))
-    (remove-hook 'eshell-exec-hook #'eat--eshell-setup-proc-and-term
-                 t)
-    (remove-hook 'eshell-post-command-hook #'eat--eshell-cleanup t)
-    (remove-function
-     (local 'window-adjust-process-window-size-function)
-     #'eat--resize-maybe)
-    (kill-local-variable 'eshell-variable-aliases-list)
-    (kill-local-variable 'glyphless-char-display)
-    (kill-local-variable 'track-mouse)
-    (kill-local-variable 'eat--terminal)
-    (kill-local-variable 'eat--process)
-    (kill-local-variable 'eat--synchronize-scroll-function))))
+      (dolist (buffer (buffer-list))
+        (with-current-buffer buffer
+          (when (eq major-mode #'eshell-mode)
+            (when eshell-last-async-procs
+              (user-error
+               (concat "Can't toggle Eat Eshell mode while"
+                       " any Eshell process is running")))
+            (push buffer buffers))))
+      (setq eat-eshell-mode nil)
+      (dolist (buffer buffers)
+        (with-current-buffer buffer
+          (eat--eshell-local-mode -1))))
+    (remove-hook 'eshell-mode-hook #'eat--eshell-local-mode)
+    (setq eshell-variable-aliases-list
+          (cl-delete-if
+           (lambda (elem)
+             (member elem
+                     '(("TERM" eat-term-name t t)
+                       ("TERMINFO" eat-term-terminfo-directory t)
+                       ("INSIDE_EMACS" eat-term-inside-emacs t))))
+           eshell-variable-aliases-list))
+    (advice-remove #'eshell-gather-process-output
+                   #'eat--adjust-make-process-args))))
 
 
 ;;;; Eshell visual command handling.
