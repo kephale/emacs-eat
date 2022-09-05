@@ -2054,7 +2054,7 @@ client process may get confused."
                           (append (remq 'meta mods) (list base)))))
                  (send (cond
                         ((and (memq 'meta mods) (memq ch '(?\[ ?O)))
-                         "\e\e")
+                         "\e")
                         (t
                          (format (if (memq 'meta mods) "\e%c" "%c")
                                  (pcase ch
@@ -2593,6 +2593,8 @@ event."
                       meta-prefix-char))
              ;; HACK: Capture meta modifier (ESC prefix) in terminal.
              (cond
+              ((eq last-command-event meta-prefix-char)
+               last-command-event)
               ((characterp last-command-event)
                (aref
                 (kbd (format "M-%c" last-command-event))
@@ -2601,7 +2603,8 @@ event."
                (aref
                 (kbd (format "M-<%S>" last-command-event))
                 0))
-              (t last-command-event))
+              (t
+               last-command-event))
            last-command-event)))
   (when (memq (event-basic-type e)
               '( mouse-1 mouse-2 mouse-3 mouse-4 mouse-5 mouse-6
