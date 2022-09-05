@@ -2478,6 +2478,18 @@ The output chunks are pushed, so last output appears first.")
 (defvar eat--process-output-queue-timer nil
   "Timer to process output queue.")
 
+(defvar eat--mouse-grabbing-type nil
+  "Current mouse grabbing type/mode.")
+
+(defvar eat--mouse-pressed-buttons nil
+  "Mouse buttons currently pressed.")
+
+(defvar eat--mouse-last-position nil
+  "Last position of mouse, nil when not dragging.")
+
+(defvar eat--mouse-drag-transient-map-exit nil
+  "Function to exit mouse dragging transient map.")
+
 (defun eat-self-input (n &optional e)
   "Send E as input N times.
 
@@ -2503,46 +2515,81 @@ event."
            last-command-event)))
   (when (memq (event-basic-type e)
               '( mouse-1 mouse-2 mouse-3 mouse-4 mouse-5 mouse-6
-                 mouse-7))
+                 mouse-7 mouse-8 mouse-9 mouse-10 mouse-11))
     (select-window (posn-window (event-start e))))
   (when eat--terminal
     (unless (mouse-movement-p e)
       (funcall eat--synchronize-scroll-function))
     (if (memq (event-basic-type e)
               '( mouse-1 mouse-2 mouse-3 mouse-4 mouse-5 mouse-6
-                 mouse-7 mouse-movement))
+                 mouse-7 mouse-8 mouse-9 mouse-10 mouse-11
+                 mouse-movement))
         (let ((disp-begin-posn
                (posn-at-point
-                (eat-term-display-beginning eat--terminal))))
-          (eat-term-input-event eat--terminal n e disp-begin-posn)
-          (when (and (memq (event-basic-type e)
-                           '(mouse-1 mouse-2 mouse-3))
-                     (memq 'down (event-modifiers e)))
-            (track-mouse
-              (let ((track t)
-                    (event nil))
-                (while track
-                  (setq event (read-event))
-                  (when (or
-                         (mouse-movement-p event)
-                         (and
-                          (eq (event-basic-type event)
-                              (event-basic-type e))
-                          (or (memq 'click (event-modifiers event))
-                              (memq 'drag (event-modifiers event)))))
-                    (when (eq (posn-window
-                               (if (mouse-movement-p event)
-                                   (event-start event)
-                                 (event-end event)))
-                              (posn-window (event-start e)))
-                      (eat-term-input-event eat--terminal n event
-                                            disp-begin-posn))
-                    (when (and
-                           (eq (event-basic-type event)
-                               (event-basic-type e))
-                           (or (memq 'click (event-modifiers event))
-                               (memq 'drag (event-modifiers event))))
-                      (setq track nil))))))))
+                (eat-term-display-beginning eat--terminal)))
+              (e (if (or (not eat--mouse-last-position)
+                         (eq (posn-window
+                              (if (memq 'drag (event-modifiers e))
+                                  (event-end e)
+                                (event-start e)))
+                             (posn-window eat--mouse-last-position)))
+                     e
+                   (pcase e
+                     (`(,type ,_)
+                      `(,type ,eat--mouse-last-position))
+                     (`(,type ,start ,_)
+                      `(,type ,start ,eat--mouse-last-position))
+                     (ev ev)))))
+          (if (not (mouse-movement-p e))
+              (eat-term-input-event eat--terminal n e disp-begin-posn)
+            (if (not eat--mouse-pressed-buttons)
+                (when (eq eat--mouse-grabbing-type :all)
+                  (eat-term-input-event eat--terminal n e
+                                        disp-begin-posn))
+              (when (memq eat--mouse-grabbing-type '(:all :drag))
+                (eat-term-input-event eat--terminal n e
+                                      disp-begin-posn))
+              (setq eat--mouse-last-position (event-start e))))
+          (when (memq (event-basic-type e) '(mouse-1 mouse-2 mouse-3))
+            (when (or (memq 'click (event-modifiers e))
+                      (memq 'drag (event-modifiers e)))
+              (setq eat--mouse-pressed-buttons
+                    (delq (event-basic-type e)
+                          eat--mouse-pressed-buttons))
+              (unless eat--mouse-pressed-buttons
+                (setq eat--mouse-last-position nil)
+                (funcall eat--mouse-drag-transient-map-exit)
+                (setq eat--mouse-drag-transient-map-exit nil)))
+            (when (memq 'down (event-modifiers e))
+              (push (event-basic-type e) eat--mouse-pressed-buttons)
+              (setq eat--mouse-last-position (event-start e))
+              (unless eat--mouse-drag-transient-map-exit
+                (let ((old-track-mouse track-mouse)
+                      (buffer (current-buffer)))
+                  (setq track-mouse 'dragging)
+                  (setq eat--mouse-drag-transient-map-exit
+                        (set-transient-map
+                         (let ((map (eat-term-make-keymap
+                                     #'eat-self-input
+                                     '(:mouse-modifier
+                                       :mouse-movement)
+                                     nil)))
+                           ;; Some of the events will of course end up
+                           ;; looked up with a mode-line, header-line
+                           ;; or vertical-line prefix ...
+                           (define-key map [mode-line] map)
+                           (define-key map [header-line] map)
+                           (define-key map [tab-line] map)
+                           (define-key map [vertical-line] map)
+                           ;; ... and some maybe even with a right- or
+                           ;; bottom-divider prefix.
+                           (define-key map [right-divider] map)
+                           (define-key map [bottom-divider] map))
+                         #'always
+                         (lambda ()
+                           (with-current-buffer buffer
+                             (setq track-mouse
+                                   old-track-mouse))))))))))
       (eat-term-input-event eat--terminal n e))))
 
 (defun eat-quoted-input ()
@@ -2646,9 +2693,6 @@ ARG is passed to `yank-pop', which see."
 (defvar eat--mouse-movement-mode-map
   (eat-term-make-keymap #'eat-self-input '(:mouse-movement) nil)
   "Keymap for `eat--mouse-movement-mode'.")
-
-(defvar eat--mouse-grabbing-type nil
-  "Current mouse grabbing type/mode.")
 
 (define-minor-mode eat--semi-char-mode
   "Minor mode for semi-char mode keymap."
@@ -2945,16 +2989,16 @@ MODE should one of:
      (eat--mouse-click-mode -1)
      (eat--mouse-modifier-click-mode +1)
      (eat--mouse-movement-mode +1))
+    ((or :modifier-click :drag)
+     (setq track-mouse nil)
+     (eat--mouse-click-mode -1)
+     (eat--mouse-movement-mode -1)
+     (eat--mouse-modifier-click-mode +1))
     (:click
      (setq track-mouse nil)
      (eat--mouse-modifier-click-mode -1)
      (eat--mouse-movement-mode -1)
      (eat--mouse-click-mode +1))
-    ((or :modifier-click :modifier-click :drag)
-     (setq track-mouse nil)
-     (eat--mouse-click-mode -1)
-     (eat--mouse-movement-mode -1)
-     (eat--mouse-modifier-click-mode +1))
     (_
      (setq track-mouse nil)
      (eat--mouse-click-mode -1)
@@ -3010,8 +3054,8 @@ MODE should one of:
 (defun eat--sentinel (process message)
   "Sentinel for Eat buffers.
 
-  PROCESS is the process and MESSAGE is the description of what happened
-  to it."
+PROCESS is the process and MESSAGE is the description of what happened
+to it."
   (let ((buffer (process-buffer process)))
     (when (memq (process-status process) '(signal exit))
       (if (buffer-live-p buffer)
