@@ -2456,27 +2456,117 @@ return \"eat-color\", otherwise return \"eat-mono\"."
     (kill-local-variable 'eat--fast-blink-timer))))
 
 
+;;;; Buffer-local Cursor Blinking.
+
+(defvar eat--cursor-blink-state nil
+  "Current state of slowly blinking text, non-nil means invisible.")
+
+(defvar eat--cursor-blink-timer nil
+  "Timer for blinking slowly blinking text.")
+
+(defvar eat--cursor-blink-frequency nil
+  "Frequency of cursor blinking.")
+
+(defvar eat--cursor-blink-mode)
+
+(defun eat--flip-cursor-blink-state ()
+  "Flip the state of slowly blinking text."
+  (when (and eat--cursor-blink-mode
+             (display-graphic-p))
+    (if eat--cursor-blink-state
+        (progn
+          (setq-local cursor-type eat--cursor-blink-state)
+          (setq eat--cursor-blink-state nil))
+      (setq eat--cursor-blink-state cursor-type)
+      (setq-local cursor-type nil))
+    (when-let ((window (get-buffer-window nil 'visible)))
+      (redraw-frame (window-frame window)))))
+
+(defun eat--cursor-blink-stop-timers ()
+  "Start blinking timers."
+  (when eat--cursor-blink-state
+    (eat--flip-cursor-blink-state))
+  (when eat--cursor-blink-timer
+    (cancel-timer eat--cursor-blink-timer)
+    (setq eat--cursor-blink-timer nil)))
+
+(defun eat--cursor-blink-start-timers ()
+  "Start blinking timers."
+  (eat--cursor-blink-stop-timers)
+  (setq eat--cursor-blink-timer
+        (run-with-timer t (/ (float eat--cursor-blink-frequency))
+                        #'eat--flip-cursor-blink-state)))
+
+(define-minor-mode eat--cursor-blink-mode
+  "Toggle blinking of cursor."
+  :interactive nil
+  (cond
+   (eat--cursor-blink-mode
+    (make-local-variable 'eat--cursor-blink-state)
+    (make-local-variable 'eat--cursor-blink-timer)
+    (setq eat--cursor-blink-state nil)
+    (setq eat--cursor-blink-timer nil)
+    (add-hook 'pre-command-hook #'eat--cursor-blink-stop-timers nil t)
+    (add-hook 'post-command-hook #'eat--cursor-blink-start-timers
+              nil t)
+    (when (current-idle-time)
+      (eat--cursor-blink-start-timers)))
+   (t
+    (eat--cursor-blink-stop-timers)
+    (remove-hook 'pre-command-hook #'eat--cursor-blink-stop-timers t)
+    (remove-hook 'post-command-hook #'eat--cursor-blink-start-timers
+                 t)
+    (kill-local-variable 'eat--cursor-blink-state)
+    (kill-local-variable 'eat--cursor-blink-timer))))
+
+
 ;;;; User Interface.
 
 (defvar eat--terminal nil
   "The terminal object.")
 
-(defvar eat--process nil
-  "The running process.")
-
 (defvar eat--synchronize-scroll-function nil
   "Function to synchronize scrolling between terminal and window.")
 
-(defvar eat--pending-output-chunks nil
-  "The list of pending output chunks.
+(defun eat-reset ()
+  "Perform a terminal reset."
+  (interactive)
+  (when eat--terminal
+    (let ((inhibit-read-only t))
+      (eat-term-reset eat--terminal))))
 
-The output chunks are pushed, so last output appears first.")
+(defun eat--set-cursor (_ state)
+  "Set cursor type according to STATE.
 
-(defvar eat--output-queue-first-chunk-time nil
-  "Time when the first chunk in the current output queue was pushed.")
+  STATE can be one of the following:
 
-(defvar eat--process-output-queue-timer nil
-  "Timer to process output queue.")
+  `:default'            Default cursor.
+  `:invisible'          Invisible cursor.
+  `:very-visible'       Very visible cursor.  Can also be implemented
+                        as blinking cursor.
+  Any other value     Default cursor."
+  (pcase state
+    (:invisible
+     (setq-local cursor-type (car eat-invisible-cursor-type))
+     (setq-local eat--cursor-blink-frequency
+                 (cdr eat-invisible-cursor-type))
+     (eat--cursor-blink-mode
+      (if (cdr eat-invisible-cursor-type) +1 -1)))
+    (:very-visible
+     (setq-local cursor-type (car eat-very-visible-cursor-type))
+     (setq-local eat--cursor-blink-frequency
+                 (cdr eat-very-visible-cursor-type))
+     (eat--cursor-blink-mode
+      (if (cdr eat-very-visible-cursor-type) +1 -1)))
+    (_ ; `:default'
+     (setq-local cursor-type (car eat-default-cursor-type))
+     (setq-local eat--cursor-blink-frequency
+                 (cdr eat-default-cursor-type))
+     (eat--cursor-blink-mode
+      (if (cdr eat-default-cursor-type) +1 -1)))))
+
+
+;;;;; Input.
 
 (defvar eat--mouse-grabbing-type nil
   "Current mouse grabbing type/mode.")
@@ -2636,19 +2726,6 @@ ARG is passed to `yank-pop', which see."
                                args)))))
         (yank-pop arg)))))
 
-(defun eat-reset ()
-  "Perform a terminal reset."
-  (interactive)
-  (when eat--terminal
-    (let ((inhibit-read-only t))
-      (eat-term-reset eat--terminal))))
-
-(defun eat-kill-process ()
-  "Kill Eat process in current buffer."
-  (interactive)
-  (when eat--process
-    (kill-process eat--process)))
-
 (defvar eat-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?\C-c ?\C-j] #'eat-char-mode)
@@ -2728,7 +2805,7 @@ ARG is passed to `yank-pop', which see."
 (defun eat-semi-char-mode ()
   "Switch to semi-char mode."
   (interactive)
-  (if (not (or eat--process eat--terminal))
+  (if (not eat--terminal)
       (error "Process not running")
     (setq buffer-read-only nil)
     (eat--char-mode -1)
@@ -2739,13 +2816,61 @@ ARG is passed to `yank-pop', which see."
 (defun eat-char-mode ()
   "Switch to char mode."
   (interactive)
-  (if (not (or eat--process eat--terminal))
+  (if (not eat--terminal)
       (error "Process not running")
     (setq buffer-read-only nil)
     (eat--semi-char-mode -1)
     (eat--char-mode +1)
     (eat--grab-mouse nil eat--mouse-grabbing-type)
     (force-mode-line-update)))
+
+(defvar eat--eshell-semi-char-mode)
+(defvar eat--eshell-char-mode)
+
+(defun eat--grab-mouse (_ mode)
+  "Grab mouse.
+
+MODE should one of:
+
+  nil                 Disable mouse.
+  `:click'              Pass `mouse-1', `mouse-2', and `mouse-3'
+                        clicks.
+  `:modifier-click'     Pass all mouse clicks, including control,
+                        meta and shift modifiers.
+  `:drag'               All of :modifier-click, plus dragging
+                        (moving mouse while pressed) information.
+  `:all'                Pass all mouse events, including movement.
+  Any other value    Disable mouse."
+  (setq eat--mouse-grabbing-type mode)
+  (pcase (and eat-enable-mouse
+              (or eat--semi-char-mode
+                  eat--char-mode
+                  eat--eshell-semi-char-mode
+                  eat--eshell-char-mode)
+              mode)
+    (:all
+     (setq track-mouse t)
+     (eat--mouse-click-mode -1)
+     (eat--mouse-modifier-click-mode +1)
+     (eat--mouse-movement-mode +1))
+    ((or :modifier-click :drag)
+     (setq track-mouse nil)
+     (eat--mouse-click-mode -1)
+     (eat--mouse-movement-mode -1)
+     (eat--mouse-modifier-click-mode +1))
+    (:click
+     (setq track-mouse nil)
+     (eat--mouse-modifier-click-mode -1)
+     (eat--mouse-movement-mode -1)
+     (eat--mouse-click-mode +1))
+    (_
+     (setq track-mouse nil)
+     (eat--mouse-click-mode -1)
+     (eat--mouse-modifier-click-mode -1)
+     (eat--mouse-movement-mode -1))))
+
+
+;;;;; Major Mode.
 
 (defun eat--synchronize-scroll ()
   "Synchronize scrolling and point between terminal and window."
@@ -2864,146 +2989,33 @@ ARG is passed to `yank-pop', which see."
   ;; that would break the display.
   (eat--setup-glyphless-chars))
 
+
+;;;;; Process Handling.
+
+(defvar eat--process nil
+  "The running process.")
+
+(defvar eat--pending-output-chunks nil
+  "The list of pending output chunks.
+
+The output chunks are pushed, so last output appears first.")
+
+(defvar eat--output-queue-first-chunk-time nil
+  "Time when the first chunk in the current output queue was pushed.")
+
+(defvar eat--process-output-queue-timer nil
+  "Timer to process output queue.")
+
+(defun eat-kill-process ()
+  "Kill Eat process in current buffer."
+  (interactive)
+  (when eat--process
+    (kill-process eat--process)))
+
 (defun eat--send-input (_ input)
   "Send INPUT to subprocess."
   (when eat--process
     (eat--send-string eat--process input)))
-
-(defvar eat--cursor-blink-state nil
-  "Current state of slowly blinking text, non-nil means invisible.")
-
-(defvar eat--cursor-blink-timer nil
-  "Timer for blinking slowly blinking text.")
-
-(defvar eat--cursor-blink-frequency nil
-  "Frequency of cursor blinking.")
-
-(defvar eat--cursor-blink-mode)
-
-(defun eat--flip-cursor-blink-state ()
-  "Flip the state of slowly blinking text."
-  (when (and eat--cursor-blink-mode
-             (display-graphic-p))
-    (if eat--cursor-blink-state
-        (progn
-          (setq-local cursor-type eat--cursor-blink-state)
-          (setq eat--cursor-blink-state nil))
-      (setq eat--cursor-blink-state cursor-type)
-      (setq-local cursor-type nil))
-    (when-let ((window (get-buffer-window nil 'visible)))
-      (redraw-frame (window-frame window)))))
-
-(defun eat--cursor-blink-stop-timers ()
-  "Start blinking timers."
-  (when eat--cursor-blink-state
-    (eat--flip-cursor-blink-state))
-  (when eat--cursor-blink-timer
-    (cancel-timer eat--cursor-blink-timer)
-    (setq eat--cursor-blink-timer nil)))
-
-(defun eat--cursor-blink-start-timers ()
-  "Start blinking timers."
-  (eat--cursor-blink-stop-timers)
-  (setq eat--cursor-blink-timer
-        (run-with-timer t (/ (float eat--cursor-blink-frequency))
-                        #'eat--flip-cursor-blink-state)))
-
-(define-minor-mode eat--cursor-blink-mode
-  "Toggle blinking of cursor."
-  :interactive nil
-  (cond
-   (eat--cursor-blink-mode
-    (make-local-variable 'eat--cursor-blink-state)
-    (make-local-variable 'eat--cursor-blink-timer)
-    (setq eat--cursor-blink-state nil)
-    (setq eat--cursor-blink-timer nil)
-    (add-hook 'pre-command-hook #'eat--cursor-blink-stop-timers nil t)
-    (add-hook 'post-command-hook #'eat--cursor-blink-start-timers
-              nil t)
-    (when (current-idle-time)
-      (eat--cursor-blink-start-timers)))
-   (t
-    (eat--cursor-blink-stop-timers)
-    (remove-hook 'pre-command-hook #'eat--cursor-blink-stop-timers t)
-    (remove-hook 'post-command-hook #'eat--cursor-blink-start-timers
-                 t)
-    (kill-local-variable 'eat--cursor-blink-state)
-    (kill-local-variable 'eat--cursor-blink-timer))))
-
-(defvar eat--eshell-semi-char-mode)
-(defvar eat--eshell-char-mode)
-
-(defun eat--set-cursor (_ state)
-  "Set cursor type according to STATE.
-
-  STATE can be one of the following:
-
-  `:default'            Default cursor.
-  `:invisible'          Invisible cursor.
-  `:very-visible'       Very visible cursor.  Can also be implemented
-                        as blinking cursor.
-  Any other value     Default cursor."
-  (pcase state
-    (:invisible
-     (setq-local cursor-type (car eat-invisible-cursor-type))
-     (setq-local eat--cursor-blink-frequency
-                 (cdr eat-invisible-cursor-type))
-     (eat--cursor-blink-mode
-      (if (cdr eat-invisible-cursor-type) +1 -1)))
-    (:very-visible
-     (setq-local cursor-type (car eat-very-visible-cursor-type))
-     (setq-local eat--cursor-blink-frequency
-                 (cdr eat-very-visible-cursor-type))
-     (eat--cursor-blink-mode
-      (if (cdr eat-very-visible-cursor-type) +1 -1)))
-    (_ ; `:default'
-     (setq-local cursor-type (car eat-default-cursor-type))
-     (setq-local eat--cursor-blink-frequency
-                 (cdr eat-default-cursor-type))
-     (eat--cursor-blink-mode
-      (if (cdr eat-default-cursor-type) +1 -1)))))
-
-(defun eat--grab-mouse (_ mode)
-  "Grab mouse.
-
-MODE should one of:
-
-  nil                 Disable mouse.
-  `:click'              Pass `mouse-1', `mouse-2', and `mouse-3'
-                        clicks.
-  `:modifier-click'     Pass all mouse clicks, including control,
-                        meta and shift modifiers.
-  `:drag'               All of :modifier-click, plus dragging
-                        (moving mouse while pressed) information.
-  `:all'                Pass all mouse events, including movement.
-  Any other value    Disable mouse."
-  (setq eat--mouse-grabbing-type mode)
-  (pcase (and eat-enable-mouse
-              (or eat--semi-char-mode
-                  eat--char-mode
-                  eat--eshell-semi-char-mode
-                  eat--eshell-char-mode)
-              mode)
-    (:all
-     (setq track-mouse t)
-     (eat--mouse-click-mode -1)
-     (eat--mouse-modifier-click-mode +1)
-     (eat--mouse-movement-mode +1))
-    ((or :modifier-click :drag)
-     (setq track-mouse nil)
-     (eat--mouse-click-mode -1)
-     (eat--mouse-movement-mode -1)
-     (eat--mouse-modifier-click-mode +1))
-    (:click
-     (setq track-mouse nil)
-     (eat--mouse-modifier-click-mode -1)
-     (eat--mouse-movement-mode -1)
-     (eat--mouse-click-mode +1))
-    (_
-     (setq track-mouse nil)
-     (eat--mouse-click-mode -1)
-     (eat--mouse-modifier-click-mode -1)
-     (eat--mouse-movement-mode -1))))
 
 (defun eat--process-output-queue (buffer)
   "Process the output queue on BUFFER."
@@ -3149,6 +3161,9 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
       (run-hooks 'eat-exec-hook)
       buffer)))
 
+
+;;;;; Entry Points.
+
 (defun eat-make (name program &optional startfile &rest switches)
   "Make a Eat process NAME in a buffer, running PROGRAM.
 
@@ -3205,6 +3220,8 @@ PROGRAM can be a shell command."
 
 
 ;;;; Eshell integration.
+
+;;;;; Input.
 
 (defvar eat-eshell-emacs-mode-map
   (let ((map (make-sparse-keymap)))
@@ -3300,6 +3317,9 @@ PROGRAM can be a shell command."
     (eat--grab-mouse nil eat--mouse-grabbing-type)
     (force-mode-line-update)))
 
+
+;;;;; Process Handling.
+
 (defun eat--eshell-output-filter ()
   "Handle output from subprocess."
   (defvar eshell-last-output-start) ; In `esh-mode'.
@@ -3320,27 +3340,6 @@ PROGRAM can be a shell command."
       (set-marker eshell-last-output-start end)
       (set-marker eshell-last-output-end end)
       (set-marker (process-mark eat--process) end))))
-
-(defun eat--eshell-synchronize-scroll ()
-  "Synchronize scrolling and point between terminal and window."
-  (when-let ((window (get-buffer-window (current-buffer))))
-    (set-window-start
-     window
-     (if (eat-term-in-alternative-framebuffer-p eat--terminal)
-         (eat-term-display-beginning eat--terminal)
-       (save-restriction
-         (narrow-to-region
-          (eat-term-beginning eat--terminal)
-          (eat-term-end eat--terminal))
-         (let ((start-line (- (window-text-height window)
-                              (line-number-at-pos (point-max)))))
-           (goto-char (point-min))
-           (widen)
-           (if (<= start-line 0)
-               (eat-term-display-beginning eat--terminal)
-             (vertical-motion (- start-line))
-             (point)))))))
-  (goto-char (eat-term-display-cursor eat--terminal)))
 
 (defun eat--eshell-setup-proc-and-term (proc)
   "Setup a PROC and a new terminal for it."
@@ -3472,6 +3471,30 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
             (eat--eshell-setup-proc-and-term process)
             process))))
     (funcall fn command args)))
+
+
+;;;;; Minor Modes.
+
+(defun eat--eshell-synchronize-scroll ()
+  "Synchronize scrolling and point between terminal and window."
+  (when-let ((window (get-buffer-window (current-buffer))))
+    (set-window-start
+     window
+     (if (eat-term-in-alternative-framebuffer-p eat--terminal)
+         (eat-term-display-beginning eat--terminal)
+       (save-restriction
+         (narrow-to-region
+          (eat-term-beginning eat--terminal)
+          (eat-term-end eat--terminal))
+         (let ((start-line (- (window-text-height window)
+                              (line-number-at-pos (point-max)))))
+           (goto-char (point-min))
+           (widen)
+           (if (<= start-line 0)
+               (eat-term-display-beginning eat--terminal)
+             (vertical-motion (- start-line))
+             (point)))))))
+  (goto-char (eat-term-display-cursor eat--terminal)))
 
 (define-minor-mode eat--eshell-local-mode
   "Toggle Eat terminal emulation is Eshell."
@@ -3625,9 +3648,9 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                    #'eat--adjust-make-process-args))))
 
 
-;;;; Eshell visual command handling.
+;;;; Eshell Visual Command Handling.
 
-;; Adapted from em-term.
+;; Adapted from `em-term'.
 (defun eat--eshell-visual-sentinel (proc _msg)
   "Clean up the buffer visiting PROC.
 
