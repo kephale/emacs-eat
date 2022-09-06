@@ -270,23 +270,23 @@ If your process is choking on big inputs, try lowering the value."
   :type 'integer
   :group 'eat-ui)
 
-(defface eat-bold '((t :inherit bold))
+(defface eat-term-bold '((t :inherit bold))
   "Face used to render bold text."
   :group 'eat-term)
 
-(defface eat-faint '((t :weight light))
+(defface eat-term-faint '((t :weight light))
   "Face used to render faint text."
   :group 'eat-term)
 
-(defface eat-italic '((t :inherit italic))
+(defface eat-term-italic '((t :inherit italic))
   "Face used to render italic text."
   :group 'eat-term)
 
-(defface eat-slow-blink '((t :inverse-video t))
+(defface eat-term-slow-blink '((t :inverse-video t))
   "Face used to render slowly blinking text."
   :group 'eat-term)
 
-(defface eat-fast-blink '((t :inverse-video t))
+(defface eat-term-fast-blink '((t :inverse-video t))
   "Face used to render rapidly blinking text."
   :group 'eat-term)
 
@@ -2479,11 +2479,11 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
          (setf (eat--face-inverse face) nil)
          (setf (eat--face-blink face) nil))
         ('(1)
-         (setf (eat--face-intensity face) 'eat-bold))
+         (setf (eat--face-intensity face) 'eat-term-bold))
         ('(2)
-         (setf (eat--face-intensity face) 'eat-faint))
+         (setf (eat--face-intensity face) 'eat-term-faint))
         ('(3)
-         (setf (eat--face-italic face) 'eat-italic))
+         (setf (eat--face-italic face) 'eat-term-italic))
         ('(4)
          (setf (eat--face-underline face) t))
         ('(4 0)
@@ -2499,9 +2499,9 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
         ('(4 5)
          (setf (eat--face-underline face) 'wave))
         ('(5)
-         (setf (eat--face-blink face) 'eat-slow-blink))
+         (setf (eat--face-blink face) 'eat-term-slow-blink))
         ('(6)
-         (setf (eat--face-blink face) 'eat-fast-blink))
+         (setf (eat--face-blink face) 'eat-term-fast-blink))
         ('(7)
          (setf (eat--face-inverse face) t))
         ('(8)
@@ -3719,9 +3719,9 @@ return \"eat-color\", otherwise return \"eat-mono\"."
     (setq eat--slow-blink-state nil)
     (setq eat--fast-blink-state nil)
     (setq eat--slow-blink-remap
-          (face-remap-add-relative 'eat-slow-blink '(:box nil)))
+          (face-remap-add-relative 'eat-term-slow-blink '(:box nil)))
     (setq eat--fast-blink-remap
-          (face-remap-add-relative 'eat-fast-blink '(:box nil)))
+          (face-remap-add-relative 'eat-term-fast-blink '(:box nil)))
     (add-hook 'pre-command-hook #'eat--blink-stop-timers nil t)
     (add-hook 'post-command-hook #'eat--blink-start-timers nil t))
    (t
