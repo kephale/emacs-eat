@@ -178,6 +178,4 @@ eat-256color|Emacs Eat with 256 colors,
 
 eat-truecolor|Emacs Eat with truecolor,
   use=eat-256color,
-  colors#0x1000000,
-  pairs#0x1000000,
   Tc,
