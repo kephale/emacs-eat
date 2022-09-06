@@ -4486,7 +4486,7 @@ PROGRAM."
 
 ;;;###autoload
 (defun eat (&optional program)
-  "Start new a terminal-emulator in a new buffer.
+  "Start new a Eat terminal emulator in a new buffer.
 
 PROGRAM can be a shell command."
   (interactive (list (read-shell-command "Run program: "
