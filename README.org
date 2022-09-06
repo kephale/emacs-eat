@@ -1,0 +1,99 @@
+#+title: Eat: Emulate A Terminal
+
+Eat's name self-explainary, it stands "Emulate A Terminal".  Eat is a
+terminal emulator.  It can run most (if not all) full-screen terminal
+programs, including Emacs.
+
+It is pretty fast, almost twice as fast as Term, despite being
+implemented entirely in Emacs Lisp.  So fast that you can comfortably
+run Emacs inside Eat, or even use your Emacs as a terminal
+multiplexer.
+
+It has many feature that other Emacs terminal emulator still don't
+have, for example complete mouse support.
+
+It flickers less than other Emacs terminal emulator, so you get more
+performance and a smooth experience.
+
+* Usage
+
+To start Eat, run =M-x eat=.  Eat has three keybinding modes:
+
+- "emacs" mode: No special keybinding, except the following:
+
+  - =C-c C-s=: Switch to semi-char mode.
+  - =C-c C-j=: Switch to char mode.
+  - =C-c C-k=: Kill process.
+
+- "semi-char" mode: Most keys are bound to send the key to the
+  terminal, except the following keys: =C-\= =C-c= =C-x= =C-g= =C-h=
+  =C-M-c= =C-u= =M-x= =M-:= =M-!= =M-&=.  The following special
+  keybinding are available:
+
+  - =C-q=: Send next key to the terminal.
+  - =C-y=: Like `yank', but send the text to the terminal.
+  - =M-y=: Like `yank-pop', but send the text to the terminal.
+  - =C-c C-k=: Kill process.
+
+- "char" mode: All supported keys are bound to send the key to the
+  terminal, except =C-M-m= or =M-RET=, which is bound to switch to
+  semi-char mode.
+
+If you like Eshell, then there is a good news for you.  Eat integrates
+with Eshell.  Eat has two global minor modes for Eshell:
+
+- ~eat-eshell-visual-command-mode~: Run visual commands with Eat
+  instead of Term.
+
+- ~eat-eshell-mode~: Run Eat inside Eshell.  After enabling this, you
+  can run full-screen terminal programs directly in Eshell.  You have
+  the above three keybinding modes here too.
+
+You can add any of these to ~eshell-first-time-mode-hook~ like the
+following:
+
+#+begin_src emacs-lisp
+;; For `eat-eshell-visual-command-mode'.
+(add-hook 'eshell-first-time-mode-hook
+          #'eat-eshell-visual-command-mode)
+
+;; For `eat-eshell-mode'.
+(add-hook 'eshell-first-time-mode-hook #'eat-eshell-mode)
+#+end_src
+
+* Installation
+
+Eat isn't available on any ELPA right now.  So, you have to follow one
+of the following methods:
+
+** Quelpa
+
+#+begin_src emacs-lisp
+(quelpa (eat :fetcher git
+             :url "https://codeberg.org/akib/emacs-iwindow.git"
+             :files ("*.el" "dir"
+                     "*.info" "*.texi"
+                     "*.ti" ("e" "e/*")))
+#+end_src
+
+** Manual
+
+Clone the repository and put it in your ~load-path~.
+
+* Comparison With Other Terminal Emulators
+
+** Term
+
+Term is the Emacs built-in terminal emulator.  Its terminal emulation
+is pretty good too.  it is slow.  It is so slow that Eat can beat
+native-compiled Term even without byte-compilation.  Also, it
+flickers, just try to run =emacs -nw= in it.
+
+** VTerm
+
+VTerm is powered by a C library, libvterm.  For this reason, it can
+process huge amount of text quickly.  It is about 2.5 times faster
+than Eat (byte-compiled or native-compiled) (and about 3.75 faster
+then Eat without byte-compilation).  But it doesn't have a char mode
+(however you can make a char mode putting some efforts).  And it too
+flickers like Term.

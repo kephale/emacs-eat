@@ -1,4 +1,4 @@
-;;; eat.el --- Emulate A Terminal, in a buffer and in Eshell -*- lexical-binding: t; -*-
+;;; eat.el --- Emulate A Terminal, in a region, a buffer and in Eshell -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2022 Akib Azmain Turja.
 
