@@ -4382,11 +4382,12 @@ Run COMMAND with SWITCHES.  Set NAME as the name of the process.
 Blast any old process running in the buffer.  Don't set the buffer
 mode.  You can use this to cheaply run a series of processes in the
 same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
-  (let ((inhibit-read-only t))
-    (with-current-buffer buffer
-      (let ((process (get-buffer-process buffer)))
-        (when process
-          (delete-process process)))
+  (with-current-buffer buffer
+    (message "%S" (current-buffer))
+    (let ((inhibit-read-only t))
+      (when eat--process
+        (let ((eat-kill-buffer-on-exit nil))
+          (delete-process eat--process)))
       ;; Ensure final newline.
       (goto-char (point-max))
       (unless (or (= (point-min) (point-max))
@@ -4394,7 +4395,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
         (insert ?\n))
       (unless (= (point-min) (point-max))
         (insert "\n\n"))
-      (setq eat--terminal (eat-term-make (current-buffer) (point)))
+      (setq eat--terminal (eat-term-make buffer (point)))
       (eat-semi-char-mode)
       (when-let ((window (get-buffer-window nil t)))
         (with-selected-window window
@@ -4469,39 +4470,42 @@ PROGRAM."
       (eat-exec buffer name program startfile switches))
     buffer))
 
-(defun eat--get-free-buffer (name)
-  "Get a Eat buffer with name starting with NAME without any process."
-  (cl-labels ((free-p (buffer)
-                (or (not (get-buffer buffer))
-                    (with-current-buffer buffer
-                      (and (eq major-mode 'eat-mode)
-                           (not eat--terminal)
-                           (not eat--process))))))
-    (get-buffer-create
-     (if (free-p name)
-         name
-       (cl-loop for n = 2 then (1+ n)
-                if (free-p (format "%s<%i>" name n))
-                return (format "%s<%i>" name n))))))
-
 ;;;###autoload
-(defun eat (&optional program)
+(defun eat (&optional program arg)
   "Start new a Eat terminal emulator in a new buffer.
+
+Start a new Eat session, or switch to an already active session.
+Return the buffer selected (or created).
+
+With a non-numeric prefix ARG, create a new session.
+
+With a numeric prefix ARG (like \\[universal-argument] 42 \\[eshell]),
+switch to the session with that number, or create it if it doesn't
+already exist.
 
 PROGRAM can be a shell command."
   (interactive (list (read-shell-command "Run program: "
                                          (or explicit-shell-file-name
                                              (getenv "ESHELL")
-                                             shell-file-name))))
+                                             shell-file-name))
+                     current-prefix-arg))
   (let ((program (or program (or explicit-shell-file-name
                                  (getenv "ESHELL")
                                  shell-file-name)))
-        (buffer (eat--get-free-buffer eat-buffer-name)))
-    (set-buffer buffer)
-    (eat-mode)
-    (pop-to-buffer-same-window (current-buffer))
-    (eat-exec (current-buffer) "eat" "/usr/bin/env" nil
-              `("sh" "-c" ,program))))
+        (buffer (cond ((numberp arg)
+		       (get-buffer-create
+                        (format "%s<%d>" eat-buffer-name arg)))
+		      (arg
+		       (generate-new-buffer eat-buffer-name))
+		      (t
+		       (get-buffer-create eat-buffer-name)))))
+    (with-current-buffer buffer
+      (unless (eq major-mode #'eat-mode)
+        (eat-mode))
+      (pop-to-buffer-same-window buffer)
+      (unless eat--process
+        (eat-exec buffer "eat" "/usr/bin/env" nil
+                  `("sh" "-c" ,program))))))
 
 
 ;;;; Eshell integration.
