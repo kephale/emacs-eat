@@ -1851,7 +1851,8 @@ OS's."
 
 Nil when not in alternative display mode.")
   (face (eat--make-face) :documentation "Display attributes.")
-  (cur-state :default :documentation "Current state) of cursor.")
+  (ins-mode nil :documentation "Non-nil means insert mode.")
+  (cur-state :default :documentation "Current state of cursor.")
   (cur-blinking-p nil :documentation "Is the cursor blinking?")
   (saved-face (eat--make-face) :documentation "Saved SGR attributes.")
   (bracketed-yank nil :documentation "State of bracketed yank mode.")
@@ -2100,11 +2101,50 @@ Every character of STR should occupy a single column."
             (setf (eat--cur-x cursor) 1)
             (cl-incf (eat--cur-y cursor))))))))
 
+(defun eat--insert (str)
+  "Insert STR.
+
+Every character of STR should occupy a single column."
+  ;; REVIEW: This probably needs to be updated.
+  (let* ((disp (eat--term-display eat--term))
+         (cursor (eat--disp-cursor disp))
+         (scroll-end (eat--term-scroll-end eat--term)))
+    (while (not (string-empty-p str))
+      (let ((ins-count (min (- (eat--disp-width disp)
+                               (1- (eat--cur-x cursor)))
+                            (length str))))
+        (insert (substring str 0 ins-count))
+        (setq str (substring str ins-count))
+        (cl-incf (eat--cur-x cursor) ins-count)
+        (delete-region
+         (save-excursion
+           (eat--col-motion (- (eat--disp-width disp)
+                               (1- (eat--cur-x cursor))))
+           (point))
+         (car (eat--eol)))
+        (unless (string-empty-p str)
+          (when (= (eat--cur-y cursor) scroll-end)
+            ;; We need to save the point because otherwise
+            ;; `eat--scroll-up' would move it.
+            (save-excursion
+              (eat--scroll-up 1 'preserve-point)))
+          (if (= (eat--cur-y cursor) scroll-end)
+              (eat--carriage-return)
+            (if (= (point) (point-max))
+                (insert (propertize "\n" 'eat-wrap-line t))
+              (put-text-property (point) (1+ (point))
+                                 'eat-wrap-line t)
+              (forward-char))
+            (setf (eat--cur-x cursor) 1)
+            (cl-incf (eat--cur-y cursor))))))))
+
 (defun eat--write (str)
   "Write STR on display."
-  (eat--overwrite
-   (propertize str 'face (eat--face-face
-                          (eat--term-face eat--term)))))
+  (let ((str (propertize str 'face (eat--face-face
+                                    (eat--term-face eat--term)))))
+    (if (eat--term-ins-mode eat--term)
+        (eat--insert str)
+      (eat--overwrite str))))
 
 (defun eat--horizontal-tab (&optional n)
   "Go to the Nth next tabulation stop.
@@ -2461,6 +2501,14 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
       (setf (eat--term-scroll-end eat--term) bottom)
       (eat--goto 1 1))))
 
+(defun eat--insert-mode ()
+  "Enable insert mode and disable replace mode."
+  (setf (eat--term-ins-mode eat--term) t))
+
+(defun eat--replace-mode ()
+  "Enable replace mode and disable insert mode."
+  (setf (eat--term-ins-mode eat--term) nil))
+
 (defun eat--set-sgr-params (params)
   "Set SGR parameters PARAMS."
   (let ((params (or params '((0))))
@@ -2703,6 +2751,11 @@ MODE should be one of nil and `x10', `normal', `button-event',
 (defun eat--set-modes (params format)
   "Set modes according to PARAMS in format FORMAT."
   (pcase format
+    ('nil
+     (while params
+       (pcase (pop params)
+         ('(4)
+          (eat--insert-mode)))))
     ('dec-private
      (while params
        (pcase (pop params)
@@ -2730,6 +2783,11 @@ MODE should be one of nil and `x10', `normal', `button-event',
 (defun eat--reset-modes (params format)
   "Reset modes according to PARAMS in format FORMAT."
   (pcase format
+    ('nil
+     (while params
+       (pcase (pop params)
+         ('(4)
+          (eat--replace-mode)))))
     ('dec-private
      (while params
        (pcase (pop params)
