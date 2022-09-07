@@ -1855,8 +1855,8 @@ OS's."
    #'ignore
    :documentation "Function to set focus event mode.")
   (parser-state nil :documentation "State of parser.")
-  (scroll-begin nil :documentation "First line of scroll region.")
-  (scroll-end nil :documentation "Last line of scroll region.")
+  (scroll-begin 1 :documentation "First line of scroll region.")
+  (scroll-end 24 :documentation "Last line of scroll region.")
   (display nil :documentation "The display.")
   (main-display nil :documentation "Main display.
 
@@ -4705,12 +4705,14 @@ PROGRAM can be a shell command."
   (when eat--terminal
     (let ((inhibit-read-only t))
       (goto-char (eat-term-end eat--terminal))
-      (unless (bolp)
+      (unless (or (= (point) (point-min))
+                  (= (char-before) ?\n))
         (insert ?\n))
       (set-marker eshell-last-output-start (point))
       (set-marker eshell-last-output-end (point))
-      (eat-term-delete eat--terminal)
       (eat--cursor-blink-mode -1)
+      (eat-term-delete eat--terminal)
+      (set-process-filter eat--process #'eshell-output-filter)
       (setq eat--terminal nil)
       (setq eat--process nil)
       (kill-local-variable 'eshell-output-filter-functions)
@@ -4734,26 +4736,24 @@ PROGRAM can be a shell command."
   "Process output STRING from PROCESS."
   (when (buffer-live-p (process-buffer process))
     (with-current-buffer (process-buffer process)
-      (if (not eat--terminal)
-          (eshell-output-filter process string)
-        (when eat--process-output-queue-timer
-          (cancel-timer eat--process-output-queue-timer))
-        (unless eat--output-queue-first-chunk-time
-          (setq eat--output-queue-first-chunk-time (current-time)))
-        (push string eat--pending-output-chunks)
-        (let ((time-left
-               (- eat-maximum-latency
-                  (float-time
-                   (time-subtract
-                    nil eat--output-queue-first-chunk-time)))))
-          (if (<= time-left 0)
-              (eat--eshell-process-output-queue
-               process (current-buffer))
-            (setq eat--process-output-queue-timer
-                  (run-with-timer
-                   (min time-left eat-minimum-latency) nil
-                   #'eat--eshell-process-output-queue process
-                   (current-buffer)))))))))
+      (when eat--process-output-queue-timer
+        (cancel-timer eat--process-output-queue-timer))
+      (unless eat--output-queue-first-chunk-time
+        (setq eat--output-queue-first-chunk-time (current-time)))
+      (push string eat--pending-output-chunks)
+      (let ((time-left
+             (- eat-maximum-latency
+                (float-time
+                 (time-subtract
+                  nil eat--output-queue-first-chunk-time)))))
+        (if (<= time-left 0)
+            (eat--eshell-process-output-queue
+             process (current-buffer))
+          (setq eat--process-output-queue-timer
+                (run-with-timer
+                 (min time-left eat-minimum-latency) nil
+                 #'eat--eshell-process-output-queue process
+                 (current-buffer))))))))
 
 (defun eat--eshell-sentinel (process message)
   "Process status message MESSAGE from PROCESS."
@@ -4963,7 +4963,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
       (setq eat-eshell-mode t)
       (dolist (buffer (buffer-list))
         (with-current-buffer buffer
-          (when (eq major-mode #'eshell-mode)
+          (when (and (eq major-mode #'eshell-mode)
+                     eat--eshell-local-mode)
             (when eshell-last-async-procs
               (user-error
                (concat "Can't toggle Eat Eshell mode while"
