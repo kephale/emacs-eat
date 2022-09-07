@@ -97,8 +97,8 @@ is 26.1 or above.
 ** Vterm
 
 Vterm is powered by a C library, libvterm.  For this reason, it can
-process huge amount of text quickly.  It is about 2.5 times faster
-than Eat (byte-compiled or native-compiled) (and about 3.75 faster
+process huge amount of text quickly.  It is about 2 times faster
+than Eat (byte-compiled or native-compiled) (and about 3.5 faster
 then Eat without byte-compilation).  But it doesn't have a char mode
 (however you can make a char mode putting some efforts).  And it too
 flickers like Term, so despite being much faster that Eat, it seems to
@@ -110,7 +110,8 @@ of data, you should Vterm.
 Coterm adds terminal emulation to Comint.  Although the terminal
 Coterm emulates is same as Term, it is much faster, about 1.75 times.
 However, it also flickers like other terminals.  Since it's an upgrade
-to Comint, you get all the features like "line" mode, completion using
-your favorite completion UI (Company, Corfu, etc), etc.  Some of these
-features are available in Eat-Eshell-Mode, however that's not Comint.
-Recommended if you like Comint.
+to Comint, you get all the features of Comint like "line" mode,
+completion using your favorite completion UI (Company, Corfu, etc),
+etc.  Some of these features are available in Eat-Eshell-Mode as
+Eshell is similar to Comint, however it's not Comint.  Recommended
+if you like Comint.
