@@ -2068,83 +2068,45 @@ of range, place cursor at the edge of display."
   (eat--cur-vertical-abs y)
   (eat--cur-horizontal-abs x))
 
-(defun eat--overwrite (str)
-  "Overwrite old content with STR.
-
-Every character of STR should occupy a single column."
-  ;; REVIEW: This probably needs to be updated.
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (scroll-end (eat--term-scroll-end eat--term)))
-    (while (not (string-empty-p str))
-      (let ((ins-count (min (- (eat--disp-width disp)
-                               (1- (eat--cur-x cursor)))
-                            (length str))))
-        (delete-region (point) (min (+ ins-count (point))
-                                    (car (eat--eol))))
-        (insert (substring str 0 ins-count))
-        (setq str (substring str ins-count))
-        (cl-incf (eat--cur-x cursor) ins-count)
-        (unless (string-empty-p str)
-          (when (= (eat--cur-y cursor) scroll-end)
-            ;; We need to save the point because otherwise
-            ;; `eat--scroll-up' would move it.
-            (save-excursion
-              (eat--scroll-up 1 'preserve-point)))
-          (if (= (eat--cur-y cursor) scroll-end)
-              (eat--carriage-return)
-            (if (= (point) (point-max))
-                (insert (propertize "\n" 'eat-wrap-line t))
-              (put-text-property (point) (1+ (point))
-                                 'eat-wrap-line t)
-              (forward-char))
-            (setf (eat--cur-x cursor) 1)
-            (cl-incf (eat--cur-y cursor))))))))
-
-(defun eat--insert (str)
-  "Insert STR.
-
-Every character of STR should occupy a single column."
-  ;; REVIEW: This probably needs to be updated.
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (scroll-end (eat--term-scroll-end eat--term)))
-    (while (not (string-empty-p str))
-      (let ((ins-count (min (- (eat--disp-width disp)
-                               (1- (eat--cur-x cursor)))
-                            (length str))))
-        (insert (substring str 0 ins-count))
-        (setq str (substring str ins-count))
-        (cl-incf (eat--cur-x cursor) ins-count)
-        (delete-region
-         (save-excursion
-           (eat--col-motion (- (eat--disp-width disp)
-                               (1- (eat--cur-x cursor))))
-           (point))
-         (car (eat--eol)))
-        (unless (string-empty-p str)
-          (when (= (eat--cur-y cursor) scroll-end)
-            ;; We need to save the point because otherwise
-            ;; `eat--scroll-up' would move it.
-            (save-excursion
-              (eat--scroll-up 1 'preserve-point)))
-          (if (= (eat--cur-y cursor) scroll-end)
-              (eat--carriage-return)
-            (if (= (point) (point-max))
-                (insert (propertize "\n" 'eat-wrap-line t))
-              (put-text-property (point) (1+ (point))
-                                 'eat-wrap-line t)
-              (forward-char))
-            (setf (eat--cur-x cursor) 1)
-            (cl-incf (eat--cur-y cursor))))))))
-
 (defun eat--write (str)
   "Write STR on display."
   (let ((str (propertize str 'face (eat--face-face
                                     (eat--term-face eat--term)))))
-    (if (eat--term-ins-mode eat--term)
-        (eat--insert str)
-      (eat--overwrite str))))
+    ;; REVIEW: This probably needs to be updated.
+    (let* ((disp (eat--term-display eat--term))
+           (cursor (eat--disp-cursor disp))
+           (scroll-end (eat--term-scroll-end eat--term)))
+      (while (not (string-empty-p str))
+        (let ((ins-count (min (- (eat--disp-width disp)
+                                 (1- (eat--cur-x cursor)))
+                              (length str))))
+          (insert (substring str 0 ins-count))
+          (setq str (substring str ins-count))
+          (cl-incf (eat--cur-x cursor) ins-count)
+          (if (eat--term-ins-mode eat--term)
+              (delete-region
+               (save-excursion
+                 (eat--col-motion (- (eat--disp-width disp)
+                                     (1- (eat--cur-x cursor))))
+                 (point))
+               (car (eat--eol)))
+            (delete-region (point) (min (+ ins-count (point))
+                                        (car (eat--eol)))))
+          (unless (string-empty-p str)
+            (when (= (eat--cur-y cursor) scroll-end)
+              ;; We need to save the point because otherwise
+              ;; `eat--scroll-up' would move it.
+              (save-excursion
+                (eat--scroll-up 1 'preserve-point)))
+            (if (= (eat--cur-y cursor) scroll-end)
+                (eat--carriage-return)
+              (if (= (point) (point-max))
+                  (insert (propertize "\n" 'eat-wrap-line t))
+                (put-text-property (point) (1+ (point))
+                                   'eat-wrap-line t)
+                (forward-char))
+              (setf (eat--cur-x cursor) 1)
+              (cl-incf (eat--cur-y cursor)))))))))
 
 (defun eat--horizontal-tab (&optional n)
   "Go to the Nth next tabulation stop.
