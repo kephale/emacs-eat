@@ -300,7 +300,7 @@ If your process is choking on big inputs, try lowering the value."
 (defface eat-term-color-1
   '((t :inherit ansi-color-red))
   "Face used to render red color text."
-  :group 'term
+  :group 'eat-term
   :version "28.1")
 
 (put 'eat-term-color-red 'face-alias 'eat-term-color-1)
@@ -308,7 +308,7 @@ If your process is choking on big inputs, try lowering the value."
 (defface eat-term-color-2
   '((t :inherit ansi-color-green))
   "Face used to render green color text."
-  :group 'term
+  :group 'eat-term
   :version "28.1")
 
 (put 'eat-term-color-green 'face-alias 'eat-term-color-2)
