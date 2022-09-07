@@ -5081,5 +5081,15 @@ already exist."
          (eat-buffer-name (project-prefixed-buffer-name "eat")))
     (eat nil arg)))
 
+;;;###autoload
+(with-eval-after-load 'project
+  (when (and (boundp 'project-switch-commands)
+             (boundp 'project-prefix-map)
+             (not (member '(eat-project "Eat")
+                          project-switch-commands)))
+    (setq project-switch-commands (append project-switch-commands
+                                          '((eat-project "Eat"))))
+    (define-key project-prefix-map "E" #'eat-project)))
+
 (provide 'eat)
 ;;; eat.el ends here
