@@ -116,7 +116,8 @@ This is the default name used when running Eat."
   "Size of scrollback area in characters.  Nil means unlimited."
   :type '(choice integer (const nil))
   :group 'eat-term
-  :group 'eat-ui)
+  :group 'eat-ui
+  :group 'eat-ehell)
 
 (defcustom eat-default-cursor-type
   (cons (default-value 'cursor-type) nil)
@@ -141,7 +142,8 @@ blinking frequency of cursor."
           (choice
            (const :tag "No blinking" nil)
            (number :tag "Blinking frequency")))
-  :group 'eat-ui)
+  :group 'eat-ui
+  :group 'eat-ehell)
 
 (defcustom eat-invisible-cursor-type '(nil . nil)
   "Cursor to use in Eat buffer.
@@ -165,7 +167,8 @@ blinking frequency of cursor."
           (choice
            (const :tag "No blinking" nil)
            (number :tag "Blinking frequency")))
-  :group 'eat-ui)
+  :group 'eat-ui
+  :group 'eat-ehell)
 
 (defcustom eat-very-visible-cursor-type
   (cons (default-value 'cursor-type) 2)
@@ -190,7 +193,8 @@ blinking frequency of cursor."
           (choice
            (const :tag "No blinking" nil)
            (number :tag "Blinking frequency")))
-  :group 'eat-ui)
+  :group 'eat-ui
+  :group 'eat-ehell)
 
 (defcustom eat-term-name #'eat-term-get-suitable-term-name
   "Value for the `TERM' environment variable.
@@ -210,19 +214,23 @@ display."
   "Minimum display latency in seconds.
 
 Lowering it too much may cause (or increase) flickering and decrease
-performance due to too many redisplay.  Try to increase this value if
-the terminal flickers."
+performance due to too many redisplays.  Increasing it too much will
+cause the terminal to feel less responsive.  Try to increase this
+value if the terminal flickers."
   :type 'number
-  :group 'eat-ui)
+  :group 'eat-ui
+  :group 'eat-ehell)
 
 (defcustom eat-maximum-latency 0.033
   "Minimum display latency in seconds.
 
-Increasing it too much may make the terminal feel less responsive.
-Try to increase this value if the terminal flickers.  Try to lower the
-value if the terminal feels less responsive."
+Increasing it too much may make the terminal feel less responsive in
+case of huge burst of output.  Try to increase this value if the
+terminal flickers.  Try to lower the value if the terminal feels less
+responsive."
   :type 'number
-  :group 'eat-ui)
+  :group 'eat-ui
+  :group 'eat-ehell)
 
 (defcustom eat-term-terminfo-directory
   (file-name-directory (or load-file-name buffer-file-name))
@@ -1748,29 +1756,28 @@ Assume all characters occupy a single column."
 (defun eat--join-long-line (&optional limit)
   "Join long line once, but don't try to go beyond LIMIT.
 
-For example: \"*foo\nbar\nbaz\" is converted to \"foo*bar\nbaz\",
+For example: \"*foo\\nbar\\nbaz\" is converted to \"foo*bar\\nbaz\",
 where `*' indicates point."
-  (or (when (get-char-property (point) 'eat-wrap-line)
-        (unless (eq (point) (or limit (point-max)))
-          (delete-char 1))
-        t)
-      (let ((next (next-single-char-property-change
-                   (point) 'eat-wrap-line nil limit)))
-        (goto-char next)
-        (unless (eq (point) (or limit (point-max)))
-          (delete-char 1)))))
+  (if (get-char-property (point) 'eat-wrap-line)
+      (when (< (point) (or limit (point-max)))
+        (delete-char 1))
+    (let ((next (next-single-char-property-change
+                 (point) 'eat-wrap-line nil limit)))
+      (goto-char next)
+      (when (< (point) (or limit (point-max)))
+        (delete-char 1)))))
 
 (defun eat--break-long-line (threshold)
   "Break a line longer than THRESHOLD once.
 
 For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
-\"foo\n*barbaz\", where `*' indicates point."
+\"foo\\n*barbaz\", where `*' indicates point."
   (let ((loop t))
     (while (and loop (< (point) (point-max)))
       (eat--goto-col threshold)
       (if (eq (char-after) ?\n)
           (forward-char)
-        (unless (eq (point) (point-max))
+        (unless (= (point) (point-max))
           (insert-before-markers (propertize "\n" 'eat-wrap-line t)))
         (setq loop nil)))))
 
@@ -1810,7 +1817,11 @@ OS's."
   (width 80 :documentation "Width of display.")
   (height 24 :documentation "Height of display.")
   (cursor nil :documentation "Cursor.")
-  (saved-cursor (eat--make-cur) :documentation "Saved cursor."))
+  (saved-cursor (eat--make-cur) :documentation "Saved cursor.")
+  (old-begin
+   nil
+   :documentation
+   "Beginning of visible display during last Eat redisplay."))
 
 (cl-defstruct (eat--face
                (:constructor eat--make-face)
@@ -1871,6 +1882,7 @@ Don't `set' it, bind it to a value with `let'.")
   (let* ((disp (eat--term-display eat--term)))
     (setf (eat--term-parser-state eat--term) nil)
     (setf (eat--disp-begin disp) (point-min-marker))
+    (setf (eat--disp-old-begin disp) (point-min-marker))
     (setf (eat--disp-cursor disp)
           (eat--make-cur :position (point-min-marker)))
     (setf (eat--disp-saved-cursor disp) (eat--make-cur))
@@ -2009,17 +2021,7 @@ relative to the text and change current line accordingly."
           (unless (or (= (point) (point-min))
                       (= (char-before) ?\n))
             (insert ?\n))
-          (let ((old-beg (marker-position (eat--disp-begin disp)))
-                (limit (1- (point))))
-            (set-marker (eat--disp-begin disp) (point))
-            (save-excursion
-              (goto-char (max (1- old-beg) (point-min)))
-              (while (< (point) limit)
-                (eat--join-long-line limit)))
-            ;; Truncate scrollback.
-            (delete-region
-             (point-min)
-             (max (point-min) (- (point) eat-term-scrollback-size)))))
+          (set-marker (eat--disp-begin disp) (point)))
         (eat--goto-bol (- (1+ (- scroll-end scroll-begin)) n))
         (eat--repeated-insert ?\n n))
       (when (and preserve-point
@@ -2337,6 +2339,8 @@ STATE one of the `:default', `:invisible', `:very-visible'."
                         (eat--term-display eat--term))))
         (setf (eat--disp-begin main-disp)
               (- (eat--disp-begin main-disp) (point-min)))
+        (setf (eat--disp-old-begin main-disp)
+              (- (eat--disp-old-begin main-disp) (point-min)))
         (setf (eat--disp-cursor main-disp)
               (eat--copy-cur (eat--disp-cursor main-disp)))
         (setf (eat--disp-saved-cursor main-disp)
@@ -2359,6 +2363,9 @@ STATE one of the `:default', `:invisible', `:very-visible'."
       (setf (eat--disp-begin (car main-disp))
             (copy-marker (+ (point-min)
                             (eat--disp-begin (car main-disp)))))
+      (setf (eat--disp-old-begin (car main-disp))
+            (copy-marker (+ (point-min)
+                            (eat--disp-old-begin (car main-disp)))))
       (setf (eat--cur-position (eat--disp-cursor (car main-disp)))
             (copy-marker (+ (point-min)
                             (eat--cur-position
@@ -3054,6 +3061,7 @@ MODE should be one of nil and `x10', `normal', `button-event',
    :end (copy-marker position)
    :display (eat--make-disp
              :begin (copy-marker position)
+             :old-begin (copy-marker position)
              :cursor (eat--make-cur
                       :position (copy-marker position)))))
 
@@ -3241,7 +3249,21 @@ you need the position."
   "Prepare TERMINAL for displaying."
   (let ((inhibit-quit t))
     (eat--with-env terminal
-      (eat--disp-begin (eat--term-display eat--term)))))
+      (let* ((disp (eat--term-display eat--term)))
+        (when (< (eat--disp-old-begin disp) (eat--disp-begin disp))
+          ;; Join long lines.
+          (let ((limit (copy-marker (1- (eat--disp-begin disp)))))
+            (save-excursion
+              (goto-char (max (1- (eat--disp-old-begin disp))
+                              (point-min)))
+              (while (< (point) limit)
+                (eat--join-long-line limit))))
+          ;; Truncate scrollback.
+          (delete-region
+           (point-min)
+           (max (point-min) (- (point) eat-term-scrollback-size)))
+          (set-marker (eat--disp-old-begin disp)
+                      (eat--disp-begin disp)))))))
 
 (defun eat-term-resize (terminal width height)
   "Resize TERMINAL to WIDTH x HEIGHT."
@@ -3682,8 +3704,9 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 
 (defun eat--flip-slow-blink-state ()
   "Flip the state of slowly blinking text."
-  (declare-function face-remap-add-relative "face-remap")
-  (declare-function face-remap-remove-relative "face-remap")
+  (declare-function face-remap-add-relative "face-remap"
+                    (face &rest specs))
+  (declare-function face-remap-remove-relative "face-remap" (cookie))
   (face-remap-remove-relative eat--slow-blink-remap)
   (setq eat--slow-blink-remap
         (face-remap-add-relative
@@ -3693,8 +3716,9 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 
 (defun eat--flip-fast-blink-state ()
   "Flip the state of rapidly blinking text."
-  (declare-function face-remap-add-relative "face-remap")
-  (declare-function face-remap-remove-relative "face-remap")
+  (declare-function face-remap-add-relative "face-remap"
+                    (face &rest specs))
+  (declare-function face-remap-remove-relative "face-remap" (cookie))
   (face-remap-remove-relative eat--fast-blink-remap)
   (setq eat--fast-blink-remap
         (face-remap-add-relative
@@ -3724,7 +3748,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (define-minor-mode eat-blink-mode
   "Toggle blinking of text with blink attribute."
   :lighter " Eat-Blink"
-  (declare-function face-remap-add-relative "face-remap")
+  (declare-function face-remap-add-relative "face-remap"
+                    (face &rest specs))
   (cond
    (eat-blink-mode
     (setq eat-blink-mode nil)
@@ -4492,7 +4517,7 @@ PROGRAM."
 
 ;;;###autoload
 (defun eat (&optional program arg)
-  "Start new a Eat terminal emulator in a new buffer.
+  "Start a new Eat terminal emulator in a new buffer.
 
 Start a new Eat session, or switch to an already active session.
 Return the buffer selected (or created).
@@ -4512,20 +4537,22 @@ PROGRAM can be a shell command."
   (let ((program (or program (or explicit-shell-file-name
                                  (getenv "ESHELL")
                                  shell-file-name)))
-        (buffer (cond ((numberp arg)
-		       (get-buffer-create
-                        (format "%s<%d>" eat-buffer-name arg)))
-		      (arg
-		       (generate-new-buffer eat-buffer-name))
-		      (t
-		       (get-buffer-create eat-buffer-name)))))
+        (buffer
+         (cond
+          ((numberp arg)
+	   (get-buffer-create (format "%s<%d>" eat-buffer-name arg)))
+	  (arg
+	   (generate-new-buffer eat-buffer-name))
+	  (t
+	   (get-buffer-create eat-buffer-name)))))
     (with-current-buffer buffer
       (unless (eq major-mode #'eat-mode)
         (eat-mode))
       (pop-to-buffer-same-window buffer)
       (unless eat--process
         (eat-exec buffer "eat" "/usr/bin/env" nil
-                  `("sh" "-c" ,program))))))
+                  `("sh" "-c" ,program)))
+      buffer)))
 
 
 ;;;; Eshell integration.
@@ -4692,7 +4719,7 @@ PROGRAM can be a shell command."
 
 (defun eat--eshell-process-output-queue (process buffer)
   "Process the output queue on BUFFER from PROCESS."
-  (declare-function eshell-output-filter "esh-mode")
+  (declare-function eshell-output-filter "esh-mode" (process string))
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (when eat--process-output-queue-timer
@@ -4730,7 +4757,7 @@ PROGRAM can be a shell command."
 
 (defun eat--eshell-sentinel (process message)
   "Process status message MESSAGE from PROCESS."
-  (declare-function eshell-sentinel "esh-proc")
+  (declare-function eshell-sentinel "esh-proc" (proc string))
   (when (buffer-live-p (process-buffer process))
     (cl-letf* ((process-send-string
                 (symbol-function #'process-send-string))
@@ -4746,7 +4773,7 @@ PROGRAM can be a shell command."
   (eshell-sentinel process message))
 
 ;; HACK: This is a dirty hack, it can break easily.
-(defun eat--adjust-make-process-args (fn command args)
+(defun eat--eshell-adjust-make-process-args (fn command args)
   "Setup an environment to adjust `make-process' arguments.
 
 Call FN with COMMAND and ARGS, and whenever `make-process' is called,
@@ -4898,9 +4925,11 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                           (down-mouse-1 . eat-eshell-semi-char-mode)
                           (down-mouse-3 . eat-eshell-char-mode)))))
                     "]")))))))
+  :group 'eat-ehell
   (defvar eshell-variable-aliases-list) ; In `esh-var'.
   (defvar eshell-last-async-procs) ; In `esh-cmd'.
-  (declare-function eshell-gather-process-output "esh-proc")
+  (declare-function eshell-gather-process-output "esh-proc"
+                    (command args))
   (cond
    (eat-eshell-mode
     (let ((buffers nil))
@@ -4928,7 +4957,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
             ("INSIDE_EMACS" eat-term-inside-emacs t)
             ,@eshell-variable-aliases-list))
     (advice-add #'eshell-gather-process-output :around
-                #'eat--adjust-make-process-args))
+                #'eat--eshell-adjust-make-process-args))
    (t
     (let ((buffers nil))
       (setq eat-eshell-mode t)
@@ -4954,7 +4983,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                        ("INSIDE_EMACS" eat-term-inside-emacs t))))
            eshell-variable-aliases-list))
     (advice-remove #'eshell-gather-process-output
-                   #'eat--adjust-make-process-args))))
+                   #'eat--eshell-adjust-make-process-args))))
 
 
 ;;;; Eshell Visual Command Handling.
@@ -4985,8 +5014,9 @@ MSG describes PROC's status."
 
 ARGS are passed to the program.  At the moment, no piping of input is
 allowed."
-  (declare-function eshell-find-interpreter "esh-ext")
-  (declare-function eshell-stringify-list "esh-util")
+  (declare-function eshell-find-interpreter "esh-ext"
+                    (file args &optional no-examine-p))
+  (declare-function eshell-stringify-list "esh-util" (args))
   (defvar eshell-interpreter-alist) ; In `esh-ext'.
   (require 'esh-ext)
   (require 'esh-util)
@@ -5021,7 +5051,7 @@ allowed."
   "Toggle running Eshell visual commands with Eat."
   :group 'eat-eshell
   :global t
-  (declare-function eshell-exec-visual "em-term")
+  (declare-function eshell-exec-visual "em-term" (&rest args))
   (if eat-eshell-visual-command-mode
       (advice-add #'eshell-exec-visual :override
                   #'eat--eshell-exec-visual)
@@ -5031,25 +5061,24 @@ allowed."
 ;;;; Project integration.
 
 ;;;###autoload
-(defun eat-project ()
+(defun eat-project (&optional arg)
   "Start Eat in the current project's root directory.
 
-If a buffer already exists for running Eat in the project's root,
-switch to it.  Otherwise, create a new Eat buffer.  With
-\\[universal-argument] prefix arg, create a new Eshell buffer even if
-one already exists."
-  (interactive)
-  (declare-function project-root "project")
-  (declare-function project-prefixed-buffer-name "project")
+Start a new Eat session, or switch to an already active session.
+Return the buffer selected (or created).
+
+With a non-numeric prefix ARG, create a new session.
+
+With a numeric prefix ARG (like \\[universal-argument] 42 \\[eshell]),
+switch to the session with that number, or create it if it doesn't
+already exist."
+  (interactive "P")
+  (declare-function project-root "project" (project))
+  (declare-function project-prefixed-buffer-name "project" (mode))
   (require 'project)
   (let* ((default-directory (project-root (project-current t)))
-         (eat-buffer-name (project-prefixed-buffer-name "eat"))
-         (buffer (get-buffer eat-buffer-name)))
-    (if (and buffer
-             (get-buffer-process buffer)
-             (not current-prefix-arg))
-        (pop-to-buffer buffer)
-      (eat))))
+         (eat-buffer-name (project-prefixed-buffer-name "eat")))
+    (eat nil arg)))
 
 (provide 'eat)
 ;;; eat.el ends here
