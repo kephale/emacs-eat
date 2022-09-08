@@ -71,7 +71,9 @@
 
 ;;   * `eat-eshell-mode': Run Eat inside Eshell.  After enabling this,
 ;;     you can run full-screen terminal programs directly in Eshell.
-;;     You have three keybinding modes here too.
+;;     You have three keybinding modes here too, except that `C-c'
+;;     `C-k' is not special (i.e. not bound by Eat) in "emacs" mode
+;;     and "line" mode.
 
 ;;; Code:
 
@@ -4433,7 +4435,6 @@ Blast any old process running in the buffer.  Don't set the buffer
 mode.  You can use this to cheaply run a series of processes in the
 same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
   (with-current-buffer buffer
-    (message "%S" (current-buffer))
     (let ((inhibit-read-only t))
       (when eat--process
         (let ((eat-kill-buffer-on-exit nil))

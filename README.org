@@ -47,7 +47,8 @@ with Eshell.  Eat has two global minor modes for Eshell:
 
 - ~eat-eshell-mode~: Run Eat inside Eshell.  After enabling this, you
   can run full-screen terminal programs directly in Eshell.  You have
-  the above three keybinding modes here too.
+  the above three keybinding modes here too, except that =C-c C-k= is
+  not special (i.e. not bound by Eat) in "emacs" mode and "line" mode.
 
 You can add any of these to ~eshell-first-time-mode-hook~ like the
 following:
