@@ -3308,13 +3308,13 @@ client process may get confused."
       (dotimes (_ (or n 1))
         (pcase (or event last-command-event)
           ('up
-           (send "\e[A"))
+           (send "\eOA"))
           ('down
-           (send "\e[B"))
+           (send "\eOB"))
           ('right
-           (send "\e[C"))
+           (send "\eOC"))
           ('left
-           (send "\e[D"))
+           (send "\eOD"))
           ('C-up
            (send "\e[1;5A"))
           ('C-down
