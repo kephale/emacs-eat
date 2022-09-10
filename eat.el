@@ -243,16 +243,25 @@ responsive."
   :group 'eat-ui
   :group 'eat-ehell)
 
-;; We want override any pre-existing value.
+;; Upgrading Eat causes `eat-term-terminfo-directory' to be outdated,
+;; so update that if not modified by user (or something else).
 (defvar eat--install-path nil
   "Path to directory where Eat is installed.")
-(setq eat--install-path (file-name-directory (or load-file-name
-                                                 buffer-file-name)))
 
-(defcustom eat-term-terminfo-directory eat--install-path
-  "Directory where Terminfo database of variable `eat-term-name'."
-  :type 'directory
-  :group 'eat-term)
+(defvar eat-term-terminfo-directory)
+(let ((old-install-path eat--install-path))
+  (setq eat--install-path
+        (copy-sequence
+         (file-name-directory (or load-file-name
+                                  buffer-file-name))))
+
+  (defcustom eat-term-terminfo-directory eat--install-path
+    "Directory where Terminfo database of variable `eat-term-name'."
+    :type 'directory
+    :group 'eat-term)
+
+  (when (eq eat-term-terminfo-directory old-install-path)
+    (setq eat-term-terminfo-directory eat--install-path)))
 
 (defcustom eat-term-inside-emacs
   (format "%s,eat" emacs-version)
