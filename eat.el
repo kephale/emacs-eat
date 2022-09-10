@@ -118,8 +118,17 @@ This is the default name used when running Eat."
   "Size of scrollback area in characters.  Nil means unlimited."
   :type '(choice integer (const nil))
   :group 'eat-term
-  :group 'eat-ui
-  :group 'eat-ehell)
+  :group 'eat-ui)
+
+(defcustom eat-enable-kill-from-terminal t
+  "Non-nil means allow terminal process to add text to kill ring."
+  :type 'boolean
+  :group 'eat-ui)
+
+(defcustom eat-enable-yank-to-terminal nil
+  "Non-nil means allow terminal process to get text from kill ring."
+  :type 'boolean
+  :group 'eat-ui)
 
 (defcustom eat-default-cursor-type
   (cons (default-value 'cursor-type) nil)
@@ -1856,6 +1865,9 @@ OS's."
   (title "" :documentation "The title of the terminal.")
   (input-fn #'ignore :documentation "Function to send input.")
   (set-cursor-fn #'ignore :documentation "Function to set cursor.")
+  (manipulate-selection-fn
+   #'ignore
+   :documentation "Function to manipulate selection.")
   (set-title-fn #'ignore :documentation "Function to set title.")
   (grab-mouse-fn #'ignore :documentation "Function to grab mouse.")
   (set-focus-ev-mode-fn
@@ -1869,15 +1881,17 @@ OS's."
 
 Nil when not in alternative display mode.")
   (face (eat--make-face) :documentation "Display attributes.")
-  (ins-mode nil :documentation "Non-nil means insert mode.")
+  (ins-mode nil :documentation "State of insert mode.")
   (cur-state :default :documentation "Current state of cursor.")
   (cur-blinking-p nil :documentation "Is the cursor blinking?")
   (saved-face (eat--make-face) :documentation "Saved SGR attributes.")
   (bracketed-yank nil :documentation "State of bracketed yank mode.")
+  (keypad-mode nil :documentation "State of keypad mode.")
   (mouse-mode t :documentation "Current mouse mode.")
   (mouse-pressed nil :documentation "Pressed mouse buttons.")
+  (mouse-encoding nil :documentation "Current mouse event encoding.")
   (focus-event-mode nil :documentation "Whether to send focus event.")
-  (mouse-encoding nil :documentation "Current mouse event encoding."))
+  (cut-buffers (make-vector 10 nil) :documentation "Cut buffers."))
 
 (defvar eat--term nil
   "The current terminal.
@@ -1902,9 +1916,10 @@ Don't `set' it, bind it to a value with `let'.")
     (setf (eat--term-cur-state eat--term) :default)
     (setf (eat--term-cur-blinking-p eat--term) nil)
     (setf (eat--term-title eat--term) "")
+    (setf (eat--term-keypad-mode eat--term) nil)
     (setf (eat--term-mouse-mode eat--term) nil)
-    (setf (eat--term-focus-event-mode eat--term) nil)
     (setf (eat--term-mouse-encoding eat--term) nil)
+    (setf (eat--term-focus-event-mode eat--term) nil)
     (delete-region (point-min) (point-max))
     (funcall (eat--term-grab-mouse-fn eat--term) eat--term nil)
     (funcall (eat--term-set-focus-ev-mode-fn eat--term) eat--term nil)
@@ -2663,6 +2678,14 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
              ,@(when-let ((blink (eat--face-blink face)))
                  (list blink)))))))
 
+(defun eat--enable-keypad ()
+  "Enable keypad."
+  (setf (eat--term-keypad-mode eat--term) t))
+
+(defun eat--disable-keypad ()
+  "Disable keypad."
+  (setf (eat--term-keypad-mode eat--term) nil))
+
 (defun eat--enable-sgr-mouse-encoding ()
   "Arrange that the following mouse events will be encoded like SGR."
   (setf (eat--term-mouse-encoding eat--term) 'sgr))
@@ -2724,6 +2747,108 @@ MODE should be one of nil and `x10', `normal', `button-event',
   (setf (eat--term-title eat--term) title)
   (funcall (eat--term-set-title-fn eat--term) eat--term title))
 
+(defun eat--send-device-attrs (params format)
+  "Return device attributes.
+
+PARAMS is the parameter list and FORMAT is the format of parameters in
+output."
+  (let ((params (or params '((0)))))
+    (pcase format
+      ('nil
+       (when (= (caar params) 0)
+         (funcall (eat--term-input-fn eat--term) eat--term
+                  "\e[?1;2c")))
+      (?>
+       (when (= (caar params) 0)
+         (funcall (eat--term-input-fn eat--term) eat--term
+                  "\e[>0;242;0c"))))))
+
+(defun eat--report-foreground-color ()
+  "Report the current default foreground color to the client."
+  (funcall
+   (eat--term-input-fn eat--term) eat--term
+   (format "\e]10;%s\e\\"
+           (mapconcat (lambda (n) (format "%04x" n))
+                      (color-values (face-foreground 'default))
+                      "/"))))
+
+(defun eat--report-background-color ()
+  "Report the current default background color to the client."
+  (funcall
+   (eat--term-input-fn eat--term) eat--term
+   (format "\e]11;%s\e\\"
+           (mapconcat (lambda (n) (format "%04x" n))
+                      (color-values (face-background 'default))
+                      "/"))))
+
+(defun eat--manipulate-selection (targets data)
+  "Set and send current selection.
+
+TARGETS is a string containing zero or more characters from the set
+`c', `p', `q', `s', `0', `1', `2', `3', `4', `5', `6', `7', `8', `9'.
+DATA is the selection data encoded in base64."
+  (when (string-empty-p targets)
+    (setq targets "s0"))
+  (if (string= data "?")
+      (funcall
+       (eat--term-input-fn eat--term) eat--term
+       (let ((str nil)
+             (source nil)
+             (n 0))
+         (while (and (not str) (< n (length targets)))
+           (setq
+            str
+            (pcase (aref targets n)
+              (?c
+               (funcall
+                (eat--term-manipulate-selection-fn eat--term)
+                eat--term :clipboard t))
+              (?p
+               (funcall
+                (eat--term-manipulate-selection-fn eat--term)
+                eat--term :primary t))
+              (?q
+               (funcall
+                (eat--term-manipulate-selection-fn eat--term)
+                eat--term :secondary t))
+              (?s
+               (funcall
+                (eat--term-manipulate-selection-fn eat--term)
+                eat--term :select t))
+              ((and (pred (<= ?0))
+                    (pred (>= ?9))
+                    i)
+               (aref (eat--term-cut-buffers eat--term) (- i ?0)))))
+           (when str
+             (setq source (aref targets n)))
+           (cl-incf n))
+         (unless str
+           (setq str "")
+           (setq source (aref targets (1- (length targets)))))
+         (format "\e]52;%c;%s\e\\" source
+                 (base64-encode-string str))))
+    (let ((str (ignore-error error
+                 (decode-coding-string (base64-decode-string data)
+                                       locale-coding-system))))
+      (seq-doseq (target targets)
+        (pcase target
+          (?c
+           (funcall (eat--term-manipulate-selection-fn eat--term)
+                    eat--term :clipboard str))
+          (?p
+           (funcall (eat--term-manipulate-selection-fn eat--term)
+                    eat--term :primary str))
+          (?q
+           (funcall (eat--term-manipulate-selection-fn eat--term)
+                    eat--term :secondary str))
+          (?s
+           (funcall (eat--term-manipulate-selection-fn eat--term)
+                    eat--term :select str))
+          ((and (pred (<= ?0))
+                (pred (>= ?9))
+                i)
+           (aset (eat--term-cut-buffers eat--term) (- i ?0) str)))))))
+
 (defun eat--set-modes (params format)
   "Set modes according to PARAMS in format FORMAT."
   (pcase format
@@ -2732,9 +2857,11 @@ MODE should be one of nil and `x10', `normal', `button-event',
        (pcase (pop params)
          ('(4)
           (eat--insert-mode)))))
-    ('dec-private
+    (??
      (while params
        (pcase (pop params)
+         ('(1)
+          (eat--enable-keypad))
          ('(12)
           (eat--blinking-cursor))
          ('(25)
@@ -2764,9 +2891,11 @@ MODE should be one of nil and `x10', `normal', `button-event',
        (pcase (pop params)
          ('(4)
           (eat--replace-mode)))))
-    ('dec-private
+    (??
      (while params
        (pcase (pop params)
+         ('(1)
+          (eat--disable-keypad))
          ('(12)
           (eat--non-blinking-cursor))
          ('(25)
@@ -2893,7 +3022,15 @@ MODE should be one of nil and `x10', `normal', `button-event',
                              (match-string 0 str))))
                    (when (and (not (string-empty-p str))
                               (= (aref str 0) ??))
-                     (setq format 'dec-private)
+                     (setq format ??)
+                     (setq str (substring str 1)))
+                   (when (and (not (string-empty-p str))
+                              (= (aref str 0) ?>))
+                     (setq format ?>)
+                     (setq str (substring str 1)))
+                   (when (and (not (string-empty-p str))
+                              (= (aref str 0) ?=))
+                     (setq format ?=)
                      (setq str (substring str 1)))
                    (setq index (match-end 0))
                    (list
@@ -2965,13 +3102,19 @@ MODE should be one of nil and `x10', `normal', `button-event',
                ;; CSI <n> Z.
                (`("Z" nil ,(and (pred listp) params))
                 (eat--horizontal-backtab (caar params)))
+               ;; CSI <n> c.
+               ;; CSI > <n> c.
+               (`("c" ,format ,(and (pred listp) params))
+                (eat--send-device-attrs params format))
                ;; CSI <n> d.
                (`("d" nil ,(and (pred listp) params))
                 (eat--cur-vertical-abs (caar params)))
                ;; CSI ... h
+               ;; CSI ? ... h
                (`("h" ,format ,(and (pred listp) params))
                 (eat--set-modes params format))
                ;; CSI ... l
+               ;; CSI ? ... l
                (`("l" ,format ,(and (pred listp) params))
                 (eat--reset-modes params format))
                ;; CSI ... m
@@ -3012,10 +3155,23 @@ MODE should be one of nil and `x10', `normal', `button-event',
                  (pcase state
                    ('read-osc
                     (pcase str
-                      ((rx (or ?0 ?2) ?\;
+                      ((rx string-start (or ?0 ?2) ?\;
                            (let title (zero-or-more anything))
                            string-end)
-                       (eat--set-title title))))))))))))))
+                       (eat--set-title title))
+                      ("10;?"
+                       (eat--report-foreground-color))
+                      ("11;?"
+                       (eat--report-background-color))
+                      ((rx string-start "52;"
+                           (let targets
+                             (zero-or-more (any ?c ?p ?q ?s
+                                                (?0 . ?9))))
+                           ";"
+                           (let data (zero-or-more anything))
+                           string-end)
+                       (eat--manipulate-selection
+                        targets data))))))))))))))
 
 (defun eat--resize (width height)
   "Resize terminal to WIDTH x HEIGHT."
@@ -3173,8 +3329,8 @@ FUNCTION), where FUNCTION is the function to set title."
   "Return the function used to grab the mouse.
 
 The function is called with two arguments, TERMINAL and a symbol MODE
-describing the new mouse mode.  The function should not change point
-and buffer restriction.  MODE can be one of the following:
+describing the new mouse mode MODE.  The function should not change
+point and buffer restriction.  MODE can be one of the following:
 
   nil                 Disable mouse.
   `:click'              Pass `mouse-1', `mouse-2', and `mouse-3'
@@ -3195,6 +3351,41 @@ FUNCTION), where FUNCTION is the function to set mouse mode."
 
 (gv-define-setter eat-term-grab-mouse-function (function terminal)
   `(setf (eat--term-grab-mouse-fn ,terminal) ,function))
+
+(defun eat-term-grab-focus-events-function (terminal)
+  "Return the function used to grab focus in and out events.
+
+The function is called with two arguments, TERMINAL and a boolean
+describing the new grabbing mode.  When the boolean is nil, don't send
+focus event, otherwise send focus events.  The function should not
+change point and buffer restriction.
+
+To set it, use (`setf' (`eat-term-grab-focus-events-function'
+TERMINAL) FUNCTION), where FUNCTION is the function to set title."
+  (eat--term-set-focus-ev-mode-fn terminal))
+
+(gv-define-setter eat-term-grab-focus-events-function
+    (function terminal)
+  `(setf (eat--term-set-focus-ev-mode-fn ,terminal) ,function))
+
+(defun eat-term-manipulate-selection-function (terminal)
+  "Return the function used to manipulate selection (or `kill-ring').
+
+The function is called with three arguments, TERMINAL, a symbol
+SELECTION describing the selection paramater and DATA, a string, or a
+boolean.  The function should not change point and buffer restriction.
+SELECTION can be one of `:clipboard', `:primary', `:secondary',
+`:select'.  When DATA is a string, it should set the selection to that
+string, when DATA is nil, it should unset the selection, and when DATA
+is t, it should return the selection, or nil if none.
+
+To set it, use (`setf' (`eat-term-manipulate-selection-function'
+TERMINAL) FUNCTION), where FUNCTION is the function to set title."
+  (eat--term-manipulate-selection-fn terminal))
+
+(gv-define-setter eat-term-manipulate-selection-function
+    (function terminal)
+  `(setf (eat--term-manipulate-selection-fn ,terminal) ,function))
 
 (defun eat-term-size (terminal)
   "Return the size of TERMINAL as (WIDTH . HEIGHT)."
@@ -3307,36 +3498,82 @@ client process may get confused."
                 (funcall (eat--term-input-fn terminal) terminal str)))
       (dotimes (_ (or n 1))
         (pcase (or event last-command-event)
-          ('up
-           (send "\eOA"))
-          ('down
-           (send "\eOB"))
-          ('right
-           (send "\eOC"))
-          ('left
-           (send "\eOD"))
-          ('C-up
-           (send "\e[1;5A"))
-          ('C-down
-           (send "\e[1;5B"))
-          ('C-right
-           (send "\e[1;5C"))
-          ('C-left
-           (send "\e[1;5D"))
-          ('home
-           (send "\e[1~"))
-          ('insert
-           (send "\e[2~"))
-          ('end
-           (send "\e[4~"))
-          ('prior
-           (send "\e[5~"))
-          ('next
-           (send "\e[6~"))
-          ((or 'delete 'deletechar)
-           (send "\e[3~"))
+          ((and (or 'up 'down 'right 'left
+                    'C-up 'C-down 'C-right 'C-left
+                    'M-up 'M-down 'M-right 'M-left
+                    'S-up 'S-down 'S-right 'S-left
+                    'C-M-up 'C-M-down 'C-M-right 'C-M-left
+                    'C-S-up 'C-S-down 'C-S-right 'C-S-left
+                    'M-S-up 'M-S-down 'M-S-right 'M-S-left
+                    'C-M-S-up 'C-M-S-down 'C-M-S-right 'C-M-S-left
+                    'insert 'C-insert 'M-insert 'S-insert 'C-M-insert
+                    'C-S-insert 'M-S-insert 'C-M-S-insert
+                    'delete 'C-delete 'M-delete 'S-delete 'C-M-delete
+                    'C-S-delete 'M-S-delete 'C-M-S-delete
+                    'deletechar 'C-deletechar 'M-deletechar
+                    'S-deletechar 'C-M-deletechar 'C-S-deletechar
+                    'M-S-deletechar 'C-M-S-deletechar
+                    'home 'C-home 'M-home 'S-home 'C-M-home 'C-S-home
+                    'M-S-home 'C-M-S-home
+                    'end 'C-end 'M-end 'S-end 'C-M-end 'C-S-end
+                    'M-S-end 'C-M-S-end
+                    'prior 'C-prior 'M-prior 'S-prior 'C-M-prior
+                    'C-S-prior 'M-S-prior 'C-M-S-prior
+                    'next 'C-next 'M-next 'S-next 'C-M-next 'C-S-next
+                    'M-S-next 'C-M-S-next)
+                ev)
+           (send
+            (format
+             "\e%s%c"
+             (if (not (or (memq 'control (event-modifiers ev))
+                          (memq 'meta (event-modifiers ev))
+                          (memq 'shift (event-modifiers ev))))
+                 (pcase (event-basic-type ev)
+                   ('insert "[2")
+                   ((or 'delete 'deletechar) "[3")
+                   ('prior "[5")
+                   ('next "[6")
+                   (_ (if (eat--term-keypad-mode terminal) "O" "[")))
+               (format
+                "[%c;%c"
+                (pcase (event-basic-type ev)
+                  ('insert ?2)
+                  ((or 'delete 'deletechar) ?3)
+                  ('prior ?5)
+                  ('next ?6)
+                  (_ ?1))
+                (pcase (event-modifiers ev)
+                  ((and (pred (memq 'control))
+                        (pred (memq 'meta))
+                        (pred (memq 'shift)))
+                   ?8)
+                  ((and (pred (memq 'control))
+                        (pred (memq 'meta)))
+                   ?7)
+                  ((and (pred (memq 'control))
+                        (pred (memq 'shift)))
+                   ?6)
+                  ((and (pred (memq 'meta))
+                        (pred (memq 'shift)))
+                   ?4)
+                  ((pred (memq 'control))
+                   ?5)
+                  ((pred (memq 'meta))
+                   ?3)
+                  ((pred (memq 'shift))
+                   ?2))))
+             (pcase (event-basic-type ev)
+               ('up ?A)
+               ('down ?B)
+               ('right ?C)
+               ('left ?D)
+               ('home ?H)
+               ('end ?F)
+               (_ ?~)))))
           ('backspace
            (send "\C-?"))
+          ('C-backspace
+           (send "\C-h"))
           ((and (pred symbolp)
                 fn-key
                 (let (rx string-start "f"
@@ -3349,9 +3586,6 @@ client process may get confused."
                   (string-to-number fn-num)))
            (send
             (aref
-             ;; NOTE: This is identical to the function key sequences
-             ;; of `st' and `xterm'.  Is it a derivative work of any
-             ;; of those?
              ["\eOP" "\eOQ" "\eOR" "\eOS" "\e[15~" "\e[17~" "\e[18~"
               "\e[19~" "\e[20~" "\e[21~" "\e[23~" "\e[24~" "\e[1;2P"
               "\e[1;2Q" "\e[1;2R" "\e[1;2S" "\e[15;2~" "\e[17;2~"
@@ -3522,7 +3756,7 @@ Each argument in ARGS can be either string or character."
                                    (if (stringp s) s (string s)))
                                  args "")))
              (if (eat--term-bracketed-yank terminal)
-                 ;; TODO: What if `str' itself contains these escape
+                 ;; NOTE: What if `str' itself contains these escape
                  ;; sequences?
                  (format "\e[200~%s\e[201~" str)
                str))))
@@ -3534,17 +3768,12 @@ CATEGORIES is a list whose elements should be a one of the following
 keywords:
 
   `:ascii'              All ASCII characters, plus `backspace',
-                        `delete' and `deletechar' keys.
-  `:meta-ascii'         All supported ASCII characters with meta
-                        modifier.
-  `:control-ascii'      All supported ASCII characters with control
-                        modifier.
-  `:control-meta-ascii' All supported ASCII characters with control
-                        and meta modifier
-  `:arrow'              Arrow keys.
-  `:control-arrow'      Arrow keys with control modifiers.
+                        `insert', `delete' and `deletechar' keys, with
+                        all possible modifiers.
+  `:arrow'              Arrow keys with all possible modifiers.
   `:navigation'         Navigation keys: home, end, prior (or page up)
-                        and next (or page down).
+                        and next (or page down) with all possible
+                        modifiers.
   `:function'           Function keys (f1 - f63).
   `:mouse-click'        `mouse-1', `mouse-2' and `mouse-3'.
   `:mouse-modifier'     All mouse events except mouse movement.
@@ -3559,41 +3788,49 @@ EXCEPTIONS is a list of event, which won't be bound."
       (cl-loop
        for i from ?\  to ?~
        do (define-key map `[,i] input-command))
-      (define-key map [backspace] input-command)
-      (define-key map [delete] input-command)
-      (define-key map [deletechar] input-command))
-    (when (memq :meta-ascii categories)
-      (cl-loop
-       for i from ?\  to ?~
-       do (unless (memq i '(?O ?\[))
-            (define-key esc-map `[,i] input-command)))
-      (define-key map [?\C-\ ] input-command))
-    (when (memq :control-ascii categories)
+      (dolist (key '( backspace C-backspace
+                      insert C-insert M-insert S-insert C-M-insert
+                      C-S-insert M-S-insert C-M-S-insert
+                      delete C-delete M-delete S-delete C-M-delete
+                      C-S-delete M-S-delete C-M-S-delete
+                      deletechar C-deletechar M-deletechar
+                      S-deletechar C-M-deletechar C-S-deletechar
+                      M-S-deletechar C-M-S-deletechar))
+        (define-key map `[,key] input-command))
       (cl-loop
        for i from ?\C-@ to ?\C-_
        do (unless (= i ?\e)
             (define-key map `[,i] input-command)))
       (define-key map [?\C--] input-command)
-      (define-key map [?\C-?] input-command))
-    (when (memq :control-meta-ascii categories)
+      (define-key map [?\C-?] input-command)
+      (define-key map [?\C-\ ] input-command)
+      (cl-loop
+       for i from ?\  to ?~
+       do (unless (memq i '(?O ?\[))
+            (define-key esc-map `[,i] input-command)))
       (cl-loop
        for i from ?\C-@ to ?\C-_
        do (define-key esc-map `[,i] input-command)))
     (when (memq :arrow categories)
-      (define-key map [up] input-command)
-      (define-key map [down] input-command)
-      (define-key map [left] input-command)
-      (define-key map [right] input-command))
-    (when (memq :control-arrow categories)
-      (define-key map [C-up] input-command)
-      (define-key map [C-down] input-command)
-      (define-key map [C-left] input-command)
-      (define-key map [C-right] input-command))
+      (dolist (key '( up down right left
+                      C-up C-down C-right C-left
+                      M-up M-down M-right M-left
+                      S-up S-down S-right S-left
+                      C-M-up C-M-down C-M-right C-M-left
+                      C-S-up C-S-down C-S-right C-S-left
+                      M-S-up M-S-down M-S-right M-S-left
+                      C-M-S-up C-M-S-down C-M-S-right C-M-S-left))
+        (define-key map `[,key] input-command)))
     (when (memq :navigation categories)
-      (define-key map [home] input-command)
-      (define-key map [end] input-command)
-      (define-key map [prior] input-command)
-      (define-key map [next] input-command))
+      (dolist (key '( home C-home M-home S-home C-M-home C-S-home
+                      M-S-home C-M-S-home
+                      end C-end M-end S-end C-M-end C-S-end
+                      M-S-end C-M-S-end
+                      prior C-prior M-prior S-prior C-M-prior
+                      C-S-prior M-S-prior C-M-S-prior
+                      next C-next M-next S-next C-M-next C-S-next
+                      M-S-next C-M-S-next))
+        (define-key map `[,key] input-command)))
     (when (memq :function categories)
       (cl-loop
        for i from 1 to 63
@@ -3664,6 +3901,7 @@ EXCEPTIONS is a list of event, which won't be bound."
         (define-key map `[,key] input-command)))
     (when (or (memq :mouse-movement categories))
       (define-key map [mouse-movement] input-command))
+    (define-key map '[?\e] esc-map)
     (dolist (exception exceptions)
       (define-key map `[,exception] nil 'remove))
     map))
@@ -4074,8 +4312,7 @@ ARG is passed to `yank-pop', which see."
 (defvar eat-semi-char-mode-map
   (let ((map (eat-term-make-keymap
               #'eat-self-input
-              '( :ascii :meta-ascii :control-ascii :control-meta-ascii
-                 :arrow :control-arrow :navigation)
+              '(:ascii :arrow :navigation)
               '( ?\C-\\ ?\C-q ?\C-c ?\C-x ?\C-g ?\C-h ?\C-\M-c ?\C-u
                  ?\M-x ?\M-: ?\M-! ?\M-& ?\C-y ?\M-y))))
     (define-key map [?\C-q] #'eat-quoted-input)
@@ -4089,8 +4326,7 @@ ARG is passed to `yank-pop', which see."
 (defvar eat-char-mode-map
   (let ((map (eat-term-make-keymap
               #'eat-self-input
-              '( :ascii :meta-ascii :control-ascii :control-meta-ascii
-                 :arrow :control-arrow :navigation :function)
+              '(:ascii :arrow :navigation :function)
               nil)))
     (define-key map [?\C-\M-m] #'eat-semi-char-mode)
     map)
@@ -4205,6 +4441,26 @@ MODE should one of:
      (eat--mouse-click-mode -1)
      (eat--mouse-modifier-click-mode -1)
      (eat--mouse-movement-mode -1))))
+
+(defun eat--manipulate-kill-ring (_ selection data)
+  "Manipulate `kill-ring'.
+
+SELECTION can be one of `:clipboard', `:primary', `:secondary',
+`:select'.  When DATA is a string, set the selection to that string,
+when DATA is nil, unset the selection, and when DATA is t, return the
+selection, or nil if none."
+  (let ((inhibit-eol-conversion t)
+        (select-enable-clipboard (eq selection :clipboard))
+        (select-enable-primary (eq selection :primary)))
+    (pcase data
+      ('t
+       (when eat-enable-yank-to-terminal
+         (ignore-error error
+           (current-kill 0 'do-not-move))))
+      ((and (pred stringp)
+            str)
+       (when eat-enable-kill-from-terminal
+         (kill-new str))))))
 
 
 ;;;;; Major Mode.
@@ -4457,6 +4713,8 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
             #'eat--set-cursor)
       (setf (eat-term-grab-mouse-function eat--terminal)
             #'eat--grab-mouse)
+      (setf (eat-term-manipulate-selection-function eat--terminal)
+            #'eat--manipulate-kill-ring)
       ;; Crank up a new process.
       (let* ((size (eat-term-size eat--terminal))
              (process-environment
@@ -4575,8 +4833,7 @@ PROGRAM can be a shell command."
 (defvar eat-eshell-semi-char-mode-map
   (let ((map (eat-term-make-keymap
               #'eat-self-input
-              '( :ascii :meta-ascii :control-ascii :control-meta-ascii
-                 :arrow :control-arrow :navigation)
+              '(:ascii :arrow :navigation)
               '( ?\C-\\ ?\C-q ?\C-c ?\C-x ?\C-g ?\C-h ?\C-\M-c ?\C-u
                  ?\M-x ?\M-: ?\M-! ?\M-& ?\C-y ?\M-y))))
     (define-key map [?\C-q] #'eat-quoted-input)
@@ -4590,8 +4847,7 @@ PROGRAM can be a shell command."
 (defvar eat-eshell-char-mode-map
   (let ((map (eat-term-make-keymap
               #'eat-self-input
-              '( :ascii :meta-ascii :control-ascii :control-meta-ascii
-                 :arrow :control-arrow :navigation :function)
+              '(:ascii :arrow :navigation :function)
               nil)))
     (define-key map [?\C-\M-m] #'eat-eshell-semi-char-mode)
     map)
