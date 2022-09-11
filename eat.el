@@ -1893,6 +1893,7 @@ Nil when not in alternative display mode.")
   (face (eat--make-face) :documentation "Display attributes.")
   (auto-margin t :documentation "State of auto margin mode.")
   (ins-mode nil :documentation "State of insert mode.")
+  (charset 'standard :documentation "Current character set.")
   (cur-state :default :documentation "Current state of cursor.")
   (cur-blinking-p nil :documentation "Is the cursor blinking?")
   (saved-face (eat--make-face) :documentation "Saved SGR attributes.")
@@ -1922,6 +1923,9 @@ Don't `set' it, bind it to a value with `let'.")
     (setf (eat--term-scroll-end eat--term) (eat--disp-height disp))
     (setf (eat--term-main-display eat--term) nil)
     (setf (eat--term-face eat--term) (eat--make-face))
+    (setf (eat--term-auto-margin eat--term) t)
+    (setf (eat--term-ins-mode eat--term) nil)
+    (setf (eat--term-charset eat--term) 'standard)
     (setf (eat--term-saved-face eat--term) (eat--make-face))
     (setf (eat--term-bracketed-yank eat--term) nil)
     (setf (eat--term-cur-state eat--term) :default)
@@ -2112,10 +2116,61 @@ of range, place cursor at the edge of display."
   "Disable automatic margin."
   (setf (eat--term-auto-margin eat--term) nil))
 
+(defun eat--standard-charset ()
+  "Switch to standard character set."
+  (setf (eat--term-charset eat--term) 'standard))
+
+(defun eat--alternate-charset ()
+  "Switch to alternate character set."
+  (setf (eat--term-charset eat--term) 'alternate))
+
 (defun eat--write (str)
   "Write STR on display."
-  (let ((str (propertize str 'face (eat--face-face
-                                    (eat--term-face eat--term)))))
+  (let* ((str
+          (pcase (eat--term-charset eat--term)
+            ('standard
+             str)
+            ('alternate
+             (let ((s (copy-sequence str)))
+               (dotimes (i (length s))
+                 (let ((replacement (alist-get (aref s i)
+                                               '((?+ . ?→)
+                                                 (?, . ?←)
+                                                 (?- . ?↑)
+                                                 (?. . ?↓)
+                                                 (?0 . ?█)
+                                                 (?` . ?�)
+                                                 (?a . ?▒)
+                                                 (?f . ?°)
+                                                 (?g . ?±)
+                                                 (?h . ?░)
+                                                 (?i . ?#)
+                                                 (?j . ?┘)
+                                                 (?k . ?┐)
+                                                 (?l . ?┌)
+                                                 (?m . ?└)
+                                                 (?n . ?┼)
+                                                 (?o . ?⎺)
+                                                 (?p . ?⎻)
+                                                 (?q . ?─)
+                                                 (?r . ?⎼)
+                                                 (?s . ?⎽)
+                                                 (?t . ?├)
+                                                 (?u . ?┤)
+                                                 (?v . ?┴)
+                                                 (?w . ?┬)
+                                                 (?x . ?│)
+                                                 (?y . ?≤)
+                                                 (?z . ?≥)
+                                                 (?{ . ?π)
+                                                 (?| . ?≠)
+                                                 (?} . ?£)
+                                                 (?~ . ?•)))))
+                   (when replacement
+                     (aset s i replacement))))
+               s))))
+         (str (propertize str 'face (eat--face-face
+                                     (eat--term-face eat--term)))))
     ;; REVIEW: This probably needs to be updated.
     (let* ((disp (eat--term-display eat--term))
            (cursor (eat--disp-cursor disp))
@@ -2944,7 +2999,7 @@ DATA is the selection data encoded in base64."
       (pcase (eat--term-parser-state eat--term)
         ('nil
          (let ((match (string-match (rx (or ?\0 ?\a ?\b ?\t ?\n ?\v
-                                            ?\f ?\r ?\e))
+                                            ?\f ?\r ?\C-n ?\C-o ?\e))
                                     output index)))
            (if (not match)
                (progn
@@ -2983,6 +3038,12 @@ DATA is the selection data encoded in base64."
                   (unless (and (/= index (length output))
                                (= (aref output index) ?\n))
                     (eat--carriage-return)))
+                 (?\C-n
+                  (cl-incf index)
+                  (eat--alternate-charset))
+                 (?\C-o
+                  (cl-incf index)
+                  (eat--standard-charset))
                  (?\e
                   (cl-incf index)
                   (setf (eat--term-parser-state eat--term)
