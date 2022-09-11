@@ -4976,6 +4976,8 @@ PROGRAM can be a shell command."
           #'eat--set-cursor)
     (setf (eat-term-grab-mouse-function eat--terminal)
           #'eat--grab-mouse)
+    (setf (eat-term-manipulate-selection-function eat--terminal)
+          #'eat--manipulate-kill-ring)
     (when-let ((window (get-buffer-window nil t)))
       (with-selected-window window
         (eat-term-resize eat--terminal (window-max-chars-per-line)
