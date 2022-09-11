@@ -2194,20 +2194,21 @@ of range, place cursor at the edge of display."
           (when (> (eat--cur-x cursor) (eat--disp-width disp))
             (if (not (eat--term-auto-margin eat--term))
                 (eat--cur-left 1)
-              (when (= (eat--cur-y cursor) scroll-end)
-                ;; We need to save the point because otherwise
-                ;; `eat--scroll-up' would move it.
-                (save-excursion
-                  (eat--scroll-up 1 'preserve-point)))
-              (if (= (eat--cur-y cursor) scroll-end)
-                  (eat--carriage-return)
-                (if (= (point) (point-max))
-                    (insert (propertize "\n" 'eat-wrap-line t))
-                  (put-text-property (point) (1+ (point))
-                                     'eat-wrap-line t)
-                  (forward-char))
-                (setf (eat--cur-x cursor) 1)
-                (cl-incf (eat--cur-y cursor))))))))))
+              (unless (string-empty-p str)
+                (when (= (eat--cur-y cursor) scroll-end)
+                  ;; We need to save the point because otherwise
+                  ;; `eat--scroll-up' would move it.
+                  (save-excursion
+                    (eat--scroll-up 1 'preserve-point)))
+                (if (= (eat--cur-y cursor) scroll-end)
+                    (eat--carriage-return)
+                  (if (= (point) (point-max))
+                      (insert (propertize "\n" 'eat-wrap-line t))
+                    (put-text-property (point) (1+ (point))
+                                       'eat-wrap-line t)
+                    (forward-char))
+                  (setf (eat--cur-x cursor) 1)
+                  (cl-incf (eat--cur-y cursor)))))))))))
 
 (defun eat--horizontal-tab (&optional n)
   "Go to the Nth next tabulation stop.
@@ -3501,7 +3502,11 @@ you need the position."
 
 (defun eat-term-display-cursor (terminal)
   "Return the cursor's current position on TERMINAL's display."
-  (eat--cur-position (eat--disp-cursor (eat--term-display terminal))))
+  (let* ((disp (eat--term-display terminal))
+         (cursor (eat--disp-cursor disp)))
+    (if (> (eat--cur-x cursor) (eat--disp-width disp))
+        (1- (eat--cur-position cursor))
+      (eat--cur-position cursor))))
 
 (defmacro eat--with-env (terminal &rest body)
   "Setup the environment for TERMINAL and eval BODY in it."
