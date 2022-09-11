@@ -30,8 +30,8 @@
 ;; a terminal emulator.  It can run most (if not all) full-screen
 ;; terminal programs, including Emacs.
 
-;; It is pretty fast, almost twice as fast as Term, despite being
-;; implemented entirely in Emacs Lisp.  So fast that you can
+;; It is pretty fast, more than three times faster than Term, despite
+;; being implemented entirely in Emacs Lisp.  So fast that you can
 ;; comfortably run Emacs inside Eat, or even use your Emacs as a
 ;; terminal multiplexer.
 
@@ -244,7 +244,7 @@ responsive."
   :group 'eat-ehell)
 
 ;; Upgrading Eat causes `eat-term-terminfo-directory' to be outdated,
-;; so update that if not modified by user (or something else).
+;; so update it if not modified by user (or something else).
 (defvar eat--install-path nil
   "Path to directory where Eat is installed.")
 

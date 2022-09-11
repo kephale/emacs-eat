@@ -4,9 +4,9 @@ Eat's name self-explainary, it stands "Emulate A Terminal".  Eat is a
 terminal emulator.  It can run most (if not all) full-screen terminal
 programs, including Emacs.
 
-It is pretty fast, almost twice as fast as Term, despite being
-implemented entirely in Emacs Lisp.  So fast that you can comfortably
-run Emacs inside Eat, or even use your Emacs as a terminal
+It is pretty fast, more than three times faster than Term, despite
+being implemented entirely in Emacs Lisp.  So fast that you can
+comfortably run Emacs inside Eat, or even use your Emacs as a terminal
 multiplexer.
 
 It has many feature that other Emacs terminal emulator still don't
@@ -86,9 +86,9 @@ Clone the repository and put it in your ~load-path~.
 ** Term
 
 Term is the Emacs built-in terminal emulator.  Its terminal emulation
-is pretty good too.  it is slow.  It is so slow that Eat can beat
+is pretty good too.  But it's slow.  It is so slow that Eat can beat
 native-compiled Term even without byte-compilation, and when Eat is
-byte-compiled, Eat is more than two times faster.  Also, Term
+byte-compiled, Eat is more than three times fast.  Also, Term
 flickers, just try to run =emacs -nw= in it.  However, it has "line"
 mode, which Eat still doesn't have.  If you want line mode in a
 terminal, or use an old version of Emacs, you can use Term, but
@@ -99,9 +99,9 @@ is 26.1 or above.
 
 Vterm is powered by a C library, libvterm.  For this reason, it can
 process huge amount of text quickly.  It is about 2 times faster
-than Eat (byte-compiled or native-compiled) (and about 3.5 faster
+than Eat (byte-compiled or native-compiled) (and about 3.3 faster
 then Eat without byte-compilation).  But it doesn't have a char mode
-(however you can make a char mode putting some efforts).  And it too
+(however you can make a char mode spending some effort).  And it too
 flickers like Term, so despite being much faster that Eat, it seems to
 be slow.  If you need your terminal to handle huge bursts (megabytes)
 of data, you should Vterm.
@@ -109,10 +109,10 @@ of data, you should Vterm.
 ** Coterm + Comint
 
 Coterm adds terminal emulation to Comint.  Although the terminal
-Coterm emulates is same as Term, it is much faster, about 1.75 times.
-However, it also flickers like other terminals.  Since it's an upgrade
-to Comint, you get all the features of Comint like "line" mode,
-completion using your favorite completion UI (Company, Corfu, etc),
-etc.  Some of these features are available in Eat-Eshell-Mode as
-Eshell is similar to Comint, however it's not Comint.  Recommended
-if you like Comint.
+Coterm emulates is same as Term, it is much faster, about three times,
+just a little bit slow than Eat.  However, it too flickers like other
+terminals.  Since it's an upgrade to Comint, you get all the features
+of Comint like "line" mode, completion using your favorite completion
+UI (Company, Corfu, etc), etc.  Some of these features are available
+in Eat-Eshell-Mode as Eshell is similar to Comint, however it's not
+Comint.  Recommended if you like Comint.
