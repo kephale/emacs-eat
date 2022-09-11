@@ -2044,7 +2044,8 @@ relative to the text and change current line accordingly."
       (save-excursion
         (goto-char (eat--disp-begin disp))
         (eat--goto-bol (1- scroll-begin))
-        (if (> scroll-begin 1)
+        (if (or (eat--term-main-display eat--term)
+                (> scroll-begin 1))
             (delete-region (point) (car (eat--bol n)))
           (eat--goto-bol n)
           ;; Make sure we're at the beginning of a line, because we
