@@ -121,14 +121,41 @@ This is the default name used when running Eat."
   :group 'eat-ui)
 
 (defcustom eat-enable-kill-from-terminal t
-  "Non-nil means allow terminal process to add text to kill ring."
+  "Non-nil means allow terminal program to add text to `kill-ring'.
+
+When non-nil, terminal program can send special escape sequence to add
+some text to `kill-ring'."
   :type 'boolean
-  :group 'eat-ui)
+  :group 'eat-ui
+  :group 'eat-eshell)
 
 (defcustom eat-enable-yank-to-terminal nil
-  "Non-nil means allow terminal process to get text from kill ring."
+  "Non-nil means allow terminal program to get text from `kill-ring'.
+
+When non-nil, terminal program can get killed text from `kill-ring'.
+This is left disabled for security reasons."
   :type 'boolean
-  :group 'eat-ui)
+  :group 'eat-ui
+  :group 'eat-eshell)
+
+(defconst eat--cursor-type-value-type
+  '(cons
+    (choice
+     (const :tag "Frame default" t)
+     (const :tag "Filled box" box)
+     (cons :tag "Box with specified size" (const box) integer)
+     (const :tag "Hollow cursor" hollow)
+     (const :tag "Vertical bar" bar)
+     (cons :tag "Vertical bar with specified height" (const bar)
+           integer)
+     (const :tag "Horizontal bar" hbar)
+     (cons :tag "Horizontal bar with specified width"
+           (const hbar) integer)
+     (const :tag "None " nil))
+    (choice
+     (const :tag "No blinking" nil)
+     (number :tag "Blinking frequency")))
+  "Custom type specification for Eat's cursor type variables.")
 
 (defcustom eat-default-cursor-type
   (cons (default-value 'cursor-type) nil)
@@ -137,22 +164,7 @@ This is the default name used when running Eat."
 When the cursor is visible, the car of the value is used as
 `cursor-type', which see.  The cdr of the value, when non-nil, is the
 blinking frequency of cursor."
-  :type '(cons
-          (choice
-           (const :tag "Frame default" t)
-           (const :tag "Filled box" box)
-           (cons :tag "Box with specified size" (const box) integer)
-           (const :tag "Hollow cursor" hollow)
-           (const :tag "Vertical bar" bar)
-           (cons :tag "Vertical bar with specified height" (const bar)
-                 integer)
-           (const :tag "Horizontal bar" hbar)
-           (cons :tag "Horizontal bar with specified width"
-                 (const hbar) integer)
-           (const :tag "None " nil))
-          (choice
-           (const :tag "No blinking" nil)
-           (number :tag "Blinking frequency")))
+  :type eat--cursor-type-value-type
   :group 'eat-ui
   :group 'eat-ehell)
 
@@ -162,22 +174,7 @@ blinking frequency of cursor."
 When the cursor is invisible, the car of the value is used as
 `cursor-type', which see.  The cdr of the value, when non-nil, is the
 blinking frequency of cursor."
-  :type '(cons
-          (choice
-           (const :tag "Frame default" t)
-           (const :tag "Filled box" box)
-           (cons :tag "Box with specified size" (const box) integer)
-           (const :tag "Hollow cursor" hollow)
-           (const :tag "Vertical bar" bar)
-           (cons :tag "Vertical bar with specified height" (const bar)
-                 integer)
-           (const :tag "Horizontal bar" hbar)
-           (cons :tag "Horizontal bar with specified width"
-                 (const hbar) integer)
-           (const :tag "None " nil))
-          (choice
-           (const :tag "No blinking" nil)
-           (number :tag "Blinking frequency")))
+  :type eat--cursor-type-value-type
   :group 'eat-ui
   :group 'eat-ehell)
 
@@ -188,38 +185,9 @@ blinking frequency of cursor."
 When the cursor is very visible, the car of the value is used as
 `cursor-type', which see.  The cdr of the value, when non-nil, is the
 blinking frequency of cursor."
-  :type '(cons
-          (choice
-           (const :tag "Frame default" t)
-           (const :tag "Filled box" box)
-           (cons :tag "Box with specified size" (const box) integer)
-           (const :tag "Hollow cursor" hollow)
-           (const :tag "Vertical bar" bar)
-           (cons :tag "Vertical bar with specified height" (const bar)
-                 integer)
-           (const :tag "Horizontal bar" hbar)
-           (cons :tag "Horizontal bar with specified width"
-                 (const hbar) integer)
-           (const :tag "None " nil))
-          (choice
-           (const :tag "No blinking" nil)
-           (number :tag "Blinking frequency")))
+  :type eat--cursor-type-value-type
   :group 'eat-ui
   :group 'eat-ehell)
-
-(defcustom eat-term-name #'eat-term-get-suitable-term-name
-  "Value for the `TERM' environment variable.
-
-The value can also be a function.  In that case, the function is
-called without any argument and the return value is used as the value.
-For example, this can set to `eat-term-get-suitable-term-name' to set
-the value according to the number of colors supported by the current
-display."
-  :type '(choice
-          (string :tag "Value")
-          (const :tag "Automatic" eat-term-get-suitable-term-name)
-          (function :tag "Function"))
-  :group 'eat-term)
 
 (defcustom eat-minimum-latency 0.008
   "Minimum display latency in seconds.
@@ -243,6 +211,22 @@ responsive."
   :group 'eat-ui
   :group 'eat-ehell)
 
+(defcustom eat-term-name #'eat-term-get-suitable-term-name
+  "Value for the `TERM' environment variable.
+
+The value can also be a function.  In that case, the function is
+called without any argument and the return value is used as the value.
+For example, this can set to `eat-term-get-suitable-term-name' to set
+the value according to the number of colors supported by the current
+display.
+
+This value is used by terminal programs to identify the terminal."
+  :type '(choice
+          (string :tag "Value")
+          (const :tag "Automatic" eat-term-get-suitable-term-name)
+          (function :tag "Function"))
+  :group 'eat-term)
+
 ;; Upgrading Eat causes `eat-term-terminfo-directory' to be outdated,
 ;; so update it if not modified by user (or something else).
 (defvar eat--install-path nil
@@ -256,18 +240,30 @@ responsive."
                                   buffer-file-name))))
 
   (defcustom eat-term-terminfo-directory eat--install-path
-    "Directory where Terminfo database of variable `eat-term-name'."
+    "Directory where require terminfo databases can be found.
+
+This value is used by terminal programs to find the terminfo databases
+that describe the capabilities of the terminal."
     :type 'directory
     :group 'eat-term)
 
   (when (eq eat-term-terminfo-directory old-install-path)
     (setq eat-term-terminfo-directory eat--install-path)))
 
-(defcustom eat-term-inside-emacs
-  (format "%s,eat" emacs-version)
+(defcustom eat-term-inside-emacs (format "%s,eat" emacs-version)
   "Value for the `INSIDE_EMACS' environment variable."
   :type 'string
   :group 'eat-term)
+
+(defcustom eat-enable-blinking-text nil
+  "Non-nil means enable blinking of text with blink attribute.
+
+When non-nil, enable `eat-blink-mode' to enable blinking of text with
+blink attribute by default.  You manually toggle `eat-blink-mode' to
+toggle this behavior buffer-locally."
+  :type 'boolean
+  :group 'eat-ui
+  :group 'eat-eshell)
 
 (defcustom eat-slow-blink-frequency 2
   "Frequency of blinking of slowly text.
@@ -284,12 +280,17 @@ This has an effect only if `eat-blink-mode' is enabled."
   :group 'eat-ui)
 
 (defcustom eat-enable-alternative-framebuffer t
-  "Non-nil means use alternative framebuffer if requested by client."
+  "Non-nil means enable alternative framebuffer.
+
+Full screen programs often use alternative framebuffer to keep old
+contents on display unaltered."
   :type 'boolean
   :group 'eat-term)
 
 (defcustom eat-enable-mouse t
-  "Non-nil means enable mouse support."
+  "Non-nil means enable mouse support.
+
+When non-nil, terminal programs can receive mouse events from Emacs."
   :type 'boolean
   :group 'eat-ui)
 
@@ -1735,11 +1736,11 @@ Treat LINE FEED (?\\n) as the line delimiter."
       (cons (point) moved))))
 
 (defun eat--col-motion (n)
-  "Move to column Nth next column.
+  "Move to Nth next column.
 
-Go to the end of Nth next column if N is positive, otherwise go to the
-end of -Nth previous column.  If the specified position is before
-`point-min' or after `point-max', go to that point.
+Go to Nth next column if N is positive, otherwise go to -Nth previous
+column.  If the specified position is before `point-min' or after
+`point-max', go to that point.
 
 Return the number of columns moved.
 
@@ -4605,7 +4606,9 @@ selection, or nil if none."
   (eat-emacs-mode)
   ;; Make sure glyphless character don't display a huge box glyph,
   ;; that would break the display.
-  (eat--setup-glyphless-chars))
+  (eat--setup-glyphless-chars)
+  (when eat-enable-blinking-text
+    (eat-blink-mode +1)))
 
 
 ;;;;; Process Handling.
@@ -5144,8 +5147,12 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                   #'eat--resize-maybe)
     ;; Make sure glyphless character don't display a huge box glyph,
     ;; that would break the display.
-    (eat--setup-glyphless-chars))
+    (eat--setup-glyphless-chars)
+    (when eat-enable-blinking-text
+      (eat-blink-mode +1)))
    (t
+    (when eat-enable-blinking-text
+      (eat-blink-mode -1))
     (remove-function
      (local 'window-adjust-process-window-size-function)
      #'eat--resize-maybe)
