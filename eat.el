@@ -1890,6 +1890,7 @@ OS's."
 
 Nil when not in alternative display mode.")
   (face (eat--make-face) :documentation "Display attributes.")
+  (auto-margin t :documentation "State of auto margin mode.")
   (ins-mode nil :documentation "State of insert mode.")
   (cur-state :default :documentation "Current state of cursor.")
   (cur-blinking-p nil :documentation "Is the cursor blinking?")
@@ -2102,6 +2103,14 @@ of range, place cursor at the edge of display."
   (eat--cur-vertical-abs y)
   (eat--cur-horizontal-abs x))
 
+(defun eat--enable-auto-margin ()
+  "Enable automatic margin."
+  (setf (eat--term-auto-margin eat--term) t))
+
+(defun eat--disable-auto-margin ()
+  "Disable automatic margin."
+  (setf (eat--term-auto-margin eat--term) nil))
+
 (defun eat--write (str)
   "Write STR on display."
   (let ((str (propertize str 'face (eat--face-face
@@ -2126,21 +2135,23 @@ of range, place cursor at the edge of display."
                (car (eat--eol)))
             (delete-region (point) (min (+ ins-count (point))
                                         (car (eat--eol)))))
-          (unless (string-empty-p str)
-            (when (= (eat--cur-y cursor) scroll-end)
-              ;; We need to save the point because otherwise
-              ;; `eat--scroll-up' would move it.
-              (save-excursion
-                (eat--scroll-up 1 'preserve-point)))
-            (if (= (eat--cur-y cursor) scroll-end)
-                (eat--carriage-return)
-              (if (= (point) (point-max))
-                  (insert (propertize "\n" 'eat-wrap-line t))
-                (put-text-property (point) (1+ (point))
-                                   'eat-wrap-line t)
-                (forward-char))
-              (setf (eat--cur-x cursor) 1)
-              (cl-incf (eat--cur-y cursor)))))))))
+          (when (> (eat--cur-x cursor) (eat--disp-width disp))
+            (if (not (eat--term-auto-margin eat--term))
+                (eat--cur-left 1)
+              (when (= (eat--cur-y cursor) scroll-end)
+                ;; We need to save the point because otherwise
+                ;; `eat--scroll-up' would move it.
+                (save-excursion
+                  (eat--scroll-up 1 'preserve-point)))
+              (if (= (eat--cur-y cursor) scroll-end)
+                  (eat--carriage-return)
+                (if (= (point) (point-max))
+                    (insert (propertize "\n" 'eat-wrap-line t))
+                  (put-text-property (point) (1+ (point))
+                                     'eat-wrap-line t)
+                  (forward-char))
+                (setf (eat--cur-x cursor) 1)
+                (cl-incf (eat--cur-y cursor))))))))))
 
 (defun eat--horizontal-tab (&optional n)
   "Go to the Nth next tabulation stop.
@@ -2872,6 +2883,8 @@ DATA is the selection data encoded in base64."
        (pcase (pop params)
          ('(1)
           (eat--enable-keypad))
+         ('(7)
+          (eat--enable-auto-margin))
          ('(12)
           (eat--blinking-cursor))
          ('(25)
@@ -2906,6 +2919,8 @@ DATA is the selection data encoded in base64."
        (pcase (pop params)
          ('(1)
           (eat--disable-keypad))
+         ('(7)
+          (eat--disable-auto-margin))
          ('(12)
           (eat--non-blinking-cursor))
          ('(25)
