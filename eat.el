@@ -4027,6 +4027,15 @@ return \"eat-color\", otherwise return \"eat-mono\"."
           ((> colors 1) "eat-color")
           (t "eat-mono"))))
 
+(defun eat-term-filter-string (string)
+  "Filter Eat's special text properties from STRING."
+  (with-temp-buffer
+    (insert string)
+    (goto-char (point-min))
+    (while (not (eobp))
+      (eat--t-join-long-line))
+    (buffer-string)))
+
 
 ;;;; Blink mode.
 
@@ -4588,12 +4597,28 @@ selection, or nil if none."
       (eat-term-resize eat--terminal (car size) (cdr size))))
   size)
 
+(defun eat--filter-buffer-substring (begin end &optional delete)
+  "Filter buffer substring from BEGIN to END and return that.
+
+When DELETE is given and non-nil, delete the text between BEGIN and
+END if it's safe to do so."
+  (let ((str (eat-term-filter-string (buffer-substring begin end))))
+    (when (and delete
+               (or (not eat--terminal)
+                   (and (<= (eat-term-end eat--terminal) begin)
+                        (<= (eat-term-end eat--terminal) end))
+                   (and (<= begin (eat-term-beginning eat--terminal))
+                        (<= end (eat-term-beginning eat--terminal)))))
+      (delete-region begin end))
+    str))
+
 (define-derived-mode eat-mode nil "Eat"
   "Major mode for Eat."
   :group 'eat-ui
   :lighter
   (make-local-variable 'buffer-read-only)
   (make-local-variable 'buffer-undo-list)
+  (make-local-variable 'filter-buffer-substring-function)
   (make-local-variable 'mode-line-process)
   (make-local-variable 'mode-line-buffer-identification)
   (make-local-variable 'glyphless-char-display)
@@ -4611,6 +4636,8 @@ selection, or nil if none."
   (setq buffer-undo-list t)
   (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
   (setq eat--mouse-grabbing-type nil)
+  (setq filter-buffer-substring-function
+        #'eat--filter-buffer-substring)
   (setq mode-line-process
         '(""
           (:eval
@@ -5225,6 +5252,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
     (make-local-variable 'glyphless-char-display)
     (make-local-variable 'track-mouse)
     (make-local-variable 'cursor-type)
+    (make-local-variable 'filter-buffer-substring-function)
     (make-local-variable 'eat--terminal)
     (make-local-variable 'eat--process)
     (make-local-variable 'eat--synchronize-scroll-function)
@@ -5234,6 +5262,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
     (make-local-variable 'eat--process-output-queue-timer)
     (setq eat--synchronize-scroll-function
           #'eat--eshell-synchronize-scroll)
+    (setq filter-buffer-substring-function
+          #'eat--filter-buffer-substring)
     (add-function :filter-return
                   (local 'window-adjust-process-window-size-function)
                   #'eat--resize-maybe)
@@ -5251,6 +5281,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
     (kill-local-variable 'cursor-type)
     (kill-local-variable 'glyphless-char-display)
     (kill-local-variable 'track-mouse)
+    (make-local-variable 'filter-buffer-substring-function)
     (kill-local-variable 'eat--terminal)
     (kill-local-variable 'eat--process)
     (kill-local-variable 'eat--synchronize-scroll-function)
