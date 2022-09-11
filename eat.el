@@ -2841,12 +2841,12 @@ DATA is the selection data encoded in base64."
                     i)
                (aref (eat--term-cut-buffers eat--term) (- i ?0)))))
            (when str
-             (setq source (aref targets n)))
+             (setq source (string (aref targets n))))
            (cl-incf n))
          (unless str
            (setq str "")
-           (setq source (aref targets (1- (length targets)))))
-         (format "\e]52;%c;%s\e\\" source
+           (setq source ""))
+         (format "\e]52;%s;%s\e\\" source
                  (base64-encode-string str))))
     (let ((str (ignore-error error
                  (decode-coding-string (base64-decode-string data)
