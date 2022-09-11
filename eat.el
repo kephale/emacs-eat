@@ -1641,7 +1641,7 @@ If your process is choking on big inputs, try lowering the value."
 
 ;;;; Utility functions.
 
-(defun eat--goto-bol (&optional n)
+(defun eat--t-goto-bol (&optional n)
   "Go to the beginning of current line.
 
 With optional argument N, go to the beginning of Nth next line if N is
@@ -1672,7 +1672,7 @@ Treat LINE FEED (?\\n) as the line delimiter."
                (goto-char (match-end 0))))
         moved)))))
 
-(defun eat--goto-eol (&optional n)
+(defun eat--t-goto-eol (&optional n)
   "Go to the end of current line.
 
 With optional argument N, go to the end of Nth next line if N is
@@ -1703,7 +1703,7 @@ Treat LINE FEED (?\\n) as the line delimiter."
                (cl-decf moved)))
         moved)))))
 
-(defun eat--bol (&optional n)
+(defun eat--t-bol (&optional n)
   "Return the beginning of current line.
 
 With optional argument N, return a cons cell whose car is the
@@ -1716,10 +1716,10 @@ is number of lines that point is away from current line.
 Treat LINE FEED (?\\n) as the line delimiter."
   (save-excursion
     (let* ((n (or n 0))
-           (moved (eat--goto-bol n)))
+           (moved (eat--t-goto-bol n)))
       (cons (point) moved))))
 
-(defun eat--eol (&optional n)
+(defun eat--t-eol (&optional n)
   "Return the end of current line.
 
 With optional argument N, return a cons cell whose car the end of Nth
@@ -1732,10 +1732,10 @@ point is away from current line.
 Treat LINE FEED (?\\n) as the line delimiter."
   (save-excursion
     (let* ((n (or n 0))
-           (moved (eat--goto-eol n)))
+           (moved (eat--t-goto-eol n)))
       (cons (point) moved))))
 
-(defun eat--col-motion (n)
+(defun eat--t-col-motion (n)
   "Move to Nth next column.
 
 Go to Nth next column if N is positive, otherwise go to -Nth previous
@@ -1748,38 +1748,38 @@ Assume all characters occupy a single column."
   (let ((point (point)))
     (cond
      ((> n 0)
-      (let ((eol (car (eat--eol)))
+      (let ((eol (car (eat--t-eol)))
             (pos (+ (point) n)))
         (goto-char (min pos eol))))
      ((< n 0)
-      (let ((bol (car (eat--bol)))
+      (let ((bol (car (eat--t-bol)))
             (pos (+ (point) n)))
         (goto-char (max pos bol)))))
     (- (point) point)))
 
-(defun eat--current-col ()
+(defun eat--t-current-col ()
   "Return the current column.
 
 Assume all characters occupy a single column."
-  (- (point) (car (eat--bol))))
+  (- (point) (car (eat--t-bol))))
 
-(defun eat--goto-col (n)
+(defun eat--t-goto-col (n)
   "Go to column N.
 
 Return the current column after moving point.
 
 Assume all characters occupy a single column."
-  (eat--goto-bol)
-  (eat--col-motion n))
+  (eat--t-goto-bol)
+  (eat--t-col-motion n))
 
-(defun eat--repeated-insert (c n)
+(defun eat--t-repeated-insert (c n)
   "Insert C, N times."
   ;; TODO: Which would be better?  Make a N character long string with
   ;; each of characters initialized to C?  Or (dotimes (_ N)
   ;; (insert C))?
   (insert (make-string n c)))
 
-(defun eat--join-long-line (&optional limit)
+(defun eat--t-join-long-line (&optional limit)
   "Join long line once, but don't try to go beyond LIMIT.
 
 For example: \"*foo\\nbar\\nbaz\" is converted to \"foo*bar\\nbaz\",
@@ -1793,65 +1793,48 @@ where `*' indicates point."
       (when (< (point) (or limit (point-max)))
         (delete-char 1)))))
 
-(defun eat--break-long-line (threshold)
+(defun eat--t-break-long-line (threshold)
   "Break a line longer than THRESHOLD once.
 
 For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
 \"foo\\n*barbaz\", where `*' indicates point."
   (let ((loop t))
     (while (and loop (< (point) (point-max)))
-      (eat--goto-col threshold)
+      (eat--t-goto-col threshold)
       (if (eq (char-after) ?\n)
           (forward-char)
         (unless (= (point) (point-max))
           (insert-before-markers (propertize "\n" 'eat-wrap-line t)))
         (setq loop nil)))))
 
-(defun eat--send-string (process string)
-  "Send to PROCESS the contents of STRING as input.
-
-This is equivalent to `process-send-string', except that long input
-strings are broken up into chunks of size `eat-input-chunk-size'.
-Processes are given a chance to output between chunks.  This can help
-prevent processes from hanging when you send them long inputs on some
-OS's."
-  (let ((i 0)
-        (j eat-input-chunk-size)
-        (l (length string)))
-    (while (< i l)
-      (process-send-string process (substring string i (min j l)))
-      (accept-process-output)
-      (cl-incf i eat-input-chunk-size)
-      (cl-incf j eat-input-chunk-size))))
-
 
 ;;;; Emulator.
 
-(cl-defstruct (eat--cur
-               (:constructor eat--make-cur)
-               (:copier eat--copy-cur))
+(cl-defstruct (eat--t-cur
+               (:constructor eat--t-make-cur)
+               (:copier eat--t-copy-cur))
   "Structure describing cursor position."
   (position nil :documentation "Position of cursor.")
   (y 1 :documentation "Y coordinate of cursor.")
   (x 1 :documentation "X coordinate of cursor."))
 
-(cl-defstruct (eat--disp
-               (:constructor eat--make-disp)
-               (:copier eat--copy-disp))
+(cl-defstruct (eat--t-disp
+               (:constructor eat--t-make-disp)
+               (:copier eat--t-copy-disp))
   "Structure describing the display."
   (begin nil :documentation "Beginning of visible display.")
   (width 80 :documentation "Width of display.")
   (height 24 :documentation "Height of display.")
   (cursor nil :documentation "Cursor.")
-  (saved-cursor (eat--make-cur) :documentation "Saved cursor.")
+  (saved-cursor (eat--t-make-cur) :documentation "Saved cursor.")
   (old-begin
    nil
    :documentation
    "Beginning of visible display during last Eat redisplay."))
 
-(cl-defstruct (eat--face
-               (:constructor eat--make-face)
-               (:copier eat--copy-face))
+(cl-defstruct (eat--t-face
+               (:constructor eat--t-make-face)
+               (:copier eat--t-copy-face))
   "Structure describing the display attributes to use."
   (face nil :documentation "Face to use.")
   (fg nil :documentation "Foreground color.")
@@ -1865,9 +1848,9 @@ OS's."
   (inverse nil :documentation "Non-nil means inverse colors.")
   (blink nil :documentation "Blink face, or nil."))
 
-(cl-defstruct (eat--term
-               (:constructor eat--make-term)
-               (:copier eat--copy-term))
+(cl-defstruct (eat--t-term
+               (:constructor eat--t-make-term)
+               (:copier eat--t-copy-term))
   "Structure describing a terminal."
   (buffer nil :documentation "The buffer of terminal.")
   (begin nil :documentation "Beginning of terminal.")
@@ -1890,13 +1873,15 @@ OS's."
   (main-display nil :documentation "Main display.
 
 Nil when not in alternative display mode.")
-  (face (eat--make-face) :documentation "Display attributes.")
+  (face (eat--t-make-face) :documentation "Display attributes.")
   (auto-margin t :documentation "State of auto margin mode.")
   (ins-mode nil :documentation "State of insert mode.")
   (charset 'standard :documentation "Current character set.")
   (cur-state :default :documentation "Current state of cursor.")
   (cur-blinking-p nil :documentation "Is the cursor blinking?")
-  (saved-face (eat--make-face) :documentation "Saved SGR attributes.")
+  (saved-face
+   (eat--t-make-face)
+   :documentation "Saved SGR attributes.")
   (bracketed-yank nil :documentation "State of bracketed yank mode.")
   (keypad-mode nil :documentation "State of keypad mode.")
   (mouse-mode t :documentation "Current mouse mode.")
@@ -1905,229 +1890,232 @@ Nil when not in alternative display mode.")
   (focus-event-mode nil :documentation "Whether to send focus event.")
   (cut-buffers (make-vector 10 nil) :documentation "Cut buffers."))
 
-(defvar eat--term nil
+(defvar eat--t-term nil
   "The current terminal.
 
 Don't `set' it, bind it to a value with `let'.")
 
-(defun eat--reset ()
+(defun eat--t-reset ()
   "Reset terminal."
-  (let* ((disp (eat--term-display eat--term)))
-    (setf (eat--term-parser-state eat--term) nil)
-    (setf (eat--disp-begin disp) (point-min-marker))
-    (setf (eat--disp-old-begin disp) (point-min-marker))
-    (setf (eat--disp-cursor disp)
-          (eat--make-cur :position (point-min-marker)))
-    (setf (eat--disp-saved-cursor disp) (eat--make-cur))
-    (setf (eat--term-scroll-begin eat--term) 1)
-    (setf (eat--term-scroll-end eat--term) (eat--disp-height disp))
-    (setf (eat--term-main-display eat--term) nil)
-    (setf (eat--term-face eat--term) (eat--make-face))
-    (setf (eat--term-auto-margin eat--term) t)
-    (setf (eat--term-ins-mode eat--term) nil)
-    (setf (eat--term-charset eat--term) 'standard)
-    (setf (eat--term-saved-face eat--term) (eat--make-face))
-    (setf (eat--term-bracketed-yank eat--term) nil)
-    (setf (eat--term-cur-state eat--term) :default)
-    (setf (eat--term-cur-blinking-p eat--term) nil)
-    (setf (eat--term-title eat--term) "")
-    (setf (eat--term-keypad-mode eat--term) nil)
-    (setf (eat--term-mouse-mode eat--term) nil)
-    (setf (eat--term-mouse-encoding eat--term) nil)
-    (setf (eat--term-focus-event-mode eat--term) nil)
+  (let* ((disp (eat--t-term-display eat--t-term)))
+    (setf (eat--t-term-parser-state eat--t-term) nil)
+    (setf (eat--t-disp-begin disp) (point-min-marker))
+    (setf (eat--t-disp-old-begin disp) (point-min-marker))
+    (setf (eat--t-disp-cursor disp)
+          (eat--t-make-cur :position (point-min-marker)))
+    (setf (eat--t-disp-saved-cursor disp) (eat--t-make-cur))
+    (setf (eat--t-term-scroll-begin eat--t-term) 1)
+    (setf (eat--t-term-scroll-end eat--t-term)
+          (eat--t-disp-height disp))
+    (setf (eat--t-term-main-display eat--t-term) nil)
+    (setf (eat--t-term-face eat--t-term) (eat--t-make-face))
+    (setf (eat--t-term-auto-margin eat--t-term) t)
+    (setf (eat--t-term-ins-mode eat--t-term) nil)
+    (setf (eat--t-term-charset eat--t-term) 'standard)
+    (setf (eat--t-term-saved-face eat--t-term) (eat--t-make-face))
+    (setf (eat--t-term-bracketed-yank eat--t-term) nil)
+    (setf (eat--t-term-cur-state eat--t-term) :default)
+    (setf (eat--t-term-cur-blinking-p eat--t-term) nil)
+    (setf (eat--t-term-title eat--t-term) "")
+    (setf (eat--t-term-keypad-mode eat--t-term) nil)
+    (setf (eat--t-term-mouse-mode eat--t-term) nil)
+    (setf (eat--t-term-mouse-encoding eat--t-term) nil)
+    (setf (eat--t-term-focus-event-mode eat--t-term) nil)
     (delete-region (point-min) (point-max))
-    (funcall (eat--term-grab-mouse-fn eat--term) eat--term nil)
-    (funcall (eat--term-set-focus-ev-mode-fn eat--term) eat--term nil)
-    (funcall (eat--term-set-title-fn eat--term) eat--term "")
-    (funcall (eat--term-set-cursor-fn eat--term) eat--term :default)))
+    (funcall (eat--t-term-grab-mouse-fn eat--t-term) eat--t-term nil)
+    (funcall (eat--t-term-set-focus-ev-mode-fn eat--t-term)
+             eat--t-term nil)
+    (funcall (eat--t-term-set-title-fn eat--t-term) eat--t-term "")
+    (funcall (eat--t-term-set-cursor-fn eat--t-term) eat--t-term
+             :default)))
 
-(defun eat--cur-right (&optional n)
+(defun eat--t-cur-right (&optional n)
   "Move cursor N columns right.
 
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (n (min (- (eat--disp-width disp) (eat--cur-x cursor))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (- (eat--t-disp-width disp) (eat--t-cur-x cursor))
                  (max (or n 1) 0))))
     (unless (zerop n)
-      (eat--repeated-insert ?  (- n (eat--col-motion n)))
-      (cl-incf (eat--cur-x cursor) n))))
+      (eat--t-repeated-insert ?  (- n (eat--t-col-motion n)))
+      (cl-incf (eat--t-cur-x cursor) n))))
 
-(defun eat--cur-left (&optional n)
+(defun eat--t-cur-left (&optional n)
   "Move cursor N columns left.
 
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (n (min (1- (eat--cur-x cursor)) (max (or n 1) 1))))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (1- (eat--t-cur-x cursor)) (max (or n 1) 1))))
     (unless (zerop n)
-      (eat--col-motion (- n))
-      (cl-decf (eat--cur-x cursor) n))))
+      (eat--t-col-motion (- n))
+      (cl-decf (eat--t-cur-x cursor) n))))
 
-(defun eat--cur-horizontal-abs (&optional n)
+(defun eat--t-cur-horizontal-abs (&optional n)
   "Move cursor to Nth column on current line.
 
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (n (min (max (or n 1) 1) (eat--disp-width disp))))
-    (cond ((< (eat--cur-x cursor) n)
-           (eat--cur-right (- n (eat--cur-x cursor))))
-          ((< n (eat--cur-x cursor))
-           (eat--cur-left (- (eat--cur-x cursor) n))))))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (max (or n 1) 1) (eat--t-disp-width disp))))
+    (cond ((< (eat--t-cur-x cursor) n)
+           (eat--t-cur-right (- n (eat--t-cur-x cursor))))
+          ((< n (eat--t-cur-x cursor))
+           (eat--t-cur-left (- (eat--t-cur-x cursor) n))))))
 
-(defun eat--beg-of-next-line (n)
+(defun eat--t-beg-of-next-line (n)
   "Move to beginning of Nth next line."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (n (min (- (eat--disp-height disp) (eat--cur-y cursor))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (- (eat--t-disp-height disp) (eat--t-cur-y cursor))
                  (max (or n 1) 0))))
     (unless (zerop n)
-      (eat--repeated-insert ?\n (- n (eat--goto-bol n)))
-      (cl-incf (eat--cur-y cursor) n)
-      (setf (eat--cur-x cursor) 1))))
+      (eat--t-repeated-insert ?\n (- n (eat--t-goto-bol n)))
+      (cl-incf (eat--t-cur-y cursor) n)
+      (setf (eat--t-cur-x cursor) 1))))
 
-(defun eat--beg-of-prev-line (n)
+(defun eat--t-beg-of-prev-line (n)
   "Move to beginning of Nth previous line."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (n (min (1- (eat--cur-y cursor)) (max (or n 1) 0))))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (1- (eat--t-cur-y cursor)) (max (or n 1) 0))))
     (unless (zerop n)
-      (eat--goto-bol (- n))
-      (cl-decf (eat--cur-y cursor) n)
-      (setf (eat--cur-x cursor) 1))))
+      (eat--t-goto-bol (- n))
+      (cl-decf (eat--t-cur-y cursor) n)
+      (setf (eat--t-cur-x cursor) 1))))
 
-(defun eat--cur-down (&optional n)
+(defun eat--t-cur-down (&optional n)
   "Move cursor N lines down.
 
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (x (eat--cur-x cursor)))
-    (eat--beg-of-next-line n)
-    (eat--cur-horizontal-abs x)))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (x (eat--t-cur-x cursor)))
+    (eat--t-beg-of-next-line n)
+    (eat--t-cur-horizontal-abs x)))
 
-(defun eat--cur-up (&optional n)
+(defun eat--t-cur-up (&optional n)
   "Move cursor N lines up.
 
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (x (eat--cur-x cursor)))
-    (eat--beg-of-prev-line n)
-    (eat--cur-horizontal-abs x)))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (x (eat--t-cur-x cursor)))
+    (eat--t-beg-of-prev-line n)
+    (eat--t-cur-horizontal-abs x)))
 
-(defun eat--cur-vertical-abs (&optional n)
+(defun eat--t-cur-vertical-abs (&optional n)
   "Move cursor to Nth line on display.
 
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (n (min (max (or n 1) 1) (eat--disp-height disp))))
-    (cond ((< (eat--cur-y cursor) n)
-           (eat--cur-down (- n (eat--cur-y cursor))))
-          ((< n (eat--cur-y cursor))
-           (eat--cur-up (- (eat--cur-y cursor) n))))))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (max (or n 1) 1) (eat--t-disp-height disp))))
+    (cond ((< (eat--t-cur-y cursor) n)
+           (eat--t-cur-down (- n (eat--t-cur-y cursor))))
+          ((< n (eat--t-cur-y cursor))
+           (eat--t-cur-up (- (eat--t-cur-y cursor) n))))))
 
-(defun eat--scroll-up (&optional n preserve-point)
+(defun eat--t-scroll-up (&optional n preserve-point)
   "Scroll down N up, preserving cursor position.
 
 N default to 1.  By default, don't change current line and current
 column, but if PRESERVE-POINT is given and non-nil, don't move point
 relative to the text and change current line accordingly."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (scroll-begin (eat--term-scroll-begin eat--term))
-         (scroll-end (eat--term-scroll-end eat--term))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+         (scroll-end (eat--t-term-scroll-end eat--t-term))
          (n (min (max (or n 1) 0) (1+ (- scroll-end scroll-begin)))))
     (unless (zerop n)
       (save-excursion
-        (goto-char (eat--disp-begin disp))
-        (eat--goto-bol (1- scroll-begin))
-        (if (or (eat--term-main-display eat--term)
+        (goto-char (eat--t-disp-begin disp))
+        (eat--t-goto-bol (1- scroll-begin))
+        (if (or (eat--t-term-main-display eat--t-term)
                 (> scroll-begin 1))
-            (delete-region (point) (car (eat--bol n)))
-          (eat--goto-bol n)
+            (delete-region (point) (car (eat--t-bol n)))
+          (eat--t-goto-bol n)
           ;; Make sure we're at the beginning of a line, because we
           ;; might be at `point-max'.
           (unless (or (= (point) (point-min))
                       (= (char-before) ?\n))
             (insert ?\n))
-          (set-marker (eat--disp-begin disp) (point)))
-        (eat--goto-bol (- (1+ (- scroll-end scroll-begin)) n))
-        (eat--repeated-insert ?\n n))
+          (set-marker (eat--t-disp-begin disp) (point)))
+        (eat--t-goto-bol (- (1+ (- scroll-end scroll-begin)) n))
+        (eat--t-repeated-insert ?\n n))
       (when (and preserve-point
-                 (<= scroll-begin (eat--cur-y cursor) scroll-end))
-        (setf (eat--cur-y cursor) (min (- (eat--cur-y cursor) n)
-                                       scroll-end)))
-      (let ((y (eat--cur-y cursor))
-            (x (eat--cur-x cursor)))
-        (eat--goto 1 1)
-        (eat--goto y x)))))
+                 (<= scroll-begin (eat--t-cur-y cursor) scroll-end))
+        (setf (eat--t-cur-y cursor) (min (- (eat--t-cur-y cursor) n)
+                                         scroll-end)))
+      (let ((y (eat--t-cur-y cursor))
+            (x (eat--t-cur-x cursor)))
+        (eat--t-goto 1 1)
+        (eat--t-goto y x)))))
 
-(defun eat--scroll-down (&optional n)
+(defun eat--t-scroll-down (&optional n)
   "Scroll down N lines, preserving cursor position.
 
 N default to 1."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (scroll-begin (eat--term-scroll-begin eat--term))
-         (scroll-end (eat--term-scroll-end eat--term))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+         (scroll-end (eat--t-term-scroll-end eat--t-term))
          (n (min (max (or n 1) 0) (1+ (- scroll-end scroll-begin)))))
     (unless (zerop n)
       (save-excursion
-        (goto-char (eat--disp-begin disp))
-        (eat--goto-bol (1- scroll-begin))
-        (eat--repeated-insert ?\n n)
-        (eat--goto-eol (- (1+ (- scroll-end scroll-begin)) (1+ n)))
-        (delete-region (point) (car (eat--eol n))))
-      (let ((y (eat--cur-y cursor))
-            (x (eat--cur-x cursor)))
-        (eat--goto 1 1)
-        (eat--goto y x)))))
+        (goto-char (eat--t-disp-begin disp))
+        (eat--t-goto-bol (1- scroll-begin))
+        (eat--t-repeated-insert ?\n n)
+        (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin)) (1+ n)))
+        (delete-region (point) (car (eat--t-eol n))))
+      (let ((y (eat--t-cur-y cursor))
+            (x (eat--t-cur-x cursor)))
+        (eat--t-goto 1 1)
+        (eat--t-goto y x)))))
 
-(defun eat--goto (&optional y x)
+(defun eat--t-goto (&optional y x)
   "Go to Xth column of Yth line of display.
 
 Y and X default to 1.  Y and X are one-based.  If Y and/or X are out
 of range, place cursor at the edge of display."
   (if (and (or (not y) (eql y 1))
            (or (not x) (eql x 1)))
-      (let* ((disp (eat--term-display eat--term))
-             (cursor (eat--disp-cursor disp)))
-        (goto-char (eat--disp-begin disp))
-        (setf (eat--cur-y cursor) 1)
-        (setf (eat--cur-x cursor) 1)))
-  (eat--cur-horizontal-abs 1)
-  (eat--cur-vertical-abs y)
-  (eat--cur-horizontal-abs x))
+      (let* ((disp (eat--t-term-display eat--t-term))
+             (cursor (eat--t-disp-cursor disp)))
+        (goto-char (eat--t-disp-begin disp))
+        (setf (eat--t-cur-y cursor) 1)
+        (setf (eat--t-cur-x cursor) 1)))
+  (eat--t-cur-horizontal-abs 1)
+  (eat--t-cur-vertical-abs y)
+  (eat--t-cur-horizontal-abs x))
 
-(defun eat--enable-auto-margin ()
+(defun eat--t-enable-auto-margin ()
   "Enable automatic margin."
-  (setf (eat--term-auto-margin eat--term) t))
+  (setf (eat--t-term-auto-margin eat--t-term) t))
 
-(defun eat--disable-auto-margin ()
+(defun eat--t-disable-auto-margin ()
   "Disable automatic margin."
-  (setf (eat--term-auto-margin eat--term) nil))
+  (setf (eat--t-term-auto-margin eat--t-term) nil))
 
-(defun eat--standard-charset ()
+(defun eat--t-standard-charset ()
   "Switch to standard character set."
-  (setf (eat--term-charset eat--term) 'standard))
+  (setf (eat--t-term-charset eat--t-term) 'standard))
 
-(defun eat--alternate-charset ()
+(defun eat--t-alternate-charset ()
   "Switch to alternate character set."
-  (setf (eat--term-charset eat--term) 'alternate))
+  (setf (eat--t-term-charset eat--t-term) 'alternate))
 
-(defun eat--write (str)
+(defun eat--t-write (str)
   "Write STR on display."
   (let* ((str
-          (pcase (eat--term-charset eat--term)
+          (pcase (eat--t-term-charset eat--t-term)
             ('standard
              str)
             ('alternate
@@ -2169,173 +2157,175 @@ of range, place cursor at the edge of display."
                    (when replacement
                      (aset s i replacement))))
                s))))
-         (str (propertize str 'face (eat--face-face
-                                     (eat--term-face eat--term)))))
+         (str (propertize str 'face
+                          (eat--t-face-face
+                           (eat--t-term-face eat--t-term)))))
     ;; REVIEW: This probably needs to be updated.
-    (let* ((disp (eat--term-display eat--term))
-           (cursor (eat--disp-cursor disp))
-           (scroll-end (eat--term-scroll-end eat--term)))
+    (let* ((disp (eat--t-term-display eat--t-term))
+           (cursor (eat--t-disp-cursor disp))
+           (scroll-end (eat--t-term-scroll-end eat--t-term)))
       (while (not (string-empty-p str))
-        (let ((ins-count (min (- (eat--disp-width disp)
-                                 (1- (eat--cur-x cursor)))
+        (let ((ins-count (min (- (eat--t-disp-width disp)
+                                 (1- (eat--t-cur-x cursor)))
                               (length str))))
           (insert (substring str 0 ins-count))
           (setq str (substring str ins-count))
-          (cl-incf (eat--cur-x cursor) ins-count)
-          (if (eat--term-ins-mode eat--term)
+          (cl-incf (eat--t-cur-x cursor) ins-count)
+          (if (eat--t-term-ins-mode eat--t-term)
               (delete-region
                (save-excursion
-                 (eat--col-motion (- (eat--disp-width disp)
-                                     (1- (eat--cur-x cursor))))
+                 (eat--t-col-motion (- (eat--t-disp-width disp)
+                                       (1- (eat--t-cur-x cursor))))
                  (point))
-               (car (eat--eol)))
+               (car (eat--t-eol)))
             (delete-region (point) (min (+ ins-count (point))
-                                        (car (eat--eol)))))
-          (when (> (eat--cur-x cursor) (eat--disp-width disp))
-            (if (not (eat--term-auto-margin eat--term))
-                (eat--cur-left 1)
+                                        (car (eat--t-eol)))))
+          (when (> (eat--t-cur-x cursor) (eat--t-disp-width disp))
+            (if (not (eat--t-term-auto-margin eat--t-term))
+                (eat--t-cur-left 1)
               (unless (string-empty-p str)
-                (when (= (eat--cur-y cursor) scroll-end)
+                (when (= (eat--t-cur-y cursor) scroll-end)
                   ;; We need to save the point because otherwise
-                  ;; `eat--scroll-up' would move it.
+                  ;; `eat--t-scroll-up' would move it.
                   (save-excursion
-                    (eat--scroll-up 1 'preserve-point)))
-                (if (= (eat--cur-y cursor) scroll-end)
-                    (eat--carriage-return)
+                    (eat--t-scroll-up 1 'preserve-point)))
+                (if (= (eat--t-cur-y cursor) scroll-end)
+                    (eat--t-carriage-return)
                   (if (= (point) (point-max))
                       (insert (propertize "\n" 'eat-wrap-line t))
                     (put-text-property (point) (1+ (point))
                                        'eat-wrap-line t)
                     (forward-char))
-                  (setf (eat--cur-x cursor) 1)
-                  (cl-incf (eat--cur-y cursor)))))))))))
+                  (setf (eat--t-cur-x cursor) 1)
+                  (cl-incf (eat--t-cur-y cursor)))))))))))
 
-(defun eat--horizontal-tab (&optional n)
+(defun eat--t-horizontal-tab (&optional n)
   "Go to the Nth next tabulation stop.
 
 N default to 1."
   (let* ((n (max (or n 1) 1))
-         (disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp)))
-    (eat--cur-right (+ (- 8 (mod (1- (eat--cur-x cursor)) 8))
-                       (* (1- n) 8)))))
+         (disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp)))
+    (eat--t-cur-right (+ (- 8 (mod (1- (eat--t-cur-x cursor)) 8))
+                         (* (1- n) 8)))))
 
-(defun eat--horizontal-backtab (&optional n)
+(defun eat--t-horizontal-backtab (&optional n)
   "Go to the Nth previous tabulation stop.
 
 N default to 1."
   (let* ((n (max (or n 1) 1))
-         (disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp)))
-    (eat--cur-left (+ (1+ (mod (- (eat--cur-x cursor) 2) 8))
-                      (* (1- n) 8)))))
+         (disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp)))
+    (eat--t-cur-left (+ (1+ (mod (- (eat--t-cur-x cursor) 2) 8))
+                        (* (1- n) 8)))))
 
-(defun eat--vertical-tab (&optional n)
+(defun eat--t-vertical-tab (&optional n)
   "Go to the Nth next line preserving column, scrolling if necessary.
 
 N default to 1."
   (let* ((n (max (or n 1) 0))
-         (disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (scroll-begin (eat--term-scroll-begin eat--term))
-         (scroll-end (eat--term-scroll-end eat--term))
-         (in-scroll-region (<= (eat--cur-y cursor) scroll-end))
+         (disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+         (scroll-end (eat--t-term-scroll-end eat--t-term))
+         (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end))
          (available-lines (- (if in-scroll-region
                                  scroll-end
-                               (eat--disp-height disp))
-                             (eat--cur-y cursor)))
+                               (eat--t-disp-height disp))
+                             (eat--t-cur-y cursor)))
          (scroll (min (max (- n available-lines) 0)
                       (if in-scroll-region
                           (1+ (- scroll-end scroll-begin))
-                        (eat--disp-height disp)))))
+                        (eat--t-disp-height disp)))))
     (unless (zerop n)
-      (eat--cur-down (- n (max (- n available-lines) 0)))
+      (eat--t-cur-down (- n (max (- n available-lines) 0)))
       (when (and (not (zerop scroll)) in-scroll-region)
-        (eat--scroll-up scroll)))))
+        (eat--t-scroll-up scroll)))))
 
-(defun eat--carriage-return ()
+(defun eat--t-carriage-return ()
   "Go to column one."
-  (eat--cur-horizontal-abs 1))
+  (eat--t-cur-horizontal-abs 1))
 
-(defun eat--line-feed (&optional n)
+(defun eat--t-line-feed (&optional n)
   "Insert line feed (newline) N times, and go to column one.
 
 N default to 1."
   (if (= (point) (point-max))
       (let* ((n (max (or n 1) 0))
-             (disp (eat--term-display eat--term))
-             (cursor (eat--disp-cursor disp))
-             (scroll-begin (eat--term-scroll-begin eat--term))
-             (scroll-end (eat--term-scroll-end eat--term))
-             (in-scroll-region (<= (eat--cur-y cursor) scroll-end))
+             (disp (eat--t-term-display eat--t-term))
+             (cursor (eat--t-disp-cursor disp))
+             (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+             (scroll-end (eat--t-term-scroll-end eat--t-term))
+             (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end))
              (available-lines (- (if in-scroll-region
                                      scroll-end
-                                   (eat--disp-height disp))
-                                 (eat--cur-y cursor)))
+                                   (eat--t-disp-height disp))
+                                 (eat--t-cur-y cursor)))
              (scroll (min (max (- n available-lines) 0)
                           (if in-scroll-region
                               (1+ (- scroll-end scroll-begin))
-                            (eat--disp-height disp)))))
+                            (eat--t-disp-height disp)))))
         (unless (zerop n)
           (let ((m (- n (max (- n available-lines) 0))))
             (if (zerop m)
-                (eat--carriage-return)
-              (eat--repeated-insert ?\n m)
-              (setf (eat--cur-x cursor) 1)
-              (cl-incf (eat--cur-y cursor) m)))
+                (eat--t-carriage-return)
+              (eat--t-repeated-insert ?\n m)
+              (setf (eat--t-cur-x cursor) 1)
+              (cl-incf (eat--t-cur-y cursor) m)))
           (when (and (not (zerop scroll)) in-scroll-region)
-            (eat--scroll-up scroll))))
-    (eat--carriage-return)
-    (eat--vertical-tab n)))
+            (eat--t-scroll-up scroll))))
+    (eat--t-carriage-return)
+    (eat--t-vertical-tab n)))
 
-(defun eat--reverse-line-feed (&optional n)
+(defun eat--t-reverse-line-feed (&optional n)
   "Insert reverse line feed N times, but stay on current column.
 
 N default to 1."
   (let* ((n (max (or n 1) 0))
-         (disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (scroll-begin (eat--term-scroll-begin eat--term))
-         (scroll-end (eat--term-scroll-end eat--term))
-         (in-scroll-region (<= scroll-begin (eat--cur-y cursor)))
-         (available-lines (- (eat--cur-y cursor)
+         (disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+         (scroll-end (eat--t-term-scroll-end eat--t-term))
+         (in-scroll-region (<= scroll-begin (eat--t-cur-y cursor)))
+         (available-lines (- (eat--t-cur-y cursor)
                              (if in-scroll-region scroll-begin 1)))
          (scroll (min (max (- n available-lines) 0)
                       (1+ (- scroll-end scroll-begin)))))
     (unless (zerop n)
-      (eat--cur-up (- n (max (- n available-lines) 0)))
+      (eat--t-cur-up (- n (max (- n available-lines) 0)))
       (when (and (not (zerop scroll)) in-scroll-region)
-        (eat--scroll-down scroll)))))
+        (eat--t-scroll-down scroll)))))
 
-(defun eat--bell ()
+(defun eat--t-bell ()
   "Ring the bell."
   (beep t))
 
-(defun eat--form-feed ()
+(defun eat--t-form-feed ()
   "Insert a vertical tab."
-  (eat--vertical-tab 1))
+  (eat--t-vertical-tab 1))
 
-(defun eat--save-cur ()
+(defun eat--t-save-cur ()
   "Save current cursor position."
-  (let ((disp (eat--term-display eat--term))
-        (saved-face (eat--copy-face (eat--term-face eat--term))))
-    (setf (eat--disp-saved-cursor disp)
-          (eat--copy-cur (eat--disp-cursor disp)))
-    (setf (eat--term-saved-face eat--term) saved-face)
-    (setf (eat--face-face saved-face)
-          (copy-tree (eat--face-face saved-face)))
-    (setf (eat--face-underline-color saved-face)
-          (copy-tree (eat--face-underline-color saved-face)))))
+  (let ((disp (eat--t-term-display eat--t-term))
+        (saved-face (eat--t-copy-face
+                     (eat--t-term-face eat--t-term))))
+    (setf (eat--t-disp-saved-cursor disp)
+          (eat--t-copy-cur (eat--t-disp-cursor disp)))
+    (setf (eat--t-term-saved-face eat--t-term) saved-face)
+    (setf (eat--t-face-face saved-face)
+          (copy-tree (eat--t-face-face saved-face)))
+    (setf (eat--t-face-underline-color saved-face)
+          (copy-tree (eat--t-face-underline-color saved-face)))))
 
-(defun eat--restore-cur ()
+(defun eat--t-restore-cur ()
   "Restore previously save cursor position."
-  (let ((saved (eat--disp-saved-cursor
-                (eat--term-display eat--term))))
-    (eat--goto (eat--cur-y saved) (eat--cur-x saved))
-    (setf (eat--term-face eat--term)
-          (eat--term-saved-face eat--term))))
+  (let ((saved (eat--t-disp-saved-cursor
+                (eat--t-term-display eat--t-term))))
+    (eat--t-goto (eat--t-cur-y saved) (eat--t-cur-x saved))
+    (setf (eat--t-term-face eat--t-term)
+          (eat--t-term-saved-face eat--t-term))))
 
-(defun eat--erase-in-line (&optional n)
+(defun eat--t-erase-in-line (&optional n)
   "Erase part of current line, but don't move cursor.
 
 N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
@@ -2348,17 +2338,17 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
              (1- pos)))
          (point-max))))
   (when (memq n '(1 2))
-    (let ((x (eat--cur-x (eat--disp-cursor
-                          (eat--term-display eat--term)))))
+    (let ((x (eat--t-cur-x (eat--t-disp-cursor
+                            (eat--t-term-display eat--t-term)))))
       (if (= (point) (point-max))
           (progn
-            (delete-region (car (eat--bol)) (point))
-            (eat--repeated-insert ?  (1- x)))
-        (delete-region (car (eat--bol)) (1+ (point)))
-        (eat--repeated-insert ?  x)
+            (delete-region (car (eat--t-bol)) (point))
+            (eat--t-repeated-insert ?  (1- x)))
+        (delete-region (car (eat--t-bol)) (1+ (point)))
+        (eat--t-repeated-insert ?  x)
         (backward-char)))))
 
-(defun eat--erase-in-disp (&optional n)
+(defun eat--t-erase-in-disp (&optional n)
   "Erase part of display.
 
 N defaults to 0.  When N is 0, erase cursor to end of display.  When N
@@ -2369,288 +2359,297 @@ to (1, 1).  When N is 3, also erase the scrollback."
     ((or 0 'nil (pred (< 3)))
      (delete-region (point) (point-max)))
     (1
-     (let* ((disp (eat--term-display eat--term))
-            (cursor (eat--disp-cursor disp))
-            (y (eat--cur-y cursor))
-            (x (eat--cur-x cursor))
+     (let* ((disp (eat--t-term-display eat--t-term))
+            (cursor (eat--t-disp-cursor disp))
+            (y (eat--t-cur-y cursor))
+            (x (eat--t-cur-x cursor))
             (incl-point (/= (point) (point-max))))
-       (delete-region (eat--disp-begin disp)
+       (delete-region (eat--t-disp-begin disp)
                       (if incl-point (1+ (point)) (point)))
-       (eat--repeated-insert ?\n (1- y))
-       (eat--repeated-insert ?  (if incl-point x (1- x)))
+       (eat--t-repeated-insert ?\n (1- y))
+       (eat--t-repeated-insert ?  (if incl-point x (1- x)))
        (when incl-point
          (backward-char))))
     (2
-     (eat--goto 1 1)
+     (eat--t-goto 1 1)
      (delete-region (point) (point-max)))
     (3
-     (eat--goto 1 1)
+     (eat--t-goto 1 1)
      (delete-region (point-min) (point-max)))))
 
-(defun eat--device-status-report ()
+(defun eat--t-device-status-report ()
   "Send the current Y and X coordinate to client."
-  (let ((cursor (eat--disp-cursor (eat--term-display eat--term))))
-    (funcall (eat--term-input-fn eat--term) eat--term
-             (format "\e[%i;%iR" (eat--cur-y cursor)
-                     (eat--cur-x cursor)))))
+  (let ((cursor (eat--t-disp-cursor
+                 (eat--t-term-display eat--t-term))))
+    (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
+             (format "\e[%i;%iR" (eat--t-cur-y cursor)
+                     (eat--t-cur-x cursor)))))
 
-(defun eat--set-cursor-state (state)
+(defun eat--t-set-cursor-state (state)
   "Set cursor state to STATE.
 
 STATE one of the `:default', `:invisible', `:very-visible'."
-  (unless (eq (eat--term-cur-state eat--term) state)
-    (setf (eat--term-cur-state eat--term) state)
-    (funcall (eat--term-set-cursor-fn eat--term) eat--term state)))
+  (unless (eq (eat--t-term-cur-state eat--t-term) state)
+    (setf (eat--t-term-cur-state eat--t-term) state)
+    (funcall (eat--t-term-set-cursor-fn eat--t-term) eat--t-term
+             state)))
 
-(defun eat--default-cursor ()
+(defun eat--t-default-cursor ()
   "Set the cursor to its default state."
-  (eat--set-cursor-state
-   (if (eat--term-cur-blinking-p eat--term) :very-visible :default)))
+  (eat--t-set-cursor-state
+   (if (eat--t-term-cur-blinking-p eat--t-term)
+       :very-visible
+     :default)))
 
-(defun eat--invisible-cursor ()
+(defun eat--t-invisible-cursor ()
   "Make the cursor invisible."
-  (eat--set-cursor-state :invisible))
+  (eat--t-set-cursor-state :invisible))
 
-(defun eat--blinking-cursor ()
+(defun eat--t-blinking-cursor ()
   "Make the cursor blink."
-  (setf (eat--term-cur-blinking-p eat--term) t)
-  (when (eq (eat--term-cur-state eat--term) :default)
-    (eat--set-cursor-state :very-visible)))
+  (setf (eat--t-term-cur-blinking-p eat--t-term) t)
+  (when (eq (eat--t-term-cur-state eat--t-term) :default)
+    (eat--t-set-cursor-state :very-visible)))
 
-(defun eat--non-blinking-cursor ()
+(defun eat--t-non-blinking-cursor ()
   "Make the cursor blink."
-  (setf (eat--term-cur-blinking-p eat--term) nil)
-  (when (eq (eat--term-cur-state eat--term) :very-visible)
-    (eat--set-cursor-state :default)))
+  (setf (eat--t-term-cur-blinking-p eat--t-term) nil)
+  (when (eq (eat--t-term-cur-state eat--t-term) :very-visible)
+    (eat--t-set-cursor-state :default)))
 
-(defun eat--enable-bracketed-yank ()
+(defun eat--t-enable-bracketed-yank ()
   "Enable bracketed yank mode."
-  (setf (eat--term-bracketed-yank eat--term) t))
+  (setf (eat--t-term-bracketed-yank eat--t-term) t))
 
-(defun eat--disable-bracketed-yank ()
+(defun eat--t-disable-bracketed-yank ()
   "Disable bracketed yank mode."
-  (setf (eat--term-bracketed-yank eat--term) nil))
+  (setf (eat--t-term-bracketed-yank eat--t-term) nil))
 
-(defun eat--enable-alt-disp ()
+(defun eat--t-enable-alt-disp ()
   "Enable alternative display/framebuffer."
   (when eat-enable-alternative-framebuffer
-    (unless (eat--term-main-display eat--term)
-      (let ((main-disp (eat--copy-disp
-                        (eat--term-display eat--term))))
-        (setf (eat--disp-begin main-disp)
-              (- (eat--disp-begin main-disp) (point-min)))
-        (setf (eat--disp-old-begin main-disp)
-              (- (eat--disp-old-begin main-disp) (point-min)))
-        (setf (eat--disp-cursor main-disp)
-              (eat--copy-cur (eat--disp-cursor main-disp)))
-        (setf (eat--disp-saved-cursor main-disp)
-              (eat--copy-cur (eat--disp-saved-cursor main-disp)))
-        (setf (eat--cur-position (eat--disp-cursor main-disp))
+    (unless (eat--t-term-main-display eat--t-term)
+      (let ((main-disp (eat--t-copy-disp
+                        (eat--t-term-display eat--t-term))))
+        (setf (eat--t-disp-begin main-disp)
+              (- (eat--t-disp-begin main-disp) (point-min)))
+        (setf (eat--t-disp-old-begin main-disp)
+              (- (eat--t-disp-old-begin main-disp) (point-min)))
+        (setf (eat--t-disp-cursor main-disp)
+              (eat--t-copy-cur (eat--t-disp-cursor main-disp)))
+        (setf (eat--t-disp-saved-cursor main-disp)
+              (eat--t-copy-cur (eat--t-disp-saved-cursor main-disp)))
+        (setf (eat--t-cur-position (eat--t-disp-cursor main-disp))
               (- (point) (point-min)))
-        (setf (eat--term-main-display eat--term)
+        (setf (eat--t-term-main-display eat--t-term)
               (cons main-disp (buffer-string)))
         (delete-region (point-min) (point-max))
-        (eat--goto 1 1)))))
+        (eat--t-goto 1 1)))))
 
-(defun eat--disable-alt-disp ()
+(defun eat--t-disable-alt-disp ()
   "Disable alternative display/framebuffer."
-  (when (eat--term-main-display eat--term)
-    (let* ((main-disp (eat--term-main-display eat--term))
-           (width (eat--disp-width (eat--term-display eat--term)))
-           (height (eat--disp-height (eat--term-display eat--term))))
+  (when (eat--t-term-main-display eat--t-term)
+    (let* ((main-disp (eat--t-term-main-display eat--t-term))
+           (width (eat--t-disp-width
+                   (eat--t-term-display eat--t-term)))
+           (height (eat--t-disp-height
+                    (eat--t-term-display eat--t-term))))
       (delete-region (point-min) (point-max))
       (insert (cdr main-disp))
-      (setf (eat--disp-begin (car main-disp))
+      (setf (eat--t-disp-begin (car main-disp))
             (copy-marker (+ (point-min)
-                            (eat--disp-begin (car main-disp)))))
-      (setf (eat--disp-old-begin (car main-disp))
+                            (eat--t-disp-begin (car main-disp)))))
+      (setf (eat--t-disp-old-begin (car main-disp))
             (copy-marker (+ (point-min)
-                            (eat--disp-old-begin (car main-disp)))))
-      (setf (eat--cur-position (eat--disp-cursor (car main-disp)))
+                            (eat--t-disp-old-begin (car main-disp)))))
+      (setf (eat--t-cur-position (eat--t-disp-cursor (car main-disp)))
             (copy-marker (+ (point-min)
-                            (eat--cur-position
-                             (eat--disp-cursor (car main-disp))))))
-      (setf (eat--term-display eat--term) (car main-disp))
-      (setf (eat--term-main-display eat--term) nil)
-      (eat--resize width height)
-      (goto-char (eat--cur-position
-                  (eat--disp-cursor
-                   (eat--term-display eat--term)))))))
+                            (eat--t-cur-position
+                             (eat--t-disp-cursor (car main-disp))))))
+      (setf (eat--t-term-display eat--t-term) (car main-disp))
+      (setf (eat--t-term-main-display eat--t-term) nil)
+      (eat--t-resize width height)
+      (goto-char (eat--t-cur-position
+                  (eat--t-disp-cursor
+                   (eat--t-term-display eat--t-term)))))))
 
-(defun eat--insert-char (n)
+(defun eat--t-insert-char (n)
   "Insert N empty (space) characters, preserving cursor."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (n (min (- (eat--disp-width disp) (1- (eat--cur-x cursor)))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (- (eat--t-disp-width disp)
+                    (1- (eat--t-cur-x cursor)))
                  (max (or n 1) 0))))
     (unless (zerop n)
       (save-excursion
-        (eat--repeated-insert ?  n)
-        (eat--col-motion (- (eat--disp-width disp)
-                            (+ (1- (eat--cur-x cursor)) n)))
-        (delete-region (point) (car (eat--eol)))))))
+        (eat--t-repeated-insert ?  n)
+        (eat--t-col-motion (- (eat--t-disp-width disp)
+                              (+ (1- (eat--t-cur-x cursor)) n)))
+        (delete-region (point) (car (eat--t-eol)))))))
 
-(defun eat--delete-char (n)
+(defun eat--t-delete-char (n)
   "Delete N characters, preserving cursor."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (n (min (- (eat--disp-width disp) (1- (eat--cur-x cursor)))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (- (eat--t-disp-width disp)
+                    (1- (eat--t-cur-x cursor)))
                  (max (or n 1) 0))))
     (unless (zerop n)
       (save-excursion
         (let ((m (point)))
-          (eat--col-motion n)
+          (eat--t-col-motion n)
           (delete-region m (point)))))))
 
-(defun eat--erase-char (n)
+(defun eat--t-erase-char (n)
   "Make next N character cells empty, preserving cursor."
-  (eat--delete-char n)
-  (eat--insert-char n))
+  (eat--t-delete-char n)
+  (eat--t-insert-char n))
 
-(defun eat--insert-line (n)
+(defun eat--t-insert-line (n)
   "Insert N empty lines, preserving cursor."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (scroll-begin (eat--term-scroll-begin eat--term))
-         (scroll-end (eat--term-scroll-end eat--term))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+         (scroll-end (eat--t-term-scroll-end eat--t-term))
          (n (min (- (1+ (- scroll-end scroll-begin))
-                    (1- (eat--cur-y cursor)))
+                    (1- (eat--t-cur-y cursor)))
                  (max (or n 1) 0))))
-    (when (and (<= scroll-begin (eat--cur-y cursor) scroll-end)
+    (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
                (not (zerop n)))
       (goto-char
        (prog1
            (progn
-             (eat--goto-bol)
-             (eat--repeated-insert ?  (1- (eat--cur-x cursor)))
+             (eat--t-goto-bol)
+             (eat--t-repeated-insert ?  (1- (eat--t-cur-x cursor)))
              (point))
-         (eat--repeated-insert ?\n n)
-         (eat--goto-eol (- (1+ (- scroll-end scroll-begin))
-                           (+ (- (eat--cur-y cursor)
-                                 (1- scroll-begin))
-                              n)))
-         (delete-region (point) (car (eat--eol n))))))))
+         (eat--t-repeated-insert ?\n n)
+         (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin))
+                             (+ (- (eat--t-cur-y cursor)
+                                   (1- scroll-begin))
+                                n)))
+         (delete-region (point) (car (eat--t-eol n))))))))
 
-(defun eat--delete-line (n)
+(defun eat--t-delete-line (n)
   "Delete N lines, preserving cursor."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp))
-         (x (eat--cur-x cursor))
-         (scroll-begin (eat--term-scroll-begin eat--term))
-         (scroll-end (eat--term-scroll-end eat--term))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (x (eat--t-cur-x cursor))
+         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+         (scroll-end (eat--t-term-scroll-end eat--t-term))
          (n (min (- (1+ (- scroll-end scroll-begin))
-                    (1- (eat--cur-y cursor)))
+                    (1- (eat--t-cur-y cursor)))
                  (max (or n 1) 0))))
-    (when (and (<= scroll-begin (eat--cur-y cursor) scroll-end)
+    (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
                (not (zerop n)))
-      (eat--goto-bol)
+      (eat--t-goto-bol)
       (save-excursion
         (let ((m (point)))
-          (eat--goto-bol n)
+          (eat--t-goto-bol n)
           (delete-region m (point))))
       (save-excursion
-        (eat--goto-eol (- (1+ (- scroll-end scroll-begin))
-                          (+ (- (eat--cur-y cursor)
-                                (1- scroll-begin))
-                             n)))
-        (eat--repeated-insert ?\n n))
-      (eat--repeated-insert ?  (- (1- x) (eat--col-motion (1- x)))))))
+        (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin))
+                            (+ (- (eat--t-cur-y cursor)
+                                  (1- scroll-begin))
+                               n)))
+        (eat--t-repeated-insert ?\n n))
+      (eat--t-repeated-insert
+       ?  (- (1- x) (eat--t-col-motion (1- x)))))))
 
-(defun eat--change-scroll-region (&optional top bottom)
+(defun eat--t-change-scroll-region (&optional top bottom)
   "Change the scroll region from lines TOP to BOTTOM (inclusive).
 
 TOP defaults to 1 and BOTTOM defaults to the height of the display."
-  (let* ((disp (eat--term-display eat--term))
+  (let* ((disp (eat--t-term-display eat--t-term))
          (top (or top 1))
-         (bottom (or bottom (eat--disp-height disp))))
+         (bottom (or bottom (eat--t-disp-height disp))))
     (when (and (<= 1 top)
                (< top bottom)
-               (<= bottom (eat--disp-height disp)))
-      (setf (eat--term-scroll-begin eat--term) top)
-      (setf (eat--term-scroll-end eat--term) bottom)
-      (eat--goto 1 1))))
+               (<= bottom (eat--t-disp-height disp)))
+      (setf (eat--t-term-scroll-begin eat--t-term) top)
+      (setf (eat--t-term-scroll-end eat--t-term) bottom)
+      (eat--t-goto 1 1))))
 
-(defun eat--insert-mode ()
+(defun eat--t-insert-mode ()
   "Enable insert mode and disable replace mode."
-  (setf (eat--term-ins-mode eat--term) t))
+  (setf (eat--t-term-ins-mode eat--t-term) t))
 
-(defun eat--replace-mode ()
+(defun eat--t-replace-mode ()
   "Enable replace mode and disable insert mode."
-  (setf (eat--term-ins-mode eat--term) nil))
+  (setf (eat--t-term-ins-mode eat--t-term) nil))
 
-(defun eat--set-sgr-params (params)
+(defun eat--t-set-sgr-params (params)
   "Set SGR parameters PARAMS."
   (let ((params (or params '((0))))
-        (face (eat--term-face eat--term)))
+        (face (eat--t-term-face eat--t-term)))
     (while params
       (pcase (pop params)
         ('(0)
-         (setf (eat--face-fg face) nil)
-         (setf (eat--face-bg face) nil)
-         (setf (eat--face-intensity face) nil)
-         (setf (eat--face-italic face) nil)
-         (setf (eat--face-underline face) nil)
-         (setf (eat--face-underline-color face) nil)
-         (setf (eat--face-crossed face) nil)
-         (setf (eat--face-conceal face) nil)
-         (setf (eat--face-inverse face) nil)
-         (setf (eat--face-blink face) nil))
+         (setf (eat--t-face-fg face) nil)
+         (setf (eat--t-face-bg face) nil)
+         (setf (eat--t-face-intensity face) nil)
+         (setf (eat--t-face-italic face) nil)
+         (setf (eat--t-face-underline face) nil)
+         (setf (eat--t-face-underline-color face) nil)
+         (setf (eat--t-face-crossed face) nil)
+         (setf (eat--t-face-conceal face) nil)
+         (setf (eat--t-face-inverse face) nil)
+         (setf (eat--t-face-blink face) nil))
         ('(1)
-         (setf (eat--face-intensity face) 'eat-term-bold))
+         (setf (eat--t-face-intensity face) 'eat-term-bold))
         ('(2)
-         (setf (eat--face-intensity face) 'eat-term-faint))
+         (setf (eat--t-face-intensity face) 'eat-term-faint))
         ('(3)
-         (setf (eat--face-italic face) 'eat-term-italic))
+         (setf (eat--t-face-italic face) 'eat-term-italic))
         ('(4)
-         (setf (eat--face-underline face) t))
+         (setf (eat--t-face-underline face) t))
         ('(4 0)
-         (setf (eat--face-underline face) nil))
+         (setf (eat--t-face-underline face) nil))
         ('(4 1)
-         (setf (eat--face-underline face) 'line))
+         (setf (eat--t-face-underline face) 'line))
         ('(4 2)
-         (setf (eat--face-underline face) 'line))
+         (setf (eat--t-face-underline face) 'line))
         ('(4 3)
-         (setf (eat--face-underline face) 'wave))
+         (setf (eat--t-face-underline face) 'wave))
         ('(4 4)
-         (setf (eat--face-underline face) 'wave))
+         (setf (eat--t-face-underline face) 'wave))
         ('(4 5)
-         (setf (eat--face-underline face) 'wave))
+         (setf (eat--t-face-underline face) 'wave))
         ('(5)
-         (setf (eat--face-blink face) 'eat-term-slow-blink))
+         (setf (eat--t-face-blink face) 'eat-term-slow-blink))
         ('(6)
-         (setf (eat--face-blink face) 'eat-term-fast-blink))
+         (setf (eat--t-face-blink face) 'eat-term-fast-blink))
         ('(7)
-         (setf (eat--face-inverse face) t))
+         (setf (eat--t-face-inverse face) t))
         ('(8)
-         (setf (eat--face-conceal face) t))
+         (setf (eat--t-face-conceal face) t))
         ('(9)
-         (setf (eat--face-crossed face) t))
+         (setf (eat--t-face-crossed face) t))
         ('(21)
-         (setf (eat--face-underline face) 'line))
+         (setf (eat--t-face-underline face) 'line))
         ('(22)
-         (setf (eat--face-intensity face) nil))
+         (setf (eat--t-face-intensity face) nil))
         ('(23)
-         (setf (eat--face-italic face) nil))
+         (setf (eat--t-face-italic face) nil))
         ('(24)
-         (setf (eat--face-underline face) nil))
+         (setf (eat--t-face-underline face) nil))
         ('(25)
-         (setf (eat--face-blink face) nil))
+         (setf (eat--t-face-blink face) nil))
         ('(27)
-         (setf (eat--face-inverse face) nil))
+         (setf (eat--t-face-inverse face) nil))
         ('(28)
-         (setf (eat--face-conceal face) nil))
+         (setf (eat--t-face-conceal face) nil))
         ('(29)
-         (setf (eat--face-crossed face) nil))
+         (setf (eat--t-face-crossed face) nil))
         (`(,(and (pred (lambda (color) (<= 30 color 37)))
                  color))
-         (setf (eat--face-fg face)
+         (setf (eat--t-face-fg face)
                (face-foreground
                 (intern (format "eat-term-color-%i" (- color 30)))
                 nil t)))
         ('(38)
          (pcase (pop params)
            ('(2)
-            (setf (eat--face-fg face)
+            (setf (eat--t-face-fg face)
                   (let ((r (car (pop params)))
                         (g (car (pop params)))
                         (b (car (pop params))))
@@ -2660,21 +2659,21 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                       (format "#%02x%02x%02x" r g b)))))
            ('(5)
             (let ((color (car (pop params))))
-              (setf (eat--face-fg face)
+              (setf (eat--t-face-fg face)
                     (when (and color (<= 0 color 255))
                       (face-foreground
                        (intern (format "eat-term-color-%i" color))
                        nil t)))))))
         ('(39)
-         (setf (eat--face-fg face) nil))
+         (setf (eat--t-face-fg face) nil))
         (`(,(and (pred (lambda (color) (<= 40 color 47)))
                  color))
-         (setf (eat--face-bg face)
+         (setf (eat--t-face-bg face)
                (face-foreground
                 (intern (format "eat-term-color-%i" (- color 40)))
                 nil t)))
         ('(48)
-         (setf (eat--face-bg face)
+         (setf (eat--t-face-bg face)
                (pcase (pop params)
                  ('(2)
                   (let ((r (car (pop params)))
@@ -2691,9 +2690,9 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                        (intern (format "eat-term-color-%i" color))
                        nil t)))))))
         ('(49)
-         (setf (eat--face-bg face) nil))
+         (setf (eat--t-face-bg face) nil))
         ('(58)
-         (setf (eat--face-underline-color face)
+         (setf (eat--t-face-underline-color face)
                (pcase (pop params)
                  ('(2)
                   (let ((r (car (pop params)))
@@ -2710,122 +2709,124 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                        (intern (format "eat-term-color-%i" color))
                        nil t)))))))
         ('(59)
-         (setf (eat--face-underline-color face) nil))
+         (setf (eat--t-face-underline-color face) nil))
         (`(,(and (pred (lambda (color) (<= 90 color 97)))
                  color))
-         (setf (eat--face-fg face)
+         (setf (eat--t-face-fg face)
                (face-foreground
                 (intern (format "eat-term-color-%i" (- color 82)))
                 nil t)))
         (`(,(and (pred (lambda (color) (<= 100 color 107)))
                  color))
-         (setf (eat--face-bg face)
+         (setf (eat--t-face-bg face)
                (face-foreground
                 (intern (format "eat-term-color-%i" (- color 92)))
                 nil t)))))
-    (setf (eat--face-face face)
-          `(,@(when-let ((fg (or (if (eat--face-conceal face)
-                                     (eat--face-bg face)
-                                   (eat--face-fg face))
-                                 (and (eat--face-inverse face)
+    (setf (eat--t-face-face face)
+          `(,@(when-let ((fg (or (if (eat--t-face-conceal face)
+                                     (eat--t-face-bg face)
+                                   (eat--t-face-fg face))
+                                 (and (eat--t-face-inverse face)
                                       (face-foreground 'default)))))
-                (list (if (eat--face-inverse face)
+                (list (if (eat--t-face-inverse face)
                           :background
                         :foreground)
                       fg))
-            ,@(when-let ((bg (or (eat--face-bg face)
-                                 (and (eat--face-inverse face)
+            ,@(when-let ((bg (or (eat--t-face-bg face)
+                                 (and (eat--t-face-inverse face)
                                       (face-background 'default)))))
-                (list (if (eat--face-inverse face)
+                (list (if (eat--t-face-inverse face)
                           :foreground
                         :background)
                       bg))
-            ,@(when-let ((underline (eat--face-underline face)))
+            ,@(when-let ((underline (eat--t-face-underline face)))
                 (list
                  :underline
-                 (list :color (eat--face-underline-color face)
+                 (list :color (eat--t-face-underline-color face)
                        :style underline)))
-            ,@(when-let ((crossed (eat--face-crossed face)))
+            ,@(when-let ((crossed (eat--t-face-crossed face)))
                 ;; TODO: How about colors?
                 `(:strike-through t))
             :inherit
-            (,@(when-let ((intensity (eat--face-intensity face)))
+            (,@(when-let ((intensity (eat--t-face-intensity face)))
                  (list intensity))
-             ,@(when-let ((italic (eat--face-italic face)))
+             ,@(when-let ((italic (eat--t-face-italic face)))
                  (list italic))
-             ,@(when-let ((blink (eat--face-blink face)))
+             ,@(when-let ((blink (eat--t-face-blink face)))
                  (list blink)))))))
 
-(defun eat--enable-keypad ()
+(defun eat--t-enable-keypad ()
   "Enable keypad."
-  (setf (eat--term-keypad-mode eat--term) t))
+  (setf (eat--t-term-keypad-mode eat--t-term) t))
 
-(defun eat--disable-keypad ()
+(defun eat--t-disable-keypad ()
   "Disable keypad."
-  (setf (eat--term-keypad-mode eat--term) nil))
+  (setf (eat--t-term-keypad-mode eat--t-term) nil))
 
-(defun eat--enable-sgr-mouse-encoding ()
+(defun eat--t-enable-sgr-mouse-encoding ()
   "Arrange that the following mouse events will be encoded like SGR."
-  (setf (eat--term-mouse-encoding eat--term) 'sgr))
+  (setf (eat--t-term-mouse-encoding eat--t-term) 'sgr))
 
-(defun eat--disable-sgr-mouse-encoding ()
+(defun eat--t-disable-sgr-mouse-encoding ()
   "Arrange that the following mouse events won't be encoded like SGR."
-  (setf (eat--term-mouse-encoding eat--term) nil))
+  (setf (eat--t-term-mouse-encoding eat--t-term) nil))
 
-(defun eat--set-mouse-mode (mode)
+(defun eat--t-set-mouse-mode (mode)
   "Set current mouse mode to MODE.
 
 MODE should be one of nil and `x10', `normal', `button-event',
 `any-event'."
-  (setf (eat--term-mouse-mode eat--term) mode)
+  (setf (eat--t-term-mouse-mode eat--t-term) mode)
   (unless mode
-    (eat--disable-sgr-mouse-encoding))
+    (eat--t-disable-sgr-mouse-encoding))
   (when (or (not mode)
             (eq mode 'x10))
-    (setf (eat--term-mouse-pressed eat--term) nil))
-  (funcall (eat--term-grab-mouse-fn eat--term) eat--term
+    (setf (eat--t-term-mouse-pressed eat--t-term) nil))
+  (funcall (eat--t-term-grab-mouse-fn eat--t-term) eat--t-term
            (pcase mode
              ('x10 :click)
              ('normal :modifier-click)
              ('button-event :drag)
              ('any-event :all))))
 
-(defun eat--enable-x10-mouse ()
+(defun eat--t-enable-x10-mouse ()
   "Enable X10 mouse tracking."
-  (eat--set-mouse-mode 'x10))
+  (eat--t-set-mouse-mode 'x10))
 
-(defun eat--enable-normal-mouse ()
+(defun eat--t-enable-normal-mouse ()
   "Enable normal mouse tracking."
-  (eat--set-mouse-mode 'normal))
+  (eat--t-set-mouse-mode 'normal))
 
-(defun eat--enable-button-event-mouse ()
+(defun eat--t-enable-button-event-mouse ()
   "Enable button-event mouse tracking."
-  (eat--set-mouse-mode 'button-event))
+  (eat--t-set-mouse-mode 'button-event))
 
-(defun eat--enable-any-event-mouse ()
+(defun eat--t-enable-any-event-mouse ()
   "Enable any-event mouse tracking."
-  (eat--set-mouse-mode 'any-event))
+  (eat--t-set-mouse-mode 'any-event))
 
-(defun eat--disable-mouse ()
+(defun eat--t-disable-mouse ()
   "Disable mouse tracking."
-  (eat--set-mouse-mode nil))
+  (eat--t-set-mouse-mode nil))
 
-(defun eat--enable-focus-event ()
+(defun eat--t-enable-focus-event ()
   "Enable sending focus events."
-  (setf (eat--term-focus-event-mode eat--term) t)
-  (funcall (eat--term-set-focus-ev-mode-fn eat--term) eat--term t))
+  (setf (eat--t-term-focus-event-mode eat--t-term) t)
+  (funcall (eat--t-term-set-focus-ev-mode-fn eat--t-term) eat--t-term
+           t))
 
-(defun eat--disable-focus-event ()
+(defun eat--t-disable-focus-event ()
   "Disable sending focus events."
-  (setf (eat--term-focus-event-mode eat--term) nil)
-  (funcall (eat--term-set-focus-ev-mode-fn eat--term) eat--term nil))
+  (setf (eat--t-term-focus-event-mode eat--t-term) nil)
+  (funcall (eat--t-term-set-focus-ev-mode-fn eat--t-term) eat--t-term
+           nil))
 
-(defun eat--set-title (title)
+(defun eat--t-set-title (title)
   "Set the title of terminal to TITLE."
-  (setf (eat--term-title eat--term) title)
-  (funcall (eat--term-set-title-fn eat--term) eat--term title))
+  (setf (eat--t-term-title eat--t-term) title)
+  (funcall (eat--t-term-set-title-fn eat--t-term) eat--t-term title))
 
-(defun eat--send-device-attrs (params format)
+(defun eat--t-send-device-attrs (params format)
   "Return device attributes.
 
 PARAMS is the parameter list and FORMAT is the format of parameters in
@@ -2834,32 +2835,32 @@ output."
     (pcase format
       ('nil
        (when (= (caar params) 0)
-         (funcall (eat--term-input-fn eat--term) eat--term
+         (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
                   "\e[?1;2c")))
       (?>
        (when (= (caar params) 0)
-         (funcall (eat--term-input-fn eat--term) eat--term
+         (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
                   "\e[>0;242;0c"))))))
 
-(defun eat--report-foreground-color ()
+(defun eat--t-report-foreground-color ()
   "Report the current default foreground color to the client."
   (funcall
-   (eat--term-input-fn eat--term) eat--term
+   (eat--t-term-input-fn eat--t-term) eat--t-term
    (format "\e]10;%s\e\\"
            (mapconcat (lambda (n) (format "%04x" n))
                       (color-values (face-foreground 'default))
                       "/"))))
 
-(defun eat--report-background-color ()
+(defun eat--t-report-background-color ()
   "Report the current default background color to the client."
   (funcall
-   (eat--term-input-fn eat--term) eat--term
+   (eat--t-term-input-fn eat--t-term) eat--t-term
    (format "\e]11;%s\e\\"
            (mapconcat (lambda (n) (format "%04x" n))
                       (color-values (face-background 'default))
                       "/"))))
 
-(defun eat--manipulate-selection (targets data)
+(defun eat--t-manipulate-selection (targets data)
   "Set and send current selection.
 
 TARGETS is a string containing zero or more characters from the set
@@ -2869,7 +2870,7 @@ DATA is the selection data encoded in base64."
     (setq targets "s0"))
   (if (string= data "?")
       (funcall
-       (eat--term-input-fn eat--term) eat--term
+       (eat--t-term-input-fn eat--t-term) eat--t-term
        (let ((str nil)
              (source nil)
              (n 0))
@@ -2879,24 +2880,25 @@ DATA is the selection data encoded in base64."
             (pcase (aref targets n)
               (?c
                (funcall
-                (eat--term-manipulate-selection-fn eat--term)
-                eat--term :clipboard t))
+                (eat--t-term-manipulate-selection-fn eat--t-term)
+                eat--t-term :clipboard t))
               (?p
                (funcall
-                (eat--term-manipulate-selection-fn eat--term)
-                eat--term :primary t))
+                (eat--t-term-manipulate-selection-fn eat--t-term)
+                eat--t-term :primary t))
               (?q
                (funcall
-                (eat--term-manipulate-selection-fn eat--term)
-                eat--term :secondary t))
+                (eat--t-term-manipulate-selection-fn eat--t-term)
+                eat--t-term :secondary t))
               (?s
                (funcall
-                (eat--term-manipulate-selection-fn eat--term)
-                eat--term :select t))
+                (eat--t-term-manipulate-selection-fn eat--t-term)
+                eat--t-term :select t))
               ((and (pred (<= ?0))
                     (pred (>= ?9))
                     i)
-               (aref (eat--term-cut-buffers eat--term) (- i ?0)))))
+               (aref (eat--t-term-cut-buffers eat--t-term)
+                     (- i ?0)))))
            (when str
              (setq source (string (aref targets n))))
            (cl-incf n))
@@ -2911,126 +2913,127 @@ DATA is the selection data encoded in base64."
       (seq-doseq (target targets)
         (pcase target
           (?c
-           (funcall (eat--term-manipulate-selection-fn eat--term)
-                    eat--term :clipboard str))
+           (funcall (eat--t-term-manipulate-selection-fn eat--t-term)
+                    eat--t-term :clipboard str))
           (?p
-           (funcall (eat--term-manipulate-selection-fn eat--term)
-                    eat--term :primary str))
+           (funcall (eat--t-term-manipulate-selection-fn eat--t-term)
+                    eat--t-term :primary str))
           (?q
-           (funcall (eat--term-manipulate-selection-fn eat--term)
-                    eat--term :secondary str))
+           (funcall (eat--t-term-manipulate-selection-fn eat--t-term)
+                    eat--t-term :secondary str))
           (?s
-           (funcall (eat--term-manipulate-selection-fn eat--term)
-                    eat--term :select str))
+           (funcall (eat--t-term-manipulate-selection-fn eat--t-term)
+                    eat--t-term :select str))
           ((and (pred (<= ?0))
                 (pred (>= ?9))
                 i)
-           (aset (eat--term-cut-buffers eat--term) (- i ?0) str)))))))
+           (aset (eat--t-term-cut-buffers eat--t-term) (- i ?0)
+                 str)))))))
 
-(defun eat--set-modes (params format)
+(defun eat--t-set-modes (params format)
   "Set modes according to PARAMS in format FORMAT."
   (pcase format
     ('nil
      (while params
        (pcase (pop params)
          ('(4)
-          (eat--insert-mode)))))
+          (eat--t-insert-mode)))))
     (??
      (while params
        (pcase (pop params)
          ('(1)
-          (eat--enable-keypad))
+          (eat--t-enable-keypad))
          ('(7)
-          (eat--enable-auto-margin))
+          (eat--t-enable-auto-margin))
          ('(12)
-          (eat--blinking-cursor))
+          (eat--t-blinking-cursor))
          ('(25)
-          (eat--default-cursor))
+          (eat--t-default-cursor))
          ('(1049)
-          (eat--enable-alt-disp))
+          (eat--t-enable-alt-disp))
          ('(2004)
-          (eat--enable-bracketed-yank))
+          (eat--t-enable-bracketed-yank))
          ('(9)
-          (eat--enable-x10-mouse))
+          (eat--t-enable-x10-mouse))
          ('(1000)
-          (eat--enable-normal-mouse))
+          (eat--t-enable-normal-mouse))
          ('(1002)
-          (eat--enable-button-event-mouse))
+          (eat--t-enable-button-event-mouse))
          ('(1003)
-          (eat--enable-any-event-mouse))
+          (eat--t-enable-any-event-mouse))
          ('(1004)
-          (eat--enable-focus-event))
+          (eat--t-enable-focus-event))
          ('(1006)
-          (eat--enable-sgr-mouse-encoding)))))))
+          (eat--t-enable-sgr-mouse-encoding)))))))
 
-(defun eat--reset-modes (params format)
+(defun eat--t-reset-modes (params format)
   "Reset modes according to PARAMS in format FORMAT."
   (pcase format
     ('nil
      (while params
        (pcase (pop params)
          ('(4)
-          (eat--replace-mode)))))
+          (eat--t-replace-mode)))))
     (??
      (while params
        (pcase (pop params)
          ('(1)
-          (eat--disable-keypad))
+          (eat--t-disable-keypad))
          ('(7)
-          (eat--disable-auto-margin))
+          (eat--t-disable-auto-margin))
          ('(12)
-          (eat--non-blinking-cursor))
+          (eat--t-non-blinking-cursor))
          ('(25)
-          (eat--invisible-cursor))
+          (eat--t-invisible-cursor))
          ('(1049)
-          (eat--disable-alt-disp))
+          (eat--t-disable-alt-disp))
          ('(2004)
-          (eat--disable-bracketed-yank))
+          (eat--t-disable-bracketed-yank))
          (`(,(or 9 1000 1002 1003))
-          (eat--disable-mouse))
+          (eat--t-disable-mouse))
          ('(1004)
-          (eat--disable-focus-event))
+          (eat--t-disable-focus-event))
          ('(1006)
-          (eat--disable-sgr-mouse-encoding)))))))
+          (eat--t-disable-sgr-mouse-encoding)))))))
 
-(defun eat--handle-output (output)
+(defun eat--t-handle-output (output)
   "Parse and evaluate OUTPUT."
   (let ((index 0))
     (while (< index (length output))
-      (pcase (eat--term-parser-state eat--term)
+      (pcase (eat--t-term-parser-state eat--t-term)
         ('nil
          (let ((match (string-match (rx (or ?\0 ?\a ?\b ?\t ?\n ?\v
                                             ?\f ?\r ?\C-n ?\C-o ?\e))
                                     output index)))
            (if (not match)
                (progn
-                 (eat--write (substring output index))
+                 (eat--t-write (substring output index))
                  (setq index (length output)))
              (if (/= match index)
                  (progn
-                   (eat--write (substring output index match))
+                   (eat--t-write (substring output index match))
                    (setq index match))
                (pcase (aref output index)
                  (?\0
                   (cl-incf index))
                  (?\a
                   (cl-incf index)
-                  (eat--bell))
+                  (eat--t-bell))
                  (?\b
                   (cl-incf index)
-                  (eat--cur-left 1))
+                  (eat--t-cur-left 1))
                  (?\t
                   (cl-incf index)
-                  (eat--horizontal-tab 1))
+                  (eat--t-horizontal-tab 1))
                  (?\n
                   (cl-incf index)
-                  (eat--line-feed 1))
+                  (eat--t-line-feed 1))
                  (?\v
                   (cl-incf index)
-                  (eat--vertical-tab 1))
+                  (eat--t-vertical-tab 1))
                  (?\f
                   (cl-incf index)
-                  (eat--form-feed))
+                  (eat--t-form-feed))
                  (?\r
                   (cl-incf index)
                   ;; Avoid going to line home just before a line feed,
@@ -3038,62 +3041,63 @@ DATA is the selection data encoded in base64."
                   ;; end of display.
                   (unless (and (/= index (length output))
                                (= (aref output index) ?\n))
-                    (eat--carriage-return)))
+                    (eat--t-carriage-return)))
                  (?\C-n
                   (cl-incf index)
-                  (eat--alternate-charset))
+                  (eat--t-alternate-charset))
                  (?\C-o
                   (cl-incf index)
-                  (eat--standard-charset))
+                  (eat--t-standard-charset))
                  (?\e
                   (cl-incf index)
-                  (setf (eat--term-parser-state eat--term)
+                  (setf (eat--t-term-parser-state eat--t-term)
                         '(read-esc))))))))
         ('(read-esc)
          (let ((type (aref output index)))
            (cl-incf index)
-           (setf (eat--term-parser-state eat--term) nil)
+           (setf (eat--t-term-parser-state eat--t-term) nil)
            (pcase type
              ;; ESC 7
              (?7
-              (eat--save-cur))
+              (eat--t-save-cur))
              ;; ESC 8
              (?8
-              (eat--restore-cur))
+              (eat--t-restore-cur))
              ;; ESC c
              (?c
-              (eat--reset))
+              (eat--t-reset))
              (?M
-              (eat--reverse-line-feed 1))
+              (eat--t-reverse-line-feed 1))
              ;; ESC P, or DCS
              (?P
-              (setf (eat--term-parser-state eat--term)
+              (setf (eat--t-term-parser-state eat--t-term)
                     '(read-dcs "")))
              ;; ESC [, or CSI
              (?\[
-              (setf (eat--term-parser-state eat--term)
+              (setf (eat--t-term-parser-state eat--t-term)
                     '(read-csi "")))
              ;; ESC ], or OSC
              (?\]
-              (setf (eat--term-parser-state eat--term)
+              (setf (eat--t-term-parser-state eat--t-term)
                     '(read-osc "")))
              ;; ESC ^, or PM
              (?^
-              (setf (eat--term-parser-state eat--term) '(read-pm "")))
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-pm "")))
              ;; ESC _, or APC
              (?_
-              (setf (eat--term-parser-state eat--term)
+              (setf (eat--t-term-parser-state eat--t-term)
                     '(read-apc ""))))))
         (`(read-csi ,buf)
          (let ((match (string-match (rx (any (#x40 . #x7e)))
                                     output index)))
            (if (not match)
                (progn
-                 (setf (eat--term-parser-state eat--term)
+                 (setf (eat--t-term-parser-state eat--t-term)
                        `(read-csi ,(concat buf (substring output
                                                           index))))
                  (setq index (length output)))
-             (setf (eat--term-parser-state eat--term) nil)
+             (setf (eat--t-term-parser-state eat--t-term) nil)
              (pcase
                  (let ((str (concat buf (substring output index
                                                    match)))
@@ -3137,84 +3141,84 @@ DATA is the selection data encoded in base64."
                      (t str))))
                ;; CSI <n> @.
                (`("@" nil ,(and (pred listp) params))
-                (eat--insert-char (caar params)))
+                (eat--t-insert-char (caar params)))
                ;; CSI <n> A.
                (`("A" nil ,(and (pred listp) params))
-                (eat--cur-up (caar params)))
+                (eat--t-cur-up (caar params)))
                ;; CSI <n> B.
                (`("B" nil ,(and (pred listp) params))
-                (eat--cur-down (caar params)))
+                (eat--t-cur-down (caar params)))
                ;; CSI <n> C.
                (`("C" nil ,(and (pred listp) params))
-                (eat--cur-right (caar params)))
+                (eat--t-cur-right (caar params)))
                ;; CSI <n> D.
                (`("D" nil ,(and (pred listp) params))
-                (eat--cur-left (caar params)))
+                (eat--t-cur-left (caar params)))
                ;; CSI <n> E.
                (`("E" nil ,(and (pred listp) params))
-                (eat--beg-of-prev-line (caar params)))
+                (eat--t-beg-of-prev-line (caar params)))
                ;; CSI <n> F.
                (`("F" nil ,(and (pred listp) params))
-                (eat--beg-of-next-line (caar params)))
+                (eat--t-beg-of-next-line (caar params)))
                ;; CSI <n> G.
                (`("G" nil ,(and (pred listp) params))
-                (eat--cur-horizontal-abs (caar params)))
+                (eat--t-cur-horizontal-abs (caar params)))
                ;; CSI <n> ; <m> H
                ;; CSI <n> ; <m> f
                (`(,(or "H" "f") nil ,(and (pred listp) params))
-                (eat--goto (caar params) (caadr params)))
+                (eat--t-goto (caar params) (caadr params)))
                ;; CSI <n> J.
                (`("J" nil ,(and (pred listp) params))
-                (eat--erase-in-disp (caar params)))
+                (eat--t-erase-in-disp (caar params)))
                ;; CSI <n> K.
                (`("K" nil ,(and (pred listp) params))
-                (eat--erase-in-line (caar params)))
+                (eat--t-erase-in-line (caar params)))
                ;; CSI <n> L.
                (`("L" nil ,(and (pred listp) params))
-                (eat--insert-line (caar params)))
+                (eat--t-insert-line (caar params)))
                ;; CSI <n> M.
                (`("M" nil ,(and (pred listp) params))
-                (eat--delete-line (caar params)))
+                (eat--t-delete-line (caar params)))
                ;; CSI <n> P.
                (`("P" nil ,(and (pred listp) params))
-                (eat--delete-char (caar params)))
+                (eat--t-delete-char (caar params)))
                ;; CSI <n> S.
                (`("S" nil ,(and (pred listp) params))
-                (eat--scroll-up (caar params)))
+                (eat--t-scroll-up (caar params)))
                ;; CSI <n> T.
                (`("T" nil ,(and (pred listp) params))
-                (eat--scroll-down (caar params)))
+                (eat--t-scroll-down (caar params)))
                ;; CSI <n> X.
                (`("X" nil ,(and (pred listp) params))
-                (eat--erase-char (caar params)))
+                (eat--t-erase-char (caar params)))
                ;; CSI <n> Z.
                (`("Z" nil ,(and (pred listp) params))
-                (eat--horizontal-backtab (caar params)))
+                (eat--t-horizontal-backtab (caar params)))
                ;; CSI <n> c.
                ;; CSI > <n> c.
                (`("c" ,format ,(and (pred listp) params))
-                (eat--send-device-attrs params format))
+                (eat--t-send-device-attrs params format))
                ;; CSI <n> d.
                (`("d" nil ,(and (pred listp) params))
-                (eat--cur-vertical-abs (caar params)))
+                (eat--t-cur-vertical-abs (caar params)))
                ;; CSI ... h
                ;; CSI ? ... h
                (`("h" ,format ,(and (pred listp) params))
-                (eat--set-modes params format))
+                (eat--t-set-modes params format))
                ;; CSI ... l
                ;; CSI ? ... l
                (`("l" ,format ,(and (pred listp) params))
-                (eat--reset-modes params format))
+                (eat--t-reset-modes params format))
                ;; CSI ... m
                (`("m" nil ,(and (pred listp) params))
-                (eat--set-sgr-params params))
+                (eat--t-set-sgr-params params))
                ;; CSI 6 n
                ('("n" nil ((6)))
-                (eat--device-status-report))
+                (eat--t-device-status-report))
                ;; CSI <n> ; <n> r
                (`("r" nil ,(and (pred listp) params))
-                (eat--change-scroll-region (caar params)
-                                           (caadr params)))))))
+                (eat--t-change-scroll-region (caar params)
+                                             (caadr params)))))))
         (`(,(and (or 'read-dcs 'read-osc 'read-pm 'read-apc)
                  state)
            ,buf)
@@ -3224,7 +3228,7 @@ DATA is the selection data encoded in base64."
                                     output index)))
            (if (not match)
                (progn
-                 (setf (eat--term-parser-state eat--term)
+                 (setf (eat--t-term-parser-state eat--t-term)
                        `(,state ,(concat buf (substring output
                                                         index))))
                  (setq index (length output)))
@@ -3235,22 +3239,22 @@ DATA is the selection data encoded in base64."
                         (not (or (zerop (length str))
                                  (= (aref str (1- (length str)))
                                     ?\e))))
-                   (setf (eat--term-parser-state eat--term)
+                   (setf (eat--t-term-parser-state eat--t-term)
                          `(,state ,(concat str "\\")))
                  (when (= (aref output match) ?\\)
                    (setq str (substring str 0 (1- (length str)))))
-                 (setf (eat--term-parser-state eat--term) nil)
+                 (setf (eat--t-term-parser-state eat--t-term) nil)
                  (pcase state
                    ('read-osc
                     (pcase str
                       ((rx string-start (or ?0 ?2) ?\;
                            (let title (zero-or-more anything))
                            string-end)
-                       (eat--set-title title))
+                       (eat--t-set-title title))
                       ("10;?"
-                       (eat--report-foreground-color))
+                       (eat--t-report-foreground-color))
                       ("11;?"
-                       (eat--report-background-color))
+                       (eat--t-report-background-color))
                       ((rx string-start "52;"
                            (let targets
                              (zero-or-more (any ?c ?p ?q ?s
@@ -3258,44 +3262,44 @@ DATA is the selection data encoded in base64."
                            ";"
                            (let data (zero-or-more anything))
                            string-end)
-                       (eat--manipulate-selection
+                       (eat--t-manipulate-selection
                         targets data))))))))))))))
 
-(defun eat--resize (width height)
+(defun eat--t-resize (width height)
   "Resize terminal to WIDTH x HEIGHT."
-  (let* ((disp (eat--term-display eat--term))
-         (cursor (eat--disp-cursor disp)))
-    (unless (and (eq (eat--disp-width disp) width)
-                 (eq (eat--disp-height disp) height))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp)))
+    (unless (and (eq (eat--t-disp-width disp) width)
+                 (eq (eat--t-disp-height disp) height))
       (save-excursion
-        (setf (eat--disp-width disp) width)
-        (setf (eat--disp-height disp) height)
-        (setf (eat--term-scroll-begin eat--term) 1)
-        (setf (eat--term-scroll-end eat--term)
-              (eat--disp-height disp))
-        (goto-char (eat--disp-begin disp))
+        (setf (eat--t-disp-width disp) width)
+        (setf (eat--t-disp-height disp) height)
+        (setf (eat--t-term-scroll-begin eat--t-term) 1)
+        (setf (eat--t-term-scroll-end eat--t-term)
+              (eat--t-disp-height disp))
+        (goto-char (eat--t-disp-begin disp))
         (unless (bobp)
           (backward-char))
         (while (not (eobp))
-          (eat--join-long-line))
-        (goto-char (eat--disp-begin disp))
+          (eat--t-join-long-line))
+        (goto-char (eat--t-disp-begin disp))
         (while (not (eobp))
-          (eat--break-long-line (eat--disp-width disp)))
-        (goto-char (eat--cur-position cursor))
-        (let* ((disp-begin (car (eat--bol (- (1- height))))))
-          (when (< (eat--disp-begin disp) disp-begin)
-            (goto-char (max (- (eat--disp-begin disp) 1)
+          (eat--t-break-long-line (eat--t-disp-width disp)))
+        (goto-char (eat--t-cur-position cursor))
+        (let* ((disp-begin (car (eat--t-bol (- (1- height))))))
+          (when (< (eat--t-disp-begin disp) disp-begin)
+            (goto-char (max (- (eat--t-disp-begin disp) 1)
                             (point-min)))
-            (set-marker (eat--disp-begin disp) disp-begin)
-            (while (< (point) (1- (eat--disp-begin disp)))
-              (eat--join-long-line
-               (1- (eat--disp-begin disp))))))
-        (goto-char (eat--cur-position cursor))
-        (setf (eat--cur-x cursor) (1+ (eat--current-col)))
-        (goto-char (eat--disp-begin disp))
-        (setf (eat--cur-y cursor)
+            (set-marker (eat--t-disp-begin disp) disp-begin)
+            (while (< (point) (1- (eat--t-disp-begin disp)))
+              (eat--t-join-long-line
+               (1- (eat--t-disp-begin disp))))))
+        (goto-char (eat--t-cur-position cursor))
+        (setf (eat--t-cur-x cursor) (1+ (eat--t-current-col)))
+        (goto-char (eat--t-disp-begin disp))
+        (setf (eat--t-cur-y cursor)
               (let ((y 0))
-                (while (< (point) (eat--cur-position cursor))
+                (while (< (point) (eat--t-cur-position cursor))
                   (condition-case nil
                       (search-forward "\n")
                     (search-failed
@@ -3306,48 +3310,49 @@ DATA is the selection data encoded in base64."
 ;;;###autoload
 (defun eat-term-make (buffer position)
   "Make a Eat terminal at POSITION in BUFFER."
-  (eat--make-term
+  (eat--t-make-term
    :buffer buffer
    :begin (copy-marker position t)
    :end (copy-marker position)
-   :display (eat--make-disp
+   :display (eat--t-make-disp
              :begin (copy-marker position)
              :old-begin (copy-marker position)
-             :cursor (eat--make-cur
+             :cursor (eat--t-make-cur
                       :position (copy-marker position)))))
 
 (defun eat-term-delete (terminal)
   "Delete TERMINAL and do any cleanup to do."
   (let ((inhibit-quit t)
-        (eat--term terminal))
-    (with-current-buffer (eat--term-buffer eat--term)
+        (eat--t-term terminal))
+    (with-current-buffer (eat--t-term-buffer eat--t-term)
       (save-excursion
         (save-restriction
-          (narrow-to-region (eat--term-begin eat--term)
-                            (eat--term-end eat--term))
-          (eat--set-cursor-state :default)
-          (goto-char (eat--disp-begin (eat--term-display eat--term)))
+          (narrow-to-region (eat--t-term-begin eat--t-term)
+                            (eat--t-term-end eat--t-term))
+          (eat--t-set-cursor-state :default)
+          (goto-char (eat--t-disp-begin
+                      (eat--t-term-display eat--t-term)))
           (when (< (point-min) (point))
             (backward-char))
           (while (not (eobp))
-            (eat--join-long-line)))))))
+            (eat--t-join-long-line)))))))
 
 (defun eat-term-reset (terminal)
   "Reset TERMINAL."
   (let ((inhibit-quit t)
-        (eat--term terminal))
-    (with-current-buffer (eat--term-buffer eat--term)
+        (eat--t-term terminal))
+    (with-current-buffer (eat--t-term-buffer eat--t-term)
       (save-excursion
         (save-restriction
-          (narrow-to-region (eat--term-begin eat--term)
-                            (eat--term-end eat--term))
-          (eat--reset)
-          (set-marker (eat--cur-position
-                       (eat--disp-cursor
-                        (eat--term-display eat--term)))
+          (narrow-to-region (eat--t-term-begin eat--t-term)
+                            (eat--t-term-end eat--t-term))
+          (eat--t-reset)
+          (set-marker (eat--t-cur-position
+                       (eat--t-disp-cursor
+                        (eat--t-term-display eat--t-term)))
                       (point))
-          (set-marker (eat--term-begin eat--term) (point-min))
-          (set-marker (eat--term-end eat--term) (point-max)))))))
+          (set-marker (eat--t-term-begin eat--t-term) (point-min))
+          (set-marker (eat--t-term-end eat--t-term) (point-max)))))))
 
 (defun eat-term-input-function (terminal)
   "Return the function used to send input from TERMINAL.
@@ -3357,10 +3362,10 @@ send.  The function should not change point and buffer restriction.
 
 To set it, use (`setf' (`eat-term-input-function' TERMINAL) FUNCTION),
 where FUNCTION is the input function."
-  (eat--term-input-fn terminal))
+  (eat--t-term-input-fn terminal))
 
 (gv-define-setter eat-term-input-function (function terminal)
-  `(setf (eat--term-input-fn ,terminal) ,function))
+  `(setf (eat--t-term-input-fn ,terminal) ,function))
 
 (defun eat-term-cursor-type (terminal)
   "Return the cursor state of TERMINAL.
@@ -3370,7 +3375,7 @@ The return value can be one of the following:
   `:default'            Default cursor.
   `:invisible'          Invisible cursor.
   `:very-visible'       Very visible cursor."
-  (eat--term-cur-state terminal))
+  (eat--t-term-cur-state terminal))
 
 (defun eat-term-set-cursor-function (terminal)
   "Return the function used to set the cursor of TERMINAL.
@@ -3390,14 +3395,14 @@ the cursor to the default like the `:default' state.
 
 To set it, use (`setf' (`eat-term-set-cursor-function' TERMINAL)
 FUNCTION), where FUNCTION is the function to set cursor."
-  (eat--term-set-cursor-fn terminal))
+  (eat--t-term-set-cursor-fn terminal))
 
 (gv-define-setter eat-term-set-cursor-function (function terminal)
-  `(setf (eat--term-set-cursor-fn ,terminal) ,function))
+  `(setf (eat--t-term-set-cursor-fn ,terminal) ,function))
 
 (defun eat-term-title (terminal)
   "Return the current title of TERMINAL."
-  (eat--term-title terminal))
+  (eat--t-term-title terminal))
 
 (defun eat-term-set-title-function (terminal)
   "Return the function used to set the title of TERMINAL.
@@ -3408,10 +3413,10 @@ restriction.
 
 To set it, use (`setf' (`eat-term-set-title-function' TERMINAL)
 FUNCTION), where FUNCTION is the function to set title."
-  (eat--term-set-title-fn terminal))
+  (eat--t-term-set-title-fn terminal))
 
 (gv-define-setter eat-term-set-title-function (function terminal)
-  `(setf (eat--term-set-title-fn ,terminal) ,function))
+  `(setf (eat--t-term-set-title-fn ,terminal) ,function))
 
 (defun eat-term-grab-mouse-function (terminal)
   "Return the function used to grab the mouse.
@@ -3435,10 +3440,10 @@ as if MODE was nil and disable mouse.
 
 To set it, use (`setf' (`eat-term-set-mouse-mode-function' TERMINAL)
 FUNCTION), where FUNCTION is the function to set mouse mode."
-  (eat--term-grab-mouse-fn terminal))
+  (eat--t-term-grab-mouse-fn terminal))
 
 (gv-define-setter eat-term-grab-mouse-function (function terminal)
-  `(setf (eat--term-grab-mouse-fn ,terminal) ,function))
+  `(setf (eat--t-term-grab-mouse-fn ,terminal) ,function))
 
 (defun eat-term-grab-focus-events-function (terminal)
   "Return the function used to grab focus in and out events.
@@ -3450,11 +3455,11 @@ change point and buffer restriction.
 
 To set it, use (`setf' (`eat-term-grab-focus-events-function'
 TERMINAL) FUNCTION), where FUNCTION is the function to set title."
-  (eat--term-set-focus-ev-mode-fn terminal))
+  (eat--t-term-set-focus-ev-mode-fn terminal))
 
 (gv-define-setter eat-term-grab-focus-events-function
     (function terminal)
-  `(setf (eat--term-set-focus-ev-mode-fn ,terminal) ,function))
+  `(setf (eat--t-term-set-focus-ev-mode-fn ,terminal) ,function))
 
 (defun eat-term-manipulate-selection-function (terminal)
   "Return the function used to manipulate selection (or `kill-ring').
@@ -3469,23 +3474,23 @@ is t, it should return the selection, or nil if none.
 
 To set it, use (`setf' (`eat-term-manipulate-selection-function'
 TERMINAL) FUNCTION), where FUNCTION is the function to set title."
-  (eat--term-manipulate-selection-fn terminal))
+  (eat--t-term-manipulate-selection-fn terminal))
 
 (gv-define-setter eat-term-manipulate-selection-function
     (function terminal)
-  `(setf (eat--term-manipulate-selection-fn ,terminal) ,function))
+  `(setf (eat--t-term-manipulate-selection-fn ,terminal) ,function))
 
 (defun eat-term-size (terminal)
   "Return the size of TERMINAL as (WIDTH . HEIGHT)."
-  (let ((disp (eat--term-display terminal)))
-    (cons (eat--disp-width disp) (eat--disp-height disp))))
+  (let ((disp (eat--t-term-display terminal)))
+    (cons (eat--t-disp-width disp) (eat--t-disp-height disp))))
 
 (defun eat-term-beginning (terminal)
   "Return the beginning position of TERMINAL.
 
 Don't use markers to store the position, call this function whenever
 you need the position."
-  (eat--term-begin terminal))
+  (eat--t-term-begin terminal))
 
 (defun eat-term-end (terminal)
   "Return the end position of TERMINAL.
@@ -3494,76 +3499,78 @@ This is also the end position of TERMINAL's display.
 
 Don't use markers to store the position, call this function whenever
 you need the position."
-  (eat--term-end terminal))
+  (eat--t-term-end terminal))
 
 (defun eat-term-display-beginning (terminal)
   "Return the beginning position of TERMINAL's display."
-  (eat--disp-begin (eat--term-display terminal)))
+  (eat--t-disp-begin (eat--t-term-display terminal)))
 
 (defun eat-term-display-cursor (terminal)
   "Return the cursor's current position on TERMINAL's display."
-  (let* ((disp (eat--term-display terminal))
-         (cursor (eat--disp-cursor disp)))
-    (if (> (eat--cur-x cursor) (eat--disp-width disp))
-        (1- (eat--cur-position cursor))
-      (eat--cur-position cursor))))
+  (let* ((disp (eat--t-term-display terminal))
+         (cursor (eat--t-disp-cursor disp)))
+    (if (> (eat--t-cur-x cursor) (eat--t-disp-width disp))
+        (1- (eat--t-cur-position cursor))
+      (eat--t-cur-position cursor))))
 
-(defmacro eat--with-env (terminal &rest body)
+(defmacro eat--t-with-env (terminal &rest body)
   "Setup the environment for TERMINAL and eval BODY in it."
   (declare (indent 1))
-  `(let ((eat--term ,terminal))
-     (with-current-buffer (eat--term-buffer eat--term)
+  `(let ((eat--t-term ,terminal))
+     (with-current-buffer (eat--t-term-buffer eat--t-term)
        (save-excursion
          (save-restriction
-           (narrow-to-region (eat--term-begin eat--term)
-                             (eat--term-end eat--term))
-           (goto-char (eat--cur-position
-                       (eat--disp-cursor
-                        (eat--term-display eat--term))))
+           (narrow-to-region (eat--t-term-begin eat--t-term)
+                             (eat--t-term-end eat--t-term))
+           (goto-char (eat--t-cur-position
+                       (eat--t-disp-cursor
+                        (eat--t-term-display eat--t-term))))
            (unwind-protect
                (progn ,@body)
-             (set-marker (eat--cur-position
-                          (eat--disp-cursor
-                           (eat--term-display eat--term)))
+             (set-marker (eat--t-cur-position
+                          (eat--t-disp-cursor
+                           (eat--t-term-display eat--t-term)))
                          (point))
-             (set-marker (eat--term-begin eat--term) (point-min))
-             (set-marker (eat--term-end eat--term) (point-max))))))))
+             (set-marker (eat--t-term-begin eat--t-term) (point-min))
+             (set-marker (eat--t-term-end eat--t-term)
+                         (point-max))))))))
 
 (defun eat-term-process-output (terminal output)
   "Process OUTPUT from client and show it on TERMINAL's display."
   (let ((inhibit-quit t))
-    (eat--with-env terminal
-      (eat--handle-output output))))
+    (eat--t-with-env terminal
+      (eat--t-handle-output output))))
 
 (defun eat-term-redisplay (terminal)
   "Prepare TERMINAL for displaying."
   (let ((inhibit-quit t))
-    (eat--with-env terminal
-      (let* ((disp (eat--term-display eat--term)))
-        (when (< (eat--disp-old-begin disp) (eat--disp-begin disp))
+    (eat--t-with-env terminal
+      (let* ((disp (eat--t-term-display eat--t-term)))
+        (when (< (eat--t-disp-old-begin disp)
+                 (eat--t-disp-begin disp))
           ;; Join long lines.
-          (let ((limit (copy-marker (1- (eat--disp-begin disp)))))
+          (let ((limit (copy-marker (1- (eat--t-disp-begin disp)))))
             (save-excursion
-              (goto-char (max (1- (eat--disp-old-begin disp))
+              (goto-char (max (1- (eat--t-disp-old-begin disp))
                               (point-min)))
               (while (< (point) limit)
-                (eat--join-long-line limit))))
+                (eat--t-join-long-line limit))))
           ;; Truncate scrollback.
           (delete-region
            (point-min)
            (max (point-min) (- (point) eat-term-scrollback-size)))
-          (set-marker (eat--disp-old-begin disp)
-                      (eat--disp-begin disp)))))))
+          (set-marker (eat--t-disp-old-begin disp)
+                      (eat--t-disp-begin disp)))))))
 
 (defun eat-term-resize (terminal width height)
   "Resize TERMINAL to WIDTH x HEIGHT."
   (let ((inhibit-quit t))
-    (eat--with-env terminal
-      (eat--resize width height))))
+    (eat--t-with-env terminal
+      (eat--t-resize width height))))
 
 (defun eat-term-in-alternative-framebuffer-p (terminal)
   "Return non-nil when TERMINAL is in alternative framebuffer mode."
-  (eat--term-main-display terminal))
+  (eat--t-term-main-display terminal))
 
 (defun eat-term-input-event (terminal n event &optional ref-pos)
   "Send EVENT as input N times to TERMINAL.
@@ -3585,9 +3592,9 @@ given.
 For mouse events, events should be sent on both mouse button press and
 release unless the mouse grabing mode is `:click', otherwise the
 client process may get confused."
-  (let ((disp (eat--term-display terminal)))
+  (let ((disp (eat--t-term-display terminal)))
     (cl-flet ((send (str)
-                (funcall (eat--term-input-fn terminal) terminal str)))
+                (funcall (eat--t-term-input-fn terminal) terminal str)))
       (dotimes (_ (or n 1))
         (pcase (or event last-command-event)
           ((and (or 'up 'down 'right 'left
@@ -3625,7 +3632,9 @@ client process may get confused."
                    ((or 'delete 'deletechar) "[3")
                    ('prior "[5")
                    ('next "[6")
-                   (_ (if (eat--term-keypad-mode terminal) "O" "[")))
+                   (_ (if (eat--t-term-keypad-mode terminal)
+                          "O"
+                        "[")))
                (format
                 "[%c;%c"
                 (pcase (event-basic-type ev)
@@ -3739,7 +3748,7 @@ client process may get confused."
                          (let mouse-num 6))
                     (and (let 'wheel-left (event-basic-type mouse))
                          (let mouse-num 7))))
-           (when (eat--term-mouse-mode terminal)
+           (when (eat--t-term-mouse-mode terminal)
              (let* ((modifiers (event-modifiers mouse))
                     (pos (if (memq 'drag modifiers)
                              (event-end mouse)
@@ -3761,18 +3770,18 @@ client process may get confused."
                (when ref-pos
                  (cl-decf x (car (posn-col-row ref-pos)))
                  (cl-decf y (cdr (posn-col-row ref-pos))))
-               (when (and (<= 1 x (eat--disp-width disp))
-                          (<= 1 y (eat--disp-height disp))
-                          (or (eat--term-mouse-encoding terminal)
+               (when (and (<= 1 x (eat--t-disp-width disp))
+                          (<= 1 y (eat--t-disp-height disp))
+                          (or (eat--t-term-mouse-encoding terminal)
                               (and (<= x 95)
                                    (<= y 95)
                                    (<= button 95))))
-                 (if (eq (eat--term-mouse-mode terminal) 'x10)
+                 (if (eq (eat--t-term-mouse-mode terminal) 'x10)
                      (when (and (< button 3)
                                 (or (memq 'click modifiers)
                                     (memq 'drag modifiers)))
                        (send
-                        (if (eq (eat--term-mouse-encoding terminal)
+                        (if (eq (eat--t-term-mouse-encoding terminal)
                                 'sgr)
                             (format "\e[<%i;%i;%iM" button x y)
                           (format "\e[M%c%c%c" (+ button 32) (+ x 32)
@@ -3780,74 +3789,74 @@ client process may get confused."
                    (cond
                     ((memq 'down modifiers)
                      (when (< (logand button) 3)
-                       (setf (eat--term-mouse-pressed terminal)
-                             (nconc (eat--term-mouse-pressed terminal)
+                       (setf (eat--t-term-mouse-pressed terminal)
+                             (nconc (eat--t-term-mouse-pressed terminal)
                                     (list button))))
                      (send
-                      (if (eq (eat--term-mouse-encoding terminal)
+                      (if (eq (eat--t-term-mouse-encoding terminal)
                               'sgr)
                           (format "\e[<%i;%i;%iM" button x y)
                         (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                                 (+ y 32)))))
                     ((or (memq 'click modifiers)
                          (memq 'drag modifiers))
-                     (setf (eat--term-mouse-pressed terminal)
+                     (setf (eat--t-term-mouse-pressed terminal)
                            (cl-delete-if
                             (lambda (b)
                               (= (logand b) (logand button)))
-                            (eat--term-mouse-pressed terminal)))
+                            (eat--t-term-mouse-pressed terminal)))
                      (send
-                      (if (eq (eat--term-mouse-encoding terminal)
+                      (if (eq (eat--t-term-mouse-encoding terminal)
                               'sgr)
                           (format "\e[<%i;%i;%im" button x y)
                         (format "\e[M%c%c%c" (+ (logior button 3) 32)
                                 (+ x 32) (+ y 32)))))))))))
           ((and (pred mouse-movement-p)
                 movement)
-           (when (memq (eat--term-mouse-mode terminal)
+           (when (memq (eat--t-term-mouse-mode terminal)
                        '(button-event any-event))
              (let* ((pos (event-start movement))
                     (x (1+ (car (posn-col-row pos))))
                     (y (1+ (cdr (posn-col-row pos))))
                     (button
-                     (if (car (eat--term-mouse-pressed terminal))
-                         (+ (car (eat--term-mouse-pressed terminal))
+                     (if (car (eat--t-term-mouse-pressed terminal))
+                         (+ (car (eat--t-term-mouse-pressed terminal))
                             32)
                        35)))
                (when ref-pos
                  (cl-decf x (car (posn-col-row ref-pos)))
                  (cl-decf y (cdr (posn-col-row ref-pos))))
-               (when (and (or (eq (eat--term-mouse-mode terminal)
+               (when (and (or (eq (eat--t-term-mouse-mode terminal)
                                   'any-event)
                               button)
-                          (<= 1 x (eat--disp-width disp))
-                          (<= 1 y (eat--disp-height disp))
-                          (or (eat--term-mouse-encoding terminal)
+                          (<= 1 x (eat--t-disp-width disp))
+                          (<= 1 y (eat--t-disp-height disp))
+                          (or (eat--t-term-mouse-encoding terminal)
                               (and (<= x 95)
                                    (<= y 95)
                                    (<= button 95))))
                  (send
-                  (if (eq (eat--term-mouse-encoding terminal)
+                  (if (eq (eat--t-term-mouse-encoding terminal)
                           'sgr)
                       (format "\e[<%i;%i;%iM" button x y)
                     (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                             (+ y 32))))))))
           ('(eat-focus-in)
-           (when (eat--term-focus-event-mode eat--term)
+           (when (eat--t-term-focus-event-mode eat--t-term)
              (send "\e[I")))
           ('(eat-focus-out)
-           (when (eat--term-focus-event-mode eat--term)
+           (when (eat--t-term-focus-event-mode eat--t-term)
              (send "\e[O"))))))))
 
 (defun eat-send-string-as-yank (terminal args)
   "Send ARGS to TERMINAL, honoring bracketed yank mode.
 
 Each argument in ARGS can be either string or character."
-  (funcall (eat--term-input-fn terminal) terminal
+  (funcall (eat--t-term-input-fn terminal) terminal
            (let ((str (mapconcat (lambda (s)
                                    (if (stringp s) s (string s)))
                                  args "")))
-             (if (eat--term-bracketed-yank terminal)
+             (if (eat--t-term-bracketed-yank terminal)
                  ;; NOTE: What if `str' itself contains these escape
                  ;; sequences?
                  (format "\e[200~%s\e[201~" str)
@@ -4698,6 +4707,23 @@ The output chunks are pushed, so last output appears first.")
   (interactive)
   (when eat--process
     (kill-process eat--process)))
+
+(defun eat--send-string (process string)
+  "Send to PROCESS the contents of STRING as input.
+
+This is equivalent to `process-send-string', except that long input
+strings are broken up into chunks of size `eat-input-chunk-size'.
+Processes are given a chance to output between chunks.  This can help
+prevent processes from hanging when you send them long inputs on some
+OS's."
+  (let ((i 0)
+        (j eat-input-chunk-size)
+        (l (length string)))
+    (while (< i l)
+      (process-send-string process (substring string i (min j l)))
+      (accept-process-output)
+      (cl-incf i eat-input-chunk-size)
+      (cl-incf j eat-input-chunk-size))))
 
 (defun eat--send-input (_ input)
   "Send INPUT to subprocess."
