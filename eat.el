@@ -5226,14 +5226,15 @@ modify its argument to change the filter, the sentinel and invoke
        ((symbol-function #'make-process)
         (lambda (&rest plist)
           ;; Make sure we don't attack wrong process.
-          (when (and (eq (plist-get plist :filter)
-                         #'eshell-output-filter)
-                     (eq (plist-get plist :sentinel)
-                         #'eshell-sentinel)
-                     (equal (plist-get plist :command)
-                            (cons (file-local-name
-                                   (expand-file-name command))
-                                  args)))
+          (if (not (and (eq (plist-get plist :filter)
+                            #'eshell-output-filter)
+                        (eq (plist-get plist :sentinel)
+                            #'eshell-sentinel)
+                        (equal (plist-get plist :command)
+                               (cons (file-local-name
+                                      (expand-file-name command))
+                                     args))))
+              (apply make-process plist)
             (plist-put plist :filter #'eat--eshell-filter)
             (plist-put plist :sentinel #'eat--eshell-sentinel)
             (plist-put
@@ -5244,10 +5245,10 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                         (window-text-height)
                         (window-max-chars-per-line) null-device)
                ".."
-               ,@(plist-get plist :command))))
-          (let ((process (apply make-process plist)))
-            (eat--eshell-setup-proc-and-term process)
-            process))))
+               ,@(plist-get plist :command)))
+            (let ((process (apply make-process plist)))
+              (eat--eshell-setup-proc-and-term process)
+              process)))))
     (funcall fn command args)))
 
 
