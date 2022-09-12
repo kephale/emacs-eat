@@ -3269,8 +3269,10 @@ DATA is the selection data encoded in base64."
   "Resize terminal to WIDTH x HEIGHT."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp)))
-    (unless (and (eq (eat--t-disp-width disp) width)
-                 (eq (eat--t-disp-height disp) height))
+    (when (and (>= width 1)
+               (>= height 1)
+               (or (not (eq (eat--t-disp-width disp) width))
+                   (not (eq (eat--t-disp-height disp) height))))
       (save-excursion
         (setf (eat--t-disp-width disp) width)
         (setf (eat--t-disp-height disp) height)
@@ -3278,6 +3280,17 @@ DATA is the selection data encoded in base64."
         (setf (eat--t-term-scroll-end eat--t-term)
               (eat--t-disp-height disp))
         (goto-char (eat--t-disp-begin disp))
+        (if (eat--t-term-main-display eat--t-term)
+            (dotimes (l height)
+              (eat--t-col-motion width)
+              (delete-region (point) (car (eat--t-eol)))
+              (if (< (1+ l) height)
+                  (eat--t-goto-bol 1)
+                (delete-region (point) (point-max))
+                (let ((y (eat--t-cur-y cursor))
+                      (x (eat--t-cur-x cursor)))
+                  (eat--t-goto 1 1)
+                  (eat--t-goto y x)))))
         (unless (bobp)
           (backward-char))
         (while (not (eobp))
@@ -4836,19 +4849,20 @@ to it."
 PROCESS is the process whose window to resize, and WINDOWS is the list
 of window displaying PROCESS's buffer."
   (let* ((size (funcall window-adjust-process-window-size-function
-                        process windows))
-         (width (max (car size) 1))
-         (height (max (cdr size) 1))
-         (inhibit-read-only t)
-         (inhibit-quit t)
-         (synchronize-scroll
-          (and (<= (eat-term-display-beginning eat--terminal) (point))
-               (or (< (point) (eat-term-end eat--terminal))
-                   (= (point) (eat-term-end eat--terminal)
-                      (point-max))))))
-    (eat-term-resize eat--terminal width height)
-    (when synchronize-scroll
-      (funcall eat--synchronize-scroll-function))
+                        process windows)))
+    (when size
+      (let ((width (max (car size) 1))
+            (height (max (cdr size) 1))
+            (inhibit-read-only t)
+            (synchronize-scroll
+             (and (<= (eat-term-display-beginning eat--terminal)
+                      (point))
+                  (or (< (point) (eat-term-end eat--terminal))
+                      (= (point) (eat-term-end eat--terminal)
+                         (point-max))))))
+        (eat-term-resize eat--terminal width height)
+        (when synchronize-scroll
+          (funcall eat--synchronize-scroll-function))))
     size))
 
 ;; Adapted from Term.
