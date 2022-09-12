@@ -3799,19 +3799,27 @@ client process may get confused."
                           (format "\e[<%i;%i;%iM" button x y)
                         (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                                 (+ y 32)))))
-                    ((or (memq 'click modifiers)
-                         (memq 'drag modifiers))
+                    ((and (or (memq 'click modifiers)
+                              (memq 'drag modifiers))
+                          (< mouse-num 3))
                      (setf (eat--t-term-mouse-pressed terminal)
                            (cl-delete-if
                             (lambda (b)
-                              (= (logand b) (logand button)))
+                              (= (logand b 3) (logand button 3)))
                             (eat--t-term-mouse-pressed terminal)))
                      (send
                       (if (eq (eat--t-term-mouse-encoding terminal)
                               'sgr)
                           (format "\e[<%i;%i;%im" button x y)
                         (format "\e[M%c%c%c" (+ (logior button 3) 32)
-                                (+ x 32) (+ y 32)))))))))))
+                                (+ x 32) (+ y 32)))))
+                    (t
+                     (send
+                      (if (eq (eat--t-term-mouse-encoding terminal)
+                              'sgr)
+                          (format "\e[<%i;%i;%im" button x y)
+                        (format "\e[M%c%c%c" (+ button 32) (+ x 32)
+                                (+ y 32)))))))))))
           ((and (pred mouse-movement-p)
                 movement)
            (when (memq (eat--t-term-mouse-mode terminal)
@@ -4591,20 +4599,6 @@ selection, or nil if none."
    glyphless-char-display 0
    (if (display-graphic-p) 'empty-box 'thin-space)))
 
-(defun eat--adjust-process-window-size (process windows)
-  "Resize process window and terminal.  Return new dimensions.
-
-PROCESS is the process whose window to resize, and WINDOWS is the list
-of window displaying PROCESS's buffer."
-  (let* ((size (funcall window-adjust-process-window-size-function
-                        process windows))
-         (width (max (car size) 1))
-         (height (max (cdr size) 1))
-         (inhibit-read-only t)
-         (inhibit-quit t))
-    (eat-term-resize eat--terminal width height)
-    size))
-
 (defun eat--filter-buffer-substring (begin end &optional delete)
   "Filter buffer substring from BEGIN to END and return that.
 
@@ -4768,8 +4762,9 @@ OS's."
     (with-current-buffer buffer
       (let ((inhibit-quit t)            ; Don't disturb!
             (inhibit-read-only t)
-            (set-cursor (= (eat-term-display-cursor eat--terminal)
-                           (point))))
+            (synchronize-scroll
+             (or (= (eat-term-display-cursor eat--terminal) (point))
+                 eat--char-mode)))
         (when eat--process-output-queue-timer
           (cancel-timer eat--process-output-queue-timer))
         (setq eat--output-queue-first-chunk-time nil)
@@ -4785,7 +4780,7 @@ OS's."
            (max (point-min)
                 (- (eat-term-display-beginning eat--terminal)
                    eat-term-scrollback-size))))
-        (when set-cursor
+        (when synchronize-scroll
           (funcall eat--synchronize-scroll-function))))))
 
 (defun eat--filter (process output)
@@ -4834,6 +4829,27 @@ to it."
                         message)
                 (setq buffer-read-only nil))))
         (set-process-buffer process nil)))))
+
+(defun eat--adjust-process-window-size (process windows)
+  "Resize process window and terminal.  Return new dimensions.
+
+PROCESS is the process whose window to resize, and WINDOWS is the list
+of window displaying PROCESS's buffer."
+  (let* ((size (funcall window-adjust-process-window-size-function
+                        process windows))
+         (width (max (car size) 1))
+         (height (max (cdr size) 1))
+         (inhibit-read-only t)
+         (inhibit-quit t)
+         (synchronize-scroll
+          (and (<= (eat-term-display-beginning eat--terminal) (point))
+               (or (< (point) (eat-term-end eat--terminal))
+                   (= (point) (eat-term-end eat--terminal)
+                      (point-max))))))
+    (eat-term-resize eat--terminal width height)
+    (when synchronize-scroll
+      (funcall eat--synchronize-scroll-function))
+    size))
 
 ;; Adapted from Term.
 (defun eat-exec (buffer name command startfile switches)
@@ -5087,11 +5103,12 @@ PROGRAM can be a shell command."
               eshell-last-output-start
               eshell-last-output-end)))
     (delete-region eshell-last-output-start eshell-last-output-end)
-    (let ((set-cursor (= (eat-term-display-cursor eat--terminal)
-                         (point))))
+    (let ((synchronize-scroll
+           (or (= (eat-term-display-cursor eat--terminal) (point))
+               eat--char-mode)))
       (eat-term-process-output eat--terminal str)
       (eat-term-redisplay eat--terminal)
-      (when set-cursor
+      (when synchronize-scroll
         (funcall eat--synchronize-scroll-function)))
     (let ((end (eat-term-end eat--terminal)))
       (set-marker eshell-last-output-start end)
@@ -5102,6 +5119,8 @@ PROGRAM can be a shell command."
   "Setup a PROC and a new terminal for it."
   (unless (or eat--terminal eat--process)
     (setq eat--process proc)
+    (process-put proc 'adjust-window-size-function
+                 #'eat--adjust-process-window-size)
     (setq eat--terminal (eat-term-make (current-buffer)
                                        (process-mark proc)))
     (set-marker (process-mark proc) (eat-term-end eat--terminal))

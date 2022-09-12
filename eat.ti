@@ -178,7 +178,7 @@ eat-mono|Emacs Eat without colors,
   kf61=\e[1;4P,
   kf62=\e[1;4Q,
   kf63=\e[1;4R,
-  kmous=\e[<,
+  kmous=\e[M,
 
 eat-color|Emacs Eat with eight colors,
   use=eat-mono,
