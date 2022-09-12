@@ -3556,9 +3556,10 @@ you need the position."
               (while (< (point) limit)
                 (eat--t-join-long-line limit))))
           ;; Truncate scrollback.
-          (delete-region
-           (point-min)
-           (max (point-min) (- (point) eat-term-scrollback-size)))
+          (when eat-term-scrollback-size
+            (delete-region
+             (point-min)
+             (max (point-min) (- (point) eat-term-scrollback-size))))
           (set-marker (eat--t-disp-old-begin disp)
                       (eat--t-disp-begin disp)))))))
 
@@ -4774,11 +4775,12 @@ OS's."
             (eat-term-process-output eat--terminal output)))
         (eat-term-redisplay eat--terminal)
         ;; Truncate output of previous dead processes.
-        (delete-region
-         (point-min)
-         (max (point-min)
-              (- (eat-term-display-beginning eat--terminal)
-                 eat-term-scrollback-size)))
+        (when eat-term-scrollback-size
+          (delete-region
+           (point-min)
+           (max (point-min)
+                (- (eat-term-display-beginning eat--terminal)
+                   eat-term-scrollback-size))))
         (when set-cursor
           (funcall eat--synchronize-scroll-function))))))
 
