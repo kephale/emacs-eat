@@ -4591,12 +4591,19 @@ selection, or nil if none."
    glyphless-char-display 0
    (if (display-graphic-p) 'empty-box 'thin-space)))
 
-(defun eat--resize-maybe (size)
-  "Resize terminal size to SIZE if it has been changed.  Return SIZE."
-  (when (and eat--terminal size)
-    (let ((inhibit-read-only t))
-      (eat-term-resize eat--terminal (car size) (cdr size))))
-  size)
+(defun eat--adjust-process-window-size (process windows)
+  "Resize process window and terminal.  Return new dimensions.
+
+PROCESS is the process whose window to resize, and WINDOWS is the list
+of window displaying PROCESS's buffer."
+  (let* ((size (funcall window-adjust-process-window-size-function
+                        process windows))
+         (width (max (car size) 1))
+         (height (max (cdr size) 1))
+         (inhibit-read-only t)
+         (inhibit-quit t))
+    (eat-term-resize eat--terminal width height)
+    size))
 
 (defun eat--filter-buffer-substring (begin end &optional delete)
   "Filter buffer substring from BEGIN to END and return that.
@@ -4703,9 +4710,6 @@ END if it's safe to do so."
                       (format "(%s)"  (eat-term-title
                                        eat--terminal))))
                    help-echo "Title"))))))
-  (add-function
-   :filter-return (local 'window-adjust-process-window-size-function)
-   #'eat--resize-maybe)
   (eat-emacs-mode)
   ;; Make sure glyphless character don't display a huge box glyph,
   ;; that would break the display.
@@ -4876,19 +4880,25 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
              (process-connection-type t)
              ;; We should suppress conversion of end-of-line format.
              (inhibit-eol-conversion t)
-             (process (apply #'start-file-process name buffer
-                             "/usr/bin/env" "sh" "-c"
-                             (format "stty -nl echo rows %d columns \
+             (process
+              (make-process
+               :name name
+               :buffer buffer
+               :command `("/usr/bin/env" "sh" "-c"
+                          ,(format "stty -nl echo rows %d columns \
 %d sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
-                                     (cdr size) (car size)
-                                     null-device)
-                             ".."
-                             command switches)))
+                                   (cdr size) (car size)
+                                   null-device)
+                          ".."
+                          ,command ,@switches)
+               :filter #'eat--filter
+               :sentinel #'eat--sentinel
+               :file-handler t)))
+        (process-put process 'adjust-window-size-function
+                     #'eat--adjust-process-window-size)
         ;; Jump to the end, and set the process mark.
         (goto-char (point-max))
         (set-marker (process-mark process) (point))
-        (set-process-filter process #'eat--filter)
-        (set-process-sentinel process #'eat--sentinel)
         (setq eat--process process)
         ;; Feed it the startfile.
         (when startfile
@@ -5251,9 +5261,9 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
   :keymap eat-eshell-emacs-mode-map
   (cond
    (eat--eshell-local-mode
+    (make-local-variable 'cursor-type)
     (make-local-variable 'glyphless-char-display)
     (make-local-variable 'track-mouse)
-    (make-local-variable 'cursor-type)
     (make-local-variable 'filter-buffer-substring-function)
     (make-local-variable 'eat--terminal)
     (make-local-variable 'eat--process)
@@ -5266,9 +5276,6 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
           #'eat--eshell-synchronize-scroll)
     (setq filter-buffer-substring-function
           #'eat--filter-buffer-substring)
-    (add-function :filter-return
-                  (local 'window-adjust-process-window-size-function)
-                  #'eat--resize-maybe)
     ;; Make sure glyphless character don't display a huge box glyph,
     ;; that would break the display.
     (eat--setup-glyphless-chars)
@@ -5277,9 +5284,6 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
    (t
     (when eat-enable-blinking-text
       (eat-blink-mode -1))
-    (remove-function
-     (local 'window-adjust-process-window-size-function)
-     #'eat--resize-maybe)
     (kill-local-variable 'cursor-type)
     (kill-local-variable 'glyphless-char-display)
     (kill-local-variable 'track-mouse)

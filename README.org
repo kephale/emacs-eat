@@ -89,30 +89,49 @@ Term is the Emacs built-in terminal emulator.  Its terminal emulation
 is pretty good too.  But it's slow.  It is so slow that Eat can beat
 native-compiled Term even without byte-compilation, and when Eat is
 byte-compiled, Eat is more than three times fast.  Also, Term
-flickers, just try to run =emacs -nw= in it.  However, it has "line"
+flickers, just try to run =emacs -nw= in it.  It doesn't support
+remote connections, for example over Tramp.  However, it has "line"
 mode, which Eat still doesn't have.  If you want line mode in a
 terminal, or use an old version of Emacs, you can use Term, but
-Coterm + Comint is probably a better choice in case your Emacs version
+Coterm + Shell is probably a better choice in case your Emacs version
 is 26.1 or above.
 
 ** Vterm
 
 Vterm is powered by a C library, libvterm.  For this reason, it can
-process huge amount of text quickly.  It is about 2 times faster
-than Eat (byte-compiled or native-compiled) (and about 3.3 faster
-then Eat without byte-compilation).  But it doesn't have a char mode
-(however you can make a char mode spending some effort).  And it too
-flickers like Term, so despite being much faster that Eat, it seems to
-be slow.  If you need your terminal to handle huge bursts (megabytes)
-of data, you should Vterm.
+process huge amount of text quickly.  It is about 2 times faster than
+Eat (byte-compiled or native-compiled) (and about 3.3 faster then Eat
+without byte-compilation).  But it doesn't have a char mode (however
+you can make a char mode spending some effort).  And it too flickers
+like Term, so despite being much faster that Eat, it seems to be slow.
+If you need your terminal to handle huge bursts (megabytes) of data,
+you should Vterm.
 
-** Coterm + Comint
+** Coterm + Shell
 
-Coterm adds terminal emulation to Comint.  Although the terminal
+Coterm adds terminal emulation to Shell mode.  Although the terminal
 Coterm emulates is same as Term, it is much faster, about three times,
 just a little bit slow than Eat.  However, it too flickers like other
-terminals.  Since it's an upgrade to Comint, you get all the features
-of Comint like "line" mode, completion using your favorite completion
-UI (Company, Corfu, etc), etc.  Some of these features are available
-in Eat-Eshell-Mode as Eshell is similar to Comint, however it's not
-Comint.  Recommended if you like Comint.
+terminals.  Since it's an upgrade to Shell, you get all the features
+of Shell like "line" mode, completion using your favorite completion
+UI (Company, Corfu, etc), etc.  Most of these features are available
+in Eat-Eshell-Mode as Eshell is similar to Shell, however it's not
+Shell mode.  Recommended if you like Shell.
+
+* Acknowledgements
+
+This wouldn't have been possible if the following awesome softwares
+didn't exist:
+
+- [[https://gnu.org][GNU Operating System]]
+- [[https://st.suckless.org/][St]]
+- [[https://sw.kovidgoyal.net/kitty/][Kitty]]
+- [[https://invisible-island.net/xterm/][XTerm]]
+- [[https://www.gnu.org/software/linux-libre/][Linux-libre]]
+- [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Terminal-emulator.html][Term]]
+- [[https://repo.or.cz/emacs-coterm.git][Coterm]]
+- [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Interactive-Shell.html][Shell]]
+- [[https://github.com/akermu/emacs-libvterm][Vterm]]
+- [[https://www.gnu.org/software/emacs/manual/html_node/eshell/index.html][Eshell]]
+- Numerous terminal programs
+- And obviously, [[https://www.gnu.org/software/emacs/][Emacs]]
