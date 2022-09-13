@@ -2529,7 +2529,8 @@ position."
       (goto-char (eat--t-cur-position
                   (eat--t-disp-cursor
                    (eat--t-term-display eat--t-term))))
-      (eat--t-goto old-y old-x))))
+      (when dont-move-cursor
+        (eat--t-goto old-y old-x)))))
 
 (defun eat--t-insert-char (n)
   "Insert N empty (space) characters, preserving cursor."
@@ -3134,15 +3135,15 @@ DATA is the selection data encoded in base64."
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-charset-standard g3 "")))
              ;; ESC -.
-             (?\(
+             (?-
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-charset-vt300 g1 "")))
              ;; ESC ..
-             (?\(
+             (?.
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-charset-vt300 g2 "")))
              ;; ESC /.
-             (?\(
+             (?/
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-charset-vt300 g3 "")))
              ;; ESC 7.
