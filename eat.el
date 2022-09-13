@@ -2494,10 +2494,19 @@ STATE one of the `:default', `:invisible', `:very-visible'."
         (delete-region (point-min) (point-max))
         (eat--t-goto 1 1)))))
 
-(defun eat--t-disable-alt-disp ()
-  "Disable alternative display."
+(defun eat--t-disable-alt-disp (&optional dont-move-cursor)
+  "Disable alternative display.
+
+If DONT-MOVE-CURSOR is non-nil, don't move cursor from current
+position."
   (when (eat--t-term-main-display eat--t-term)
     (let* ((main-disp (eat--t-term-main-display eat--t-term))
+           (old-y (eat--t-cur-y
+                   (eat--t-disp-cursor
+                    (eat--t-term-display eat--t-term))))
+           (old-x (eat--t-cur-x
+                   (eat--t-disp-cursor
+                    (eat--t-term-display eat--t-term))))
            (width (eat--t-disp-width
                    (eat--t-term-display eat--t-term)))
            (height (eat--t-disp-height
@@ -2519,7 +2528,8 @@ STATE one of the `:default', `:invisible', `:very-visible'."
       (eat--t-resize width height)
       (goto-char (eat--t-cur-position
                   (eat--t-disp-cursor
-                   (eat--t-term-display eat--t-term)))))))
+                   (eat--t-term-display eat--t-term))))
+      (eat--t-goto old-y old-x))))
 
 (defun eat--t-insert-char (n)
   "Insert N empty (space) characters, preserving cursor."
@@ -3017,7 +3027,7 @@ DATA is the selection data encoded in base64."
           (eat--t-enable-sgr-mouse-encoding))
          ('(1048)
           (eat--t-save-cur))
-         ('(1049)
+         (`(,(or 1047 1049))
           (eat--t-enable-alt-disp))
          ('(2004)
           (eat--t-enable-bracketed-yank)))))))
@@ -3047,6 +3057,8 @@ DATA is the selection data encoded in base64."
           (eat--t-disable-focus-event))
          ('(1006)
           (eat--t-disable-sgr-mouse-encoding))
+         ('(1047)
+          (eat--t-disable-alt-disp 'dont-move-cursor))
          ('(1048)
           (eat--t-restore-cur))
          ('(1049)
