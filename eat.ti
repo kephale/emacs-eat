@@ -62,14 +62,14 @@ eat-mono|Emacs Eat without colors,
   dim=\e[2m,
   invis=\e[8m,
   rev=\e[7m,
-  sgr0=\e[m,
-  sgr=\e[0;%?%p1%t7%e27%;;
-           %?%p2%t4%e24%;;
-           %?%p3%t7%e27%;;
-           %?%p4%t5%e25%;;
-           %?%p5%t2%e22%;;
-           %?%p6%t1%e22%;;
-           %?%p7%t8%e28%;m,
+  sgr0=\e(B\e[m,
+  sgr=%?%p9%t\e(0%e\e(B%;
+      \e[0%?%p6%t;1%;
+          %?%p5%t;2%;
+          %?%p2%t;4%;
+          %?%p1%p3%|%t;7%;
+          %?%p4%t;5%;
+          %?%p7%t;8%;m,
   msgr,
   cvvis=\e[?12;25h,
   civis=\e[?25l,
