@@ -2614,6 +2614,18 @@ position."
       (eat--t-repeated-insert
        ?  (- (1- x) (eat--t-col-motion (1- x)))))))
 
+(defun eat--t-repeat-last-char (&optional n)
+  "Repeat last character N times."
+  (let ((disp (eat--t-term-display eat--t-term)))
+    (let ((char
+           (when (< (eat--t-disp-begin disp) (point))
+             (if (get-text-property (1- (point)) 'eat-wrap-line)
+                 (when (< (eat--t-disp-begin disp) (1- (point)))
+                   (char-before (1- (point))))
+               (char-before)))))
+      (when (and char (/= char ?\n))
+        (eat--t-write (make-string n char))))))
+
 (defun eat--t-change-scroll-region (&optional top bottom)
   "Change the scroll region from lines TOP to BOTTOM (inclusive).
 
@@ -3152,9 +3164,9 @@ DATA is the selection data encoded in base64."
              ;; ESC 8.
              (?8
               (eat--t-restore-cur))
-             ;; ESC c.
-             (?c
-              (eat--t-reset))
+             ;; ESC E.
+             (?E
+              (eat--t-line-feed 1))
              ;; ESC M.
              (?M
               (eat--t-reverse-line-feed 1))
@@ -3182,6 +3194,9 @@ DATA is the selection data encoded in base64."
              (?_
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-apc "")))
+             ;; ESC c.
+             (?c
+              (eat--t-reset))
              ;; ESC n.
              (?n
               (eat--t-change-charset 'g2))
@@ -3302,6 +3317,9 @@ DATA is the selection data encoded in base64."
                ;; CSI <n> Z.
                (`("Z" nil ,(and (pred listp) params))
                 (eat--t-horizontal-backtab (caar params)))
+               ;; CSI <n> b.
+               (`("b" nil ,(and (pred listp) params))
+                (eat--t-repeat-last-char (caar params)))
                ;; CSI <n> c.
                ;; CSI > <n> c.
                (`("c" ,format ,(and (pred listp) params))
@@ -3397,7 +3415,6 @@ DATA is the selection data encoded in base64."
                  (setq index (length output)))
              (let ((str (concat buf (substring output index
                                                (match-end 0)))))
-               (message "%S" str)
                (setq index (match-end 0))
                (setf (eat--t-term-parser-state eat--t-term) nil)
                (pcase str
