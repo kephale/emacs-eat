@@ -3326,7 +3326,13 @@ DATA is the selection data encoded in base64."
                ;; CSI <n> ; <n> r
                (`("r" nil ,(and (pred listp) params))
                 (eat--t-change-scroll-region (caar params)
-                                             (caadr params)))))))
+                                             (caadr params)))
+               ;; CSI s.
+               (`("s" nil nil)
+                (eat--t-save-cur))
+               ;; CSI u.
+               (`("u" nil nil)
+                (eat--t-restore-cur))))))
         (`(,(and (or 'read-dcs 'read-sos 'read-osc 'read-pm 'read-apc)
                  state)
            ,buf)
