@@ -1909,7 +1909,12 @@ Nil when not in alternative display mode.")
   (face (eat--t-make-face) :documentation "Display attributes.")
   (auto-margin t :documentation "State of auto margin mode.")
   (ins-mode nil :documentation "State of insert mode.")
-  (charset 'standard :documentation "Current character set.")
+  (charset
+   '(g0 (g0 . us-ascii)
+        (g1 . dec-line-drawing)
+        (g2 . dec-line-drawing)
+        (g3 . dec-line-drawing))
+   :documentation "Current character set.")
   (cur-state :default :documentation "Current state of cursor.")
   (cur-blinking-p nil :documentation "Is the cursor blinking?")
   (saved-face
@@ -1944,7 +1949,11 @@ Don't `set' it, bind it to a value with `let'.")
     (setf (eat--t-term-face eat--t-term) (eat--t-make-face))
     (setf (eat--t-term-auto-margin eat--t-term) t)
     (setf (eat--t-term-ins-mode eat--t-term) nil)
-    (setf (eat--t-term-charset eat--t-term) 'standard)
+    (setf (eat--t-term-charset eat--t-term)
+          '(g0 (g0 . us-ascii)
+               (g1 . dec-line-drawing)
+               (g2 . dec-line-drawing)
+               (g3 . dec-line-drawing)))
     (setf (eat--t-term-saved-face eat--t-term) (eat--t-make-face))
     (setf (eat--t-term-bracketed-yank eat--t-term) nil)
     (setf (eat--t-term-cur-state eat--t-term) :default)
@@ -2137,21 +2146,25 @@ of range, place cursor at the edge of display."
   "Disable automatic margin."
   (setf (eat--t-term-auto-margin eat--t-term) nil))
 
-(defun eat--t-standard-charset ()
-  "Switch to standard character set."
-  (setf (eat--t-term-charset eat--t-term) 'standard))
+(defun eat--t-set-charset (slot charset)
+  "SLOT's character set to CHARSET."
+  (setf (alist-get slot (cdr (eat--t-term-charset eat--t-term)))
+        charset))
 
-(defun eat--t-alternate-charset ()
-  "Switch to alternate character set."
-  (setf (eat--t-term-charset eat--t-term) 'alternate))
+(defun eat--t-change-charset (charset)
+  "Change character set to CHARSET.
+
+CHARSET should be one of `g0', `g1', `g2' and `g3'."
+  (setf (car (eat--t-term-charset eat--t-term)) charset))
 
 (defun eat--t-write (str)
   "Write STR on display."
   (let* ((str
-          (pcase (eat--t-term-charset eat--t-term)
-            ('standard
+          (pcase (alist-get (car (eat--t-term-charset eat--t-term))
+                            (cdr (eat--t-term-charset eat--t-term)))
+            ('us-ascii
              str)
-            ('alternate
+            ('dec-line-drawing
              (let ((s (copy-sequence str)))
                (dotimes (i (length s))
                  (let ((replacement (alist-get (aref s i)
@@ -2189,7 +2202,9 @@ of range, place cursor at the edge of display."
                                                  (?~ . ?•)))))
                    (when replacement
                      (aset s i replacement))))
-               s))))
+               s))
+            (_
+             str)))
          (str (propertize str 'face
                           (eat--t-face-face
                            (eat--t-term-face eat--t-term)))))
@@ -3079,9 +3094,9 @@ DATA is the selection data encoded in base64."
                                (= (aref output index) ?\n))
                     (eat--t-carriage-return)))
                  (?\C-n
-                  (eat--t-alternate-charset))
+                  (eat--t-change-charset 'g1))
                  (?\C-o
-                  (eat--t-standard-charset))
+                  (eat--t-change-charset 'g0))
                  (?\e
                   (setf (eat--t-term-parser-state eat--t-term)
                         '(read-esc))))))))
@@ -3090,41 +3105,76 @@ DATA is the selection data encoded in base64."
            (cl-incf index)
            (setf (eat--t-term-parser-state eat--t-term) nil)
            (pcase type
-             ;; ESC 7
+             ;; ESC (.
+             (?\(
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-charset-standard g0 "")))
+             ;; ESC ).
+             (?\)
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-charset-standard g1 "")))
+             ;; ESC *.
+             (?*
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-charset-standard g2 "")))
+             ;; ESC +.
+             (?+
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-charset-standard g3 "")))
+             ;; ESC -.
+             (?\(
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-charset-vt300 g1 "")))
+             ;; ESC ..
+             (?\(
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-charset-vt300 g2 "")))
+             ;; ESC /.
+             (?\(
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-charset-vt300 g3 "")))
+             ;; ESC 7.
              (?7
               (eat--t-save-cur))
-             ;; ESC 8
+             ;; ESC 8.
              (?8
               (eat--t-restore-cur))
-             ;; ESC c
+             ;; ESC c.
              (?c
               (eat--t-reset))
+             ;; ESC M.
              (?M
               (eat--t-reverse-line-feed 1))
-             ;; ESC P, or DCS
+             ;; ESC P, or DCS.
              (?P
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-dcs "")))
-             ;; ESC X, or SOS
+             ;; ESC X, or SOS.
              (?X
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-sos "")))
-             ;; ESC [, or CSI
+             ;; ESC [, or CSI.
              (?\[
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-csi "")))
-             ;; ESC ], or OSC
+             ;; ESC ], or OSC.
              (?\]
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-osc "")))
-             ;; ESC ^, or PM
+             ;; ESC ^, or PM.
              (?^
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-pm "")))
-             ;; ESC _, or APC
+             ;; ESC _, or APC.
              (?_
               (setf (eat--t-term-parser-state eat--t-term)
-                    '(read-apc ""))))))
+                    '(read-apc "")))
+             ;; ESC n.
+             (?n
+              (eat--t-change-charset 'g2))
+             ;; ESC o.
+             (?o
+              (eat--t-change-charset 'g3)))))
         (`(read-csi ,buf)
          (let ((match (string-match (rx (any (#x40 . #x7e)))
                                     output index)))
@@ -3292,14 +3342,19 @@ DATA is the selection data encoded in base64."
                  (pcase state
                    ('read-osc
                     (pcase str
+                      ;; OSC 0 ; <t> ST.
+                      ;; OSC 2 ; <t> ST.
                       ((rx string-start (or ?0 ?2) ?\;
                            (let title (zero-or-more anything))
                            string-end)
                        (eat--t-set-title title))
+                      ;; OSC 10 ; ? ST.
                       ("10;?"
                        (eat--t-report-foreground-color))
+                      ;; OSC 11 ; ? ST.
                       ("11;?"
                        (eat--t-report-background-color))
+                      ;; OSC 52 ; <t> ; <s> ST.
                       ((rx string-start "52;"
                            (let targets
                              (zero-or-more (any ?c ?p ?q ?s
@@ -3308,7 +3363,44 @@ DATA is the selection data encoded in base64."
                            (let data (zero-or-more anything))
                            string-end)
                        (eat--t-manipulate-selection
-                        targets data))))))))))))))
+                        targets data))))))))))
+        (`(read-charset-standard ,slot ,buf)
+         (let ((match (string-match (rx (any ?0 ?2 ?4 ?5 ?6 ?7 ?9 ?<
+                                             ?= ?> ?? ?A ?B ?C ?E ?H
+                                             ?K ?Q ?R ?Y ?Z ?f))
+                                    output index)))
+           (if (not match)
+               (progn
+                 (setf (eat--t-term-parser-state eat--t-term)
+                       `(read-charset-standard
+                         ,slot ,(concat buf (substring
+                                             output index))))
+                 (setq index (length output)))
+             (let ((str (concat buf (substring output index
+                                               (match-end 0)))))
+               (message "%S" str)
+               (setq index (match-end 0))
+               (setf (eat--t-term-parser-state eat--t-term) nil)
+               (pcase str
+                 ;; ESC ( 0
+                 ;; ESC ) 0
+                 ;; ESC * 0
+                 ;; ESC + 0
+                 ("0"
+                  (eat--t-set-charset slot 'dec-line-drawing))
+                 ;; ESC ( B
+                 ;; ESC ) B
+                 ;; ESC * B
+                 ;; ESC + B
+                 ("B"
+                  (eat--t-set-charset slot 'us-ascii)))))))
+        (`(read-charset-vt300 ,_slot)
+         (let ((_charset (aref output index)))
+           (cl-incf index)
+           (setf (eat--t-term-parser-state eat--t-term) nil)
+           (pcase charset
+             ;; IGNORED.  TODO.
+             )))))))
 
 (defun eat--t-resize (width height)
   "Resize terminal to WIDTH x HEIGHT."
