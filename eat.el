@@ -279,10 +279,10 @@ This has an effect only if `eat-blink-mode' is enabled."
   :type 'number
   :group 'eat-ui)
 
-(defcustom eat-enable-alternative-framebuffer t
-  "Non-nil means enable alternative framebuffer.
+(defcustom eat-enable-alternative-display t
+  "Non-nil means enable alternative display.
 
-Full screen programs often use alternative framebuffer to keep old
+Full screen programs often use alternative display to keep old
 contents on display unaltered."
   :type 'boolean
   :group 'eat-term)
@@ -2459,8 +2459,8 @@ STATE one of the `:default', `:invisible', `:very-visible'."
   (setf (eat--t-term-bracketed-yank eat--t-term) nil))
 
 (defun eat--t-enable-alt-disp ()
-  "Enable alternative display/framebuffer."
-  (when eat-enable-alternative-framebuffer
+  "Enable alternative display."
+  (when eat-enable-alternative-display
     (unless (eat--t-term-main-display eat--t-term)
       (let ((main-disp (eat--t-copy-disp
                         (eat--t-term-display eat--t-term))))
@@ -2480,7 +2480,7 @@ STATE one of the `:default', `:invisible', `:very-visible'."
         (eat--t-goto 1 1)))))
 
 (defun eat--t-disable-alt-disp ()
-  "Disable alternative display/framebuffer."
+  "Disable alternative display."
   (when (eat--t-term-main-display eat--t-term)
     (let* ((main-disp (eat--t-term-main-display eat--t-term))
            (width (eat--t-disp-width
@@ -3627,8 +3627,8 @@ you need the position."
     (eat--t-with-env terminal
       (eat--t-resize width height))))
 
-(defun eat-term-in-alternative-framebuffer-p (terminal)
-  "Return non-nil when TERMINAL is in alternative framebuffer mode."
+(defun eat-term-in-alternative-display-p (terminal)
+  "Return non-nil when TERMINAL is in alternative display mode."
   (eat--t-term-main-display terminal))
 
 (defun eat-term-input-event (terminal n event &optional ref-pos)
@@ -5164,7 +5164,7 @@ PROGRAM can be a shell command."
     (delete-region eshell-last-output-start eshell-last-output-end)
     (let ((synchronize-scroll
            (or (= (eat-term-display-cursor eat--terminal) (point))
-               eat--char-mode)))
+               eat--eshell-char-mode)))
       (eat-term-process-output eat--terminal str)
       (eat-term-redisplay eat--terminal)
       (when synchronize-scroll
@@ -5318,7 +5318,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
   (when-let ((window (get-buffer-window (current-buffer))))
     (set-window-start
      window
-     (if (eat-term-in-alternative-framebuffer-p eat--terminal)
+     (if (or (eat-term-in-alternative-display-p eat--terminal)
+             eat--eshell-char-mode)
          (eat-term-display-beginning eat--terminal)
        (save-restriction
          (narrow-to-region
