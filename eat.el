@@ -1638,6 +1638,38 @@ If your process is choking on big inputs, try lowering the value."
   "Face used to render text with 255th color of 256 color palette."
   :group 'eat-term)
 
+(defface eat-term-font-0 '((t))
+  "Default font.")
+
+(put 'eat-term-font-default 'face-alias 'eat-term-font-0)
+
+(defface eat-term-font-1 '((t))
+  "Alternative font 1.")
+
+(defface eat-term-font-2 '((t))
+  "Alternative font 2.")
+
+(defface eat-term-font-3 '((t))
+  "Alternative font 3.")
+
+(defface eat-term-font-4 '((t))
+  "Alternative font 4.")
+
+(defface eat-term-font-5 '((t))
+  "Alternative font 5.")
+
+(defface eat-term-font-6 '((t))
+  "Alternative font 6.")
+
+(defface eat-term-font-7 '((t))
+  "Alternative font 7.")
+
+(defface eat-term-font-8 '((t))
+  "Alternative font 8.")
+
+(defface eat-term-font-9 '((t))
+  "Alternative font 9.")
+
 
 ;;;; Utility functions.
 
@@ -1846,7 +1878,8 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (crossed nil :documentation "Non-nil means strike-through text.")
   (conceal nil :documentation "Non-nil means invisible text.")
   (inverse nil :documentation "Non-nil means inverse colors.")
-  (blink nil :documentation "Blink face, or nil."))
+  (blink nil :documentation "Blink face, or nil.")
+  (font 'eat-term-font-0 :documentation "Current font face."))
 
 (cl-defstruct (eat--t-term
                (:constructor eat--t-make-term)
@@ -2593,7 +2626,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
          (setf (eat--t-face-crossed face) nil)
          (setf (eat--t-face-conceal face) nil)
          (setf (eat--t-face-inverse face) nil)
-         (setf (eat--t-face-blink face) nil))
+         (setf (eat--t-face-blink face) nil)
+         (setf (eat--t-face-font face) 'eat-term-font-0))
         ('(1)
          (setf (eat--t-face-intensity face) 'eat-term-bold))
         ('(2)
@@ -2624,6 +2658,10 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
          (setf (eat--t-face-conceal face) t))
         ('(9)
          (setf (eat--t-face-crossed face) t))
+        (`(,(and (pred (lambda (font) (<= 10 font 19)))
+                 font))
+         (setf (eat--t-face-font face)
+               (intern (format "eat-term-font-%i" (- font 10)))))
         ('(21)
          (setf (eat--t-face-underline face) 'line))
         ('(22)
@@ -2753,7 +2791,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
              ,@(when-let ((italic (eat--t-face-italic face)))
                  (list italic))
              ,@(when-let ((blink (eat--t-face-blink face)))
-                 (list blink)))))))
+                 (list blink))
+             ,(eat--t-face-font face))))))
 
 (defun eat--t-enable-keypad ()
   "Enable keypad."
@@ -3066,6 +3105,10 @@ DATA is the selection data encoded in base64."
              (?P
               (setf (eat--t-term-parser-state eat--t-term)
                     '(read-dcs "")))
+             ;; ESC X, or SOS
+             (?X
+              (setf (eat--t-term-parser-state eat--t-term)
+                    '(read-sos "")))
              ;; ESC [, or CSI
              (?\[
               (setf (eat--t-term-parser-state eat--t-term)
@@ -3137,16 +3180,20 @@ DATA is the selection data encoded in base64."
                (`("@" nil ,(and (pred listp) params))
                 (eat--t-insert-char (caar params)))
                ;; CSI <n> A.
-               (`("A" nil ,(and (pred listp) params))
+               ;; CSI <n> k.
+               (`(,(or "A" "k") nil ,(and (pred listp) params))
                 (eat--t-cur-up (caar params)))
                ;; CSI <n> B.
-               (`("B" nil ,(and (pred listp) params))
+               ;; CSI <n> e.
+               (`(,(or "B" "e") nil ,(and (pred listp) params))
                 (eat--t-cur-down (caar params)))
                ;; CSI <n> C.
-               (`("C" nil ,(and (pred listp) params))
+               ;; CSI <n> a.
+               (`(,(or "C" "a") nil ,(and (pred listp) params))
                 (eat--t-cur-right (caar params)))
                ;; CSI <n> D.
-               (`("D" nil ,(and (pred listp) params))
+               ;; CSI <n> j.
+               (`(,(or "D" "j") nil ,(and (pred listp) params))
                 (eat--t-cur-left (caar params)))
                ;; CSI <n> E.
                (`("E" nil ,(and (pred listp) params))
@@ -3155,12 +3202,16 @@ DATA is the selection data encoded in base64."
                (`("F" nil ,(and (pred listp) params))
                 (eat--t-beg-of-next-line (caar params)))
                ;; CSI <n> G.
-               (`("G" nil ,(and (pred listp) params))
+               ;; CSI <n> `.
+               (`(,(or "G" "`") nil ,(and (pred listp) params))
                 (eat--t-cur-horizontal-abs (caar params)))
                ;; CSI <n> ; <m> H
                ;; CSI <n> ; <m> f
                (`(,(or "H" "f") nil ,(and (pred listp) params))
                 (eat--t-goto (caar params) (caadr params)))
+               ;; CSI <n> I.
+               (`("I" nil ,(and (pred listp) params))
+                (eat--t-horizontal-tab (caar params)))
                ;; CSI <n> J.
                (`("J" nil ,(and (pred listp) params))
                 (eat--t-erase-in-disp (caar params)))
@@ -3213,7 +3264,7 @@ DATA is the selection data encoded in base64."
                (`("r" nil ,(and (pred listp) params))
                 (eat--t-change-scroll-region (caar params)
                                              (caadr params)))))))
-        (`(,(and (or 'read-dcs 'read-osc 'read-pm 'read-apc)
+        (`(,(and (or 'read-dcs 'read-sos 'read-osc 'read-pm 'read-apc)
                  state)
            ,buf)
          (let ((match (string-match (if (eq state 'read-osc)
