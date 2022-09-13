@@ -3003,7 +3003,8 @@ DATA is the selection data encoded in base64."
       (pcase (eat--t-term-parser-state eat--t-term)
         ('nil
          (let ((match (string-match (rx (or ?\0 ?\a ?\b ?\t ?\n ?\v
-                                            ?\f ?\r ?\C-n ?\C-o ?\e))
+                                            ?\f ?\r ?\C-n ?\C-o ?\e
+                                            #x7f))
                                     output index)))
            (if (not match)
                (progn
@@ -3013,29 +3014,21 @@ DATA is the selection data encoded in base64."
                  (progn
                    (eat--t-write (substring output index match))
                    (setq index match))
-               (pcase (aref output index)
-                 (?\0
-                  (cl-incf index))
+               (cl-incf index)
+               (pcase (aref output (1- index))
                  (?\a
-                  (cl-incf index)
                   (eat--t-bell))
                  (?\b
-                  (cl-incf index)
                   (eat--t-cur-left 1))
                  (?\t
-                  (cl-incf index)
                   (eat--t-horizontal-tab 1))
                  (?\n
-                  (cl-incf index)
                   (eat--t-line-feed 1))
                  (?\v
-                  (cl-incf index)
                   (eat--t-vertical-tab 1))
                  (?\f
-                  (cl-incf index)
                   (eat--t-form-feed))
                  (?\r
-                  (cl-incf index)
                   ;; Avoid going to line home just before a line feed,
                   ;; we can just insert a new line if we are at the
                   ;; end of display.
@@ -3043,13 +3036,10 @@ DATA is the selection data encoded in base64."
                                (= (aref output index) ?\n))
                     (eat--t-carriage-return)))
                  (?\C-n
-                  (cl-incf index)
                   (eat--t-alternate-charset))
                  (?\C-o
-                  (cl-incf index)
                   (eat--t-standard-charset))
                  (?\e
-                  (cl-incf index)
                   (setf (eat--t-term-parser-state eat--t-term)
                         '(read-esc))))))))
         ('(read-esc)
