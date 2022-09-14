@@ -2267,7 +2267,7 @@ N default to 1."
     (eat--t-cur-left (+ (1+ (mod (- (eat--t-cur-x cursor) 2) 8))
                         (* (1- n) 8)))))
 
-(defun eat--t-vertical-tab (&optional n)
+(defun eat--t-index (&optional n)
   "Go to the Nth next line preserving column, scrolling if necessary.
 
 N default to 1."
@@ -2323,10 +2323,10 @@ N default to 1."
           (when (and (not (zerop scroll)) in-scroll-region)
             (eat--t-scroll-up scroll))))
     (eat--t-carriage-return)
-    (eat--t-vertical-tab n)))
+    (eat--t-index n)))
 
-(defun eat--t-reverse-line-feed (&optional n)
-  "Insert reverse line feed N times, but stay on current column.
+(defun eat--t-reverse-index (&optional n)
+  "Go to Nth previous line preserving column, scrolling if needed.
 
 N default to 1."
   (let* ((n (max (or n 1) 0))
@@ -2350,7 +2350,7 @@ N default to 1."
 
 (defun eat--t-form-feed ()
   "Insert a vertical tab."
-  (eat--t-vertical-tab 1))
+  (eat--t-index 1))
 
 (defun eat--t-save-cur ()
   "Save current cursor position."
@@ -3108,7 +3108,7 @@ DATA is the selection data encoded in base64."
                  (?\n
                   (eat--t-line-feed 1))
                  (?\v
-                  (eat--t-vertical-tab 1))
+                  (eat--t-index 1))
                  (?\f
                   (eat--t-form-feed))
                  (?\r
@@ -3164,12 +3164,15 @@ DATA is the selection data encoded in base64."
              ;; ESC 8.
              (?8
               (eat--t-restore-cur))
+             ;; ESC D.
+             (?D
+              (eat--t-index 1))
              ;; ESC E.
              (?E
               (eat--t-line-feed 1))
              ;; ESC M.
              (?M
-              (eat--t-reverse-line-feed 1))
+              (eat--t-reverse-index 1))
              ;; ESC P, or DCS.
              (?P
               (setf (eat--t-term-parser-state eat--t-term)
