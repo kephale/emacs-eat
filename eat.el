@@ -1804,12 +1804,12 @@ Assume all characters occupy a single column."
   (eat--t-goto-bol)
   (eat--t-col-motion n))
 
-(defun eat--t-repeated-insert (c n)
-  "Insert C, N times."
-  ;; TODO: Which would be better?  Make a N character long string with
-  ;; each of characters initialized to C?  Or (dotimes (_ N)
-  ;; (insert C))?
-  (insert (make-string n c)))
+(defun eat--t-repeated-insert (c n &optional face)
+  "Insert C, N times.
+
+C is a character.  FACE is the face to use, or nil."
+  (let ((str (make-string n c)))
+    (insert (if face (propertize str 'face face) str))))
 
 (defun eat--t-join-long-line (&optional limit)
   "Join long line once, but don't try to go beyond LIMIT.
@@ -2072,6 +2072,7 @@ N default to 1.  By default, don't change current line and current
 column, but if PRESERVE-POINT is given and non-nil, don't move point
 relative to the text and change current line accordingly."
   (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
@@ -2090,8 +2091,16 @@ relative to the text and change current line accordingly."
                       (= (char-before) ?\n))
             (insert ?\n))
           (set-marker (eat--t-disp-begin disp) (point)))
-        (eat--t-goto-bol (- (1+ (- scroll-end scroll-begin)) n))
-        (eat--t-repeated-insert ?\n n))
+        (let* ((move (- scroll-end scroll-begin n))
+               (mv (max move 0)))
+          (eat--t-repeated-insert ?\n (- mv (eat--t-goto-eol mv)))
+          (if (not (eat--t-face-bg face))
+              (eat--t-repeated-insert ?\n n)
+            (dotimes (i n)
+              (when (or (not (zerop i)) (>= move 0))
+                (insert ?\n))
+              (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+                                      (eat--t-face-face face))))))
       (when (and preserve-point
                  (<= scroll-begin (eat--t-cur-y cursor) scroll-end))
         (setf (eat--t-cur-y cursor) (min (- (eat--t-cur-y cursor) n)
@@ -2106,6 +2115,7 @@ relative to the text and change current line accordingly."
 
 N default to 1."
   (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
@@ -2114,7 +2124,12 @@ N default to 1."
       (save-excursion
         (goto-char (eat--t-disp-begin disp))
         (eat--t-goto-bol (1- scroll-begin))
-        (eat--t-repeated-insert ?\n n)
+        (if (not (eat--t-face-bg face))
+            (eat--t-repeated-insert ?\n n)
+          (dotimes (_ n)
+            (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+                                    (eat--t-face-face face))
+            (insert ?\n)))
         (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin)) (1+ n)))
         (delete-region (point) (car (eat--t-eol n))))
       (let ((y (eat--t-cur-y cursor))
@@ -2378,22 +2393,35 @@ N default to 1."
 
 N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
 1, erase beginning of line to cursor.  When N is 2, erase whole line."
-  (when (or (not n) (< 2 n) (memq n '(0 2)))
-    (delete-region
-     (point)
-     (or (save-excursion
-           (when-let ((pos (search-forward "\n" nil t)))
-             (1- pos)))
-         (point-max))))
-  (when (memq n '(1 2))
-    (let ((x (eat--t-cur-x (eat--t-disp-cursor
-                            (eat--t-term-display eat--t-term)))))
-      (if (= (point) (point-max))
-          (progn
-            (delete-region (car (eat--t-bol)) (point))
-            (eat--t-repeated-insert ?  (1- x)))
-        (delete-region (car (eat--t-bol)) (1+ (point)))
-        (eat--t-repeated-insert ?  x)
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
+         (cursor (eat--t-disp-cursor disp)))
+    (when (or (not n) (> n 2) (memq n '(0 2)))
+      ;; Erase point to end of line.
+      (delete-region
+       (point)
+       (or (save-excursion
+             (when-let ((pos (search-forward "\n" nil t)))
+               (1- pos)))
+           (point-max)))
+      (when (eat--t-face-bg face)
+        (save-excursion
+          (eat--t-repeated-insert ?  (1+ (- (eat--t-disp-width disp)
+                                            (eat--t-cur-x cursor)))
+                                  (and (eat--t-face-bg face)
+                                       (eat--t-face-face face))))))
+    (when (memq n '(1 2))
+      ;; Erase beginning of line to point.
+      (let ((x (eat--t-cur-x cursor)))
+        (if (= (point) (point-max))
+            (progn
+              (delete-region (car (eat--t-bol)) (point))
+              (eat--t-repeated-insert ?  (1- x))))
+        (delete-region (car (eat--t-bol)) (if (= (point) (point-max))
+                                              (point)
+                                            (1+ (point))))
+        (eat--t-repeated-insert ?  x (and (eat--t-face-bg face)
+                                          (eat--t-face-face face)))
         (backward-char)))))
 
 (defun eat--t-erase-in-disp (&optional n)
@@ -2403,27 +2431,62 @@ N defaults to 0.  When N is 0, erase cursor to end of display.  When N
 is 1, erase beginning of display to cursor.  In both on the previous
 cases, don't move cursor.  When N is 2, erase display and reset cursor
 to (1, 1).  When N is 3, also erase the scrollback."
-  (pcase n
-    ((or 0 'nil (pred (< 3)))
-     (delete-region (point) (point-max)))
-    (1
-     (let* ((disp (eat--t-term-display eat--t-term))
-            (cursor (eat--t-disp-cursor disp))
-            (y (eat--t-cur-y cursor))
-            (x (eat--t-cur-x cursor))
-            (incl-point (/= (point) (point-max))))
-       (delete-region (eat--t-disp-begin disp)
-                      (if incl-point (1+ (point)) (point)))
-       (eat--t-repeated-insert ?\n (1- y))
-       (eat--t-repeated-insert ?  (if incl-point x (1- x)))
-       (when incl-point
-         (backward-char))))
-    (2
-     (eat--t-goto 1 1)
-     (delete-region (point) (point-max)))
-    (3
-     (eat--t-goto 1 1)
-     (delete-region (point-min) (point-max)))))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
+         (cursor (eat--t-disp-cursor disp)))
+    (pcase n
+      ((or 0 'nil (pred (< 3)))
+       (delete-region (point) (point-max))
+       (when (eat--t-face-bg face)
+         (let ((pos (point)))
+           (eat--t-repeated-insert ?  (1+ (- (eat--t-disp-width disp)
+                                             (eat--t-cur-x cursor)))
+                                   (eat--t-face-face face))
+           (dotimes (_ (- (eat--t-disp-height disp)
+                          (eat--t-cur-y cursor)))
+             (insert ?\n)
+             (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+                                     (eat--t-face-face face)))
+           (goto-char pos))))
+      (1
+       (let* ((y (eat--t-cur-y cursor))
+              (x (eat--t-cur-x cursor))
+              (incl-point (/= (point) (point-max))))
+         (delete-region (eat--t-disp-begin disp)
+                        (if incl-point (1+ (point)) (point)))
+         (if (not (eat--t-face-bg face))
+             (eat--t-repeated-insert ?\n (1- y))
+           (dotimes (_ (1- y))
+             (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+                                     (eat--t-face-face face))
+             (insert ?\n)))
+         (eat--t-repeated-insert ?  (if incl-point x (1- x))
+                                 (and (eat--t-face-bg face)
+                                      (eat--t-face-face face)))
+         (when incl-point
+           (backward-char))))
+      (2
+       (eat--t-goto 1 1)
+       (delete-region (point) (point-max))
+       (when (eat--t-face-bg face)
+         (let ((pos (point)))
+           (dotimes (i (eat--t-disp-height disp))
+             (unless (zerop i)
+               (insert ?\n))
+             (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+                                     (eat--t-face-face face)))
+           (goto-char pos))))
+      (3
+       (eat--t-goto 1 1)
+       (delete-region (point-min) (point-max))
+       (when (eat--t-face-bg face)
+         (let ((pos (point)))
+           (dotimes (i (eat--t-disp-height disp))
+             (unless (zerop i)
+               (insert ?\n))
+             (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+                                     (eat--t-face-face face)))
+           (goto-char pos)))))))
 
 (defun eat--t-device-status-report ()
   "Send the current Y and X coordinate to client."
@@ -2535,13 +2598,15 @@ position."
 (defun eat--t-insert-char (n)
   "Insert N empty (space) characters, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
                  (max (or n 1) 0))))
     (unless (zerop n)
       (save-excursion
-        (eat--t-repeated-insert ?  n)
+        (eat--t-repeated-insert ?  n (and (eat--t-face-bg face)
+                                          (eat--t-face-face face)))
         (eat--t-col-motion (- (eat--t-disp-width disp)
                               (+ (1- (eat--t-cur-x cursor)) n)))
         (delete-region (point) (car (eat--t-eol)))))))
@@ -2549,6 +2614,7 @@ position."
 (defun eat--t-delete-char (n)
   "Delete N characters, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
@@ -2557,16 +2623,42 @@ position."
       (save-excursion
         (let ((m (point)))
           (eat--t-col-motion n)
-          (delete-region m (point)))))))
+          (delete-region m (point))
+          (when (eat--t-face-bg face)
+            (save-excursion
+              (eat--t-goto-eol)
+              (let ((empty (1+ (- (eat--t-disp-width disp)
+                                  (eat--t-cur-x cursor)
+                                  (- (point) m)))))
+                (when (> empty n)
+                  (eat--t-repeated-insert ?  (- empty n)))
+                (eat--t-repeated-insert
+                 ?  (min empty n) (eat--t-face-face face))))))))))
 
 (defun eat--t-erase-char (n)
   "Make next N character cells empty, preserving cursor."
-  (eat--t-delete-char n)
-  (eat--t-insert-char n))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (n (min (- (eat--t-disp-width disp)
+                    (1- (eat--t-cur-x cursor)))
+                 (max (or n 1) 0))))
+    (unless (zerop n)
+      (save-excursion
+        (let ((m (point)))
+          (eat--t-col-motion n)
+          (delete-region m (point))
+          (eat--t-repeated-insert
+           ?  n (and (eat--t-face-bg face)
+                     (eat--t-face-face face)))
+          (eat--t-col-motion
+           (- (eat--t-disp-width disp)
+              (+ (1- (eat--t-cur-x cursor)) n))))))))
 
 (defun eat--t-insert-line (n)
   "Insert N empty lines, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
@@ -2579,9 +2671,20 @@ position."
        (prog1
            (progn
              (eat--t-goto-bol)
-             (eat--t-repeated-insert ?  (1- (eat--t-cur-x cursor)))
+             (eat--t-repeated-insert ?  (1- (eat--t-cur-x cursor))
+                                     (and (eat--t-face-bg face)
+                                          (eat--t-face-face face)))
              (point))
-         (eat--t-repeated-insert ?\n n)
+         (if (not (eat--t-face-bg face))
+             (eat--t-repeated-insert ?\n n)
+           (dotimes (i n)
+             (eat--t-repeated-insert
+              ?  (if (not (zerop i))
+                     (eat--t-disp-width disp)
+                   (1+ (- (eat--t-disp-width disp)
+                          (eat--t-cur-x cursor))))
+              (eat--t-face-face face))
+             (insert ?\n)))
          (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin))
                              (+ (- (eat--t-cur-y cursor)
                                    (1- scroll-begin))
@@ -2591,6 +2694,7 @@ position."
 (defun eat--t-delete-line (n)
   "Delete N lines, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
+         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (x (eat--t-cur-x cursor))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
@@ -2598,6 +2702,7 @@ position."
          (n (min (- (1+ (- scroll-end scroll-begin))
                     (1- (eat--t-cur-y cursor)))
                  (max (or n 1) 0))))
+    (message "%S" n)
     (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
                (not (zerop n)))
       (eat--t-goto-bol)
@@ -2605,12 +2710,18 @@ position."
         (let ((m (point)))
           (eat--t-goto-bol n)
           (delete-region m (point))))
-      (save-excursion
-        (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin))
-                            (+ (- (eat--t-cur-y cursor)
-                                  (1- scroll-begin))
-                               n)))
-        (eat--t-repeated-insert ?\n n))
+      (let ((pos (point))
+            (move (- (1+ (- scroll-end scroll-begin))
+                     (- (+ (eat--t-cur-y cursor) n)
+                        (1- scroll-begin)))))
+        (eat--t-repeated-insert ?\n (- move (eat--t-goto-eol move)))
+        (if (not (eat--t-face-bg face))
+            (eat--t-repeated-insert ?\n n)
+          (dotimes (_ n)
+            (insert ?\n)
+            (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+                                    (eat--t-face-face face))))
+        (goto-char pos))
       (eat--t-repeated-insert
        ?  (- (1- x) (eat--t-col-motion (1- x)))))))
 
