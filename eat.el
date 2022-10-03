@@ -1816,11 +1816,11 @@ C is a character.  FACE is the face to use, or nil."
 
 For example: \"*foo\\nbar\\nbaz\" is converted to \"foo*bar\\nbaz\",
 where `*' indicates point."
-  (if (get-char-property (point) 'eat-wrap-line)
+  (if (get-char-property (point) 'eat--t-wrap-line)
       (when (< (point) (or limit (point-max)))
         (delete-char 1))
     (let ((next (next-single-char-property-change
-                 (point) 'eat-wrap-line nil limit)))
+                 (point) 'eat--t-wrap-line nil limit)))
       (goto-char next)
       (when (< (point) (or limit (point-max)))
         (delete-char 1)))))
@@ -1836,7 +1836,7 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
       (if (eq (char-after) ?\n)
           (forward-char)
         (unless (= (point) (point-max))
-          (insert-before-markers (propertize "\n" 'eat-wrap-line t)))
+          (insert-before-markers (propertize "\n" 'eat--t-wrap-line t)))
         (setq loop nil)))))
 
 
@@ -2255,9 +2255,9 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
                 (if (= (eat--t-cur-y cursor) scroll-end)
                     (eat--t-carriage-return)
                   (if (= (point) (point-max))
-                      (insert (propertize "\n" 'eat-wrap-line t))
+                      (insert (propertize "\n" 'eat--t-wrap-line t))
                     (put-text-property (point) (1+ (point))
-                                       'eat-wrap-line t)
+                                       'eat--t-wrap-line t)
                     (forward-char))
                   (setf (eat--t-cur-x cursor) 1)
                   (cl-incf (eat--t-cur-y cursor)))))))))))
@@ -2702,7 +2702,6 @@ position."
          (n (min (- (1+ (- scroll-end scroll-begin))
                     (1- (eat--t-cur-y cursor)))
                  (max (or n 1) 0))))
-    (message "%S" n)
     (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
                (not (zerop n)))
       (eat--t-goto-bol)
@@ -2730,7 +2729,7 @@ position."
   (let ((disp (eat--t-term-display eat--t-term)))
     (let ((char
            (when (< (eat--t-disp-begin disp) (point))
-             (if (get-text-property (1- (point)) 'eat-wrap-line)
+             (if (get-text-property (1- (point)) 'eat--t-wrap-line)
                  (when (< (eat--t-disp-begin disp) (1- (point)))
                    (char-before (1- (point))))
                (char-before)))))
