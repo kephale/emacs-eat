@@ -1889,6 +1889,7 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (begin nil :documentation "Beginning of terminal.")
   (end nil :documentation "End of terminal area.")
   (title "" :documentation "The title of the terminal.")
+  (bell-fn #'ignore :documentation "Function to ring the bell.")
   (input-fn #'ignore :documentation "Function to send input.")
   (set-cursor-fn #'ignore :documentation "Function to set cursor.")
   (manipulate-selection-fn
@@ -1979,7 +1980,7 @@ display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (n (min (- (eat--t-disp-width disp) (eat--t-cur-x cursor))
-                 (max (or n 1) 0))))
+                 (max (or n 1) 1))))
     (unless (zerop n)
       (eat--t-repeated-insert ?  (- n (eat--t-col-motion n)))
       (cl-incf (eat--t-cur-x cursor) n))))
@@ -2014,21 +2015,19 @@ display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (n (min (- (eat--t-disp-height disp) (eat--t-cur-y cursor))
-                 (max (or n 1) 0))))
-    (unless (zerop n)
-      (eat--t-repeated-insert ?\n (- n (eat--t-goto-bol n)))
-      (cl-incf (eat--t-cur-y cursor) n)
-      (setf (eat--t-cur-x cursor) 1))))
+                 (max (or n 1) 1))))
+    (eat--t-repeated-insert ?\n (- n (eat--t-goto-bol n)))
+    (cl-incf (eat--t-cur-y cursor) n)
+    (setf (eat--t-cur-x cursor) 1)))
 
 (defun eat--t-beg-of-prev-line (n)
   "Move to beginning of Nth previous line."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
-         (n (min (1- (eat--t-cur-y cursor)) (max (or n 1) 0))))
-    (unless (zerop n)
-      (eat--t-goto-bol (- n))
-      (cl-decf (eat--t-cur-y cursor) n)
-      (setf (eat--t-cur-x cursor) 1))))
+         (n (min (1- (eat--t-cur-y cursor)) (max (or n 1) 1))))
+    (eat--t-goto-bol (- n))
+    (cl-decf (eat--t-cur-y cursor) n)
+    (setf (eat--t-cur-x cursor) 1)))
 
 (defun eat--t-cur-down (&optional n)
   "Move cursor N lines down.
@@ -2049,6 +2048,7 @@ display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (x (eat--t-cur-x cursor)))
+
     (eat--t-beg-of-prev-line n)
     (eat--t-cur-horizontal-abs x)))
 
@@ -2066,13 +2066,12 @@ display."
            (eat--t-cur-up (- (eat--t-cur-y cursor) n))))))
 
 (defun eat--t-scroll-up (&optional n preserve-point)
-  "Scroll down N up, preserving cursor position.
+  "Scroll up N lines, preserving cursor position.
 
 N default to 1.  By default, don't change current line and current
 column, but if PRESERVE-POINT is given and non-nil, don't move point
 relative to the text and change current line accordingly."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
@@ -2091,16 +2090,8 @@ relative to the text and change current line accordingly."
                       (= (char-before) ?\n))
             (insert ?\n))
           (set-marker (eat--t-disp-begin disp) (point)))
-        (let* ((move (- scroll-end scroll-begin n))
-               (mv (max move 0)))
-          (eat--t-repeated-insert ?\n (- mv (eat--t-goto-eol mv)))
-          (if (not (eat--t-face-bg face))
-              (eat--t-repeated-insert ?\n n)
-            (dotimes (i n)
-              (when (or (not (zerop i)) (>= move 0))
-                (insert ?\n))
-              (eat--t-repeated-insert ?  (eat--t-disp-width disp)
-                                      (eat--t-face-face face))))))
+        (eat--t-goto-bol (- (1+ (- scroll-end scroll-begin)) n))
+        (eat--t-repeated-insert ?\n n))
       (when (and preserve-point
                  (<= scroll-begin (eat--t-cur-y cursor) scroll-end))
         (setf (eat--t-cur-y cursor) (min (- (eat--t-cur-y cursor) n)
@@ -2115,7 +2106,6 @@ relative to the text and change current line accordingly."
 
 N default to 1."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
@@ -2124,12 +2114,7 @@ N default to 1."
       (save-excursion
         (goto-char (eat--t-disp-begin disp))
         (eat--t-goto-bol (1- scroll-begin))
-        (if (not (eat--t-face-bg face))
-            (eat--t-repeated-insert ?\n n)
-          (dotimes (_ n)
-            (eat--t-repeated-insert ?  (eat--t-disp-width disp)
-                                    (eat--t-face-face face))
-            (insert ?\n)))
+        (eat--t-repeated-insert ?\n n)
         (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin)) (1+ n)))
         (delete-region (point) (car (eat--t-eol n))))
       (let ((y (eat--t-cur-y cursor))
@@ -2301,7 +2286,9 @@ N default to 1."
                           (1+ (- scroll-end scroll-begin))
                         (eat--t-disp-height disp)))))
     (unless (zerop n)
-      (eat--t-cur-down (- n (max (- n available-lines) 0)))
+      (let ((down (- n (max (- n available-lines) 0))))
+        (unless (zerop down)
+          (eat--t-cur-down down)))
       (when (and (not (zerop scroll)) in-scroll-region)
         (eat--t-scroll-up scroll)))))
 
@@ -2355,13 +2342,15 @@ N default to 1."
          (scroll (min (max (- n available-lines) 0)
                       (1+ (- scroll-end scroll-begin)))))
     (unless (zerop n)
-      (eat--t-cur-up (- n (max (- n available-lines) 0)))
+      (let ((up (- n (max (- n available-lines) 0))))
+        (unless (zerop up)
+          (eat--t-cur-up up)))
       (when (and (not (zerop scroll)) in-scroll-region)
         (eat--t-scroll-down scroll)))))
 
 (defun eat--t-bell ()
   "Ring the bell."
-  (beep t))
+  (funcall (eat--t-term-bell-fn eat--t-term) eat--t-term))
 
 (defun eat--t-form-feed ()
   "Insert a vertical tab."
@@ -2912,8 +2901,11 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
           `(,@(when-let ((fg (or (if (eat--t-face-conceal face)
                                      (eat--t-face-bg face)
                                    (eat--t-face-fg face))
-                                 (and (eat--t-face-inverse face)
-                                      (face-foreground 'default)))))
+                                 (cond
+                                  ((eat--t-face-inverse face)
+                                   (face-foreground 'default))
+                                  ((eat--t-face-conceal face)
+                                   (face-background 'default))))))
                 (list (if (eat--t-face-inverse face)
                           :background
                         :foreground)
@@ -3753,7 +3745,8 @@ focus event, otherwise send focus events.  The function should not
 change point and buffer restriction.
 
 To set it, use (`setf' (`eat-term-grab-focus-events-function'
-TERMINAL) FUNCTION), where FUNCTION is the function to set title."
+TERMINAL) FUNCTION), where FUNCTION is the function to grab focus
+events."
   (eat--t-term-set-focus-ev-mode-fn terminal))
 
 (gv-define-setter eat-term-grab-focus-events-function
@@ -3772,12 +3765,25 @@ string, when DATA is nil, it should unset the selection, and when DATA
 is t, it should return the selection, or nil if none.
 
 To set it, use (`setf' (`eat-term-manipulate-selection-function'
-TERMINAL) FUNCTION), where FUNCTION is the function to set title."
+TERMINAL) FUNCTION), where FUNCTION is the function to manipulate
+selection."
   (eat--t-term-manipulate-selection-fn terminal))
 
 (gv-define-setter eat-term-manipulate-selection-function
     (function terminal)
   `(setf (eat--t-term-manipulate-selection-fn ,terminal) ,function))
+
+(defun eat-term-ring-bell-function (terminal)
+  "Return the function used to ring the bell.
+
+The function is called with a single argument TERMINAL.
+
+To set it, use (`setf' (`eat-term-ring-bell-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to ring the bell."
+  (eat--t-term-manipulate-selection-fn terminal))
+
+(gv-define-setter eat-term-ring-bell-function (function terminal)
+  `(setf (eat--t-term-bell-fn ,terminal) ,function))
 
 (defun eat-term-size (terminal)
   "Return the size of TERMINAL as (WIDTH . HEIGHT)."
@@ -4191,12 +4197,14 @@ keywords:
 EXCEPTIONS is a list of event, which won't be bound."
   (let ((map (make-sparse-keymap))
         (esc-map (make-sparse-keymap)))
-    (when (memq :self-insert categories)
+    (when (and (memq :self-insert categories)
+               (not (member [remap self-insert-command] exceptions)))
       (define-key map [remap self-insert-command] input-command))
     (when (memq :ascii categories)
       (cl-loop
        for i from ?\  to ?~
-       do (define-key map `[,i] input-command))
+       do (unless (memq i exceptions)
+            (define-key map `[,i] input-command)))
       (dolist (key '( backspace C-backspace
                       insert C-insert M-insert S-insert C-M-insert
                       C-S-insert M-S-insert C-M-S-insert
@@ -4205,21 +4213,25 @@ EXCEPTIONS is a list of event, which won't be bound."
                       deletechar C-deletechar M-deletechar
                       S-deletechar C-M-deletechar C-S-deletechar
                       M-S-deletechar C-M-S-deletechar))
-        (define-key map `[,key] input-command))
+        (unless (memq key exceptions)
+          (define-key map `[,key] input-command)))
       (cl-loop
        for i from ?\C-@ to ?\C-_
-       do (unless (= i ?\e)
+       do (unless (or (= i ?\e)
+                      (memq i exceptions))
             (define-key map `[,i] input-command)))
-      (define-key map [?\C--] input-command)
-      (define-key map [?\C-?] input-command)
-      (define-key map [?\C-\ ] input-command)
+      (dolist (key '(?\C-- ?\C-? ?\C-\ ))
+        (unless (memq key exceptions)
+          (define-key map `[,key] input-command)))
       (cl-loop
        for i from ?\  to ?~
-       do (unless (memq i '(?O ?\[))
+       do (unless (or (memq i '(?O ?\[))
+                      (memq i exceptions))
             (define-key esc-map `[,i] input-command)))
       (cl-loop
        for i from ?\C-@ to ?\C-_
-       do (define-key esc-map `[,i] input-command)))
+       do (unless (memq i exceptions)
+            (define-key esc-map `[,i] input-command))))
     (when (memq :arrow categories)
       (dolist (key '( up down right left
                       C-up C-down C-right C-left
@@ -4229,7 +4241,8 @@ EXCEPTIONS is a list of event, which won't be bound."
                       C-S-up C-S-down C-S-right C-S-left
                       M-S-up M-S-down M-S-right M-S-left
                       C-M-S-up C-M-S-down C-M-S-right C-M-S-left))
-        (define-key map `[,key] input-command)))
+        (unless (memq key exceptions)
+          (define-key map `[,key] input-command))))
     (when (memq :navigation categories)
       (dolist (key '( home C-home M-home S-home C-M-home C-S-home
                       M-S-home C-M-S-home
@@ -4239,19 +4252,22 @@ EXCEPTIONS is a list of event, which won't be bound."
                       C-S-prior M-S-prior C-M-S-prior
                       next C-next M-next S-next C-M-next C-S-next
                       M-S-next C-M-S-next))
-        (define-key map `[,key] input-command)))
+        (unless (memq key exceptions)
+          (define-key map `[,key] input-command))))
     (when (memq :function categories)
       (cl-loop
        for i from 1 to 63
-       do (define-key map `[,(intern (format "f%i" i))]
-                      input-command)))
-    (when (or (memq :meta-ascii categories)
-              (memq :control-meta-ascii categories))
+       do (let ((key (intern (format "f%i" i))))
+            (unless (member key exceptions)
+              (define-key map `[,key] input-command)))))
+    (when (and (or (memq :meta-ascii categories)
+                   (memq :control-meta-ascii categories))
+               (not (memq meta-prefix-char exceptions)))
       (define-key map `[,meta-prefix-char] esc-map))
     (when (memq :mouse-click categories)
-      (define-key map [mouse-1] input-command)
-      (define-key map [mouse-2] input-command)
-      (define-key map [mouse-3] input-command))
+      (dolist (key '(mouse-1 mouse-2 mouse-3))
+        (unless (memq key exceptions)
+          (define-key map `[,key] input-command))))
     (when (memq :mouse-modifier categories)
       (dolist (key '( down-mouse-1 drag-mouse-1 down-mouse-2
                       drag-mouse-2 down-mouse-3 drag-mouse-3
@@ -4307,12 +4323,12 @@ EXCEPTIONS is a list of event, which won't be bound."
                       M-S-wheel-right M-S-wheel-left C-M-S-wheel-up
                       C-M-S-wheel-down C-M-S-wheel-right
                       C-M-S-wheel-left))
-        (define-key map `[,key] input-command)))
-    (when (or (memq :mouse-movement categories))
+        (unless (memq key exceptions)
+          (define-key map `[,key] input-command))))
+    (when (and (memq :mouse-movement categories)
+               (not (memq 'mouse-movement exceptions)))
       (define-key map [mouse-movement] input-command))
     (define-key map '[?\e] esc-map)
-    (dolist (exception exceptions)
-      (define-key map `[,exception] nil 'remove))
     map))
 
 (defun eat-term-name ()
@@ -4688,17 +4704,21 @@ ARG is passed to `yank', which see."
   (interactive "*P")
   (when eat--terminal
     (funcall eat--synchronize-scroll-function)
-    (let ((inhibit-read-only t))
-      (cl-letf (((symbol-function 'insert)
-                 (lambda (&rest args)
-                   (eat-send-string-as-yank
-                    eat--terminal
-                    (mapconcat (lambda (arg)
-                                 (if (stringp arg)
-                                     arg
-                                   (string arg)))
-                               args)))))
-        (yank arg)))))
+    (cl-letf* ((inhibit-read-only t)
+               (insert-for-yank (symbol-function #'insert-for-yank))
+               ((symbol-function #'insert-for-yank)
+                (lambda (&rest args)
+                  (cl-letf (((symbol-function #'insert)
+                             (lambda (&rest args)
+                               (eat-send-string-as-yank
+                                eat--terminal
+                                (mapconcat (lambda (arg)
+                                             (if (stringp arg)
+                                                 arg
+                                               (string arg)))
+                                           args)))))
+                    (apply insert-for-yank args)))))
+      (yank arg))))
 
 (defun eat-yank-pop (&optional arg)
   "Same as `yank-pop', but for Eat.
@@ -4707,17 +4727,21 @@ ARG is passed to `yank-pop', which see."
   (interactive "p")
   (when eat--terminal
     (funcall eat--synchronize-scroll-function)
-    (let ((inhibit-read-only t))
-      (cl-letf (((symbol-function 'insert)
-                 (lambda (&rest args)
-                   (eat-send-string-as-yank
-                    eat--terminal
-                    (mapconcat (lambda (arg)
-                                 (if (stringp arg)
-                                     arg
-                                   (string arg)))
-                               args)))))
-        (yank-pop arg)))))
+    (cl-letf* ((inhibit-read-only t)
+               (insert-for-yank (symbol-function #'insert-for-yank))
+               ((symbol-function #'insert-for-yank)
+                (lambda (&rest args)
+                  (cl-letf (((symbol-function #'insert)
+                             (lambda (&rest args)
+                               (eat-send-string-as-yank
+                                eat--terminal
+                                (mapconcat (lambda (arg)
+                                             (if (stringp arg)
+                                                 arg
+                                               (string arg)))
+                                           args)))))
+                    (apply insert-for-yank args)))))
+      (yank-pop arg))))
 
 (defvar eat-mode-map
   (let ((map (make-sparse-keymap)))
@@ -4879,6 +4903,10 @@ selection, or nil if none."
             str)
        (when eat-enable-kill-from-terminal
          (kill-new str))))))
+
+(defun eat--bell (_)
+  "Ring the bell."
+  (beep t))
 
 
 ;;;;; Major Mode.
@@ -5184,6 +5212,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
             #'eat--grab-mouse)
       (setf (eat-term-manipulate-selection-function eat--terminal)
             #'eat--manipulate-kill-ring)
+      (setf (eat-term-ring-bell-function eat--terminal) #'eat--bell)
       ;; Crank up a new process.
       (let* ((size (eat-term-size eat--terminal))
              (process-environment
@@ -5431,6 +5460,7 @@ PROGRAM can be a shell command."
           #'eat--grab-mouse)
     (setf (eat-term-manipulate-selection-function eat--terminal)
           #'eat--manipulate-kill-ring)
+    (setf (eat-term-ring-bell-function eat--terminal) #'eat--bell)
     (when-let ((window (get-buffer-window nil t)))
       (with-selected-window window
         (eat-term-resize eat--terminal (window-max-chars-per-line)
