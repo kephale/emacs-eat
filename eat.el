@@ -82,7 +82,7 @@
 (require 'shell)
 
 
-;;;; User options.
+;;;; User Options.
 
 (defgroup eat nil
   "Emulate A Terminal."
@@ -1671,7 +1671,7 @@ If your process is choking on big inputs, try lowering the value."
   "Alternative font 9.")
 
 
-;;;; Utility functions.
+;;;; Utility Functions.
 
 (defun eat--t-goto-bol (&optional n)
   "Go to the beginning of current line.
@@ -2921,7 +2921,9 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                 (list
                  :underline
                  (list :color (eat--t-face-underline-color face)
-                       :style underline)))
+                       :style (if (eq underline t)
+                                  'line
+                                underline))))
             ,@(when-let ((crossed (eat--t-face-crossed face)))
                 ;; TODO: How about colors?
                 `(:strike-through t))
@@ -5835,7 +5837,7 @@ allowed."
     (advice-remove #'eshell-exec-visual #'eat--eshell-exec-visual)))
 
 
-;;;; Project integration.
+;;;; Project Integration.
 
 ;;;###autoload
 (defun eat-project (&optional arg)

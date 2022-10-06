@@ -58,8 +58,8 @@ will return t."
             :intensity ,(let ((list (plist-get face :inherit)))
                           (cond ((member 'eat-term-faint list) 'faint)
                                 ((member 'eat-term-bold list) 'bold)))
-            :itatic ,(member 'eat-term-italic
-                             (plist-get face :inherit))
+            :italic ,(not (not (member 'eat-term-italic
+                                       (plist-get face :inherit))))
             :blink ,(let ((list (plist-get face :inherit)))
                       (cond
                        ((member 'eat-term-slow-blink list) 'slow)
@@ -99,7 +99,7 @@ will return t."
             (:underline-color . nil)
             (:crossed . nil)
             (:intensity . nil)
-            (:itatic . nil)
+            (:italic . nil)
             (:blink . nil)
             (:font . 0)))
          string)
@@ -187,7 +187,7 @@ will return t."
                   (expected (or (nth i lines) "")))
               (and (<= (length actual) (car (eat-term-size terminal)))
                    (eat--tests-compare-lines actual expected))))
-          (number-sequence 1 (cdr (eat-term-size terminal)))))))
+          (number-sequence 0 (1- (cdr (eat-term-size terminal))))))))
 
 (defun eat--tests-compare-cursor-pos (terminal cursor-pos)
   "Compare TERMINAL's cursor position with CURSOR-POS.
@@ -3571,13 +3571,726 @@ automatic scrolling as a side effect."
   (eat--tests-with-term '()
     (output "\e[3mitalic\n")
     (should (match-term
-             :display `(,(add-props "itatic" `((0 . 4) :italic t)))
+             :display `(,(add-props "italic" `((0 . 6) :italic t)))
              :cursor '(2 . 1)))
     (output "\e[23mnormal\n")
     (should (match-term
-             :display `(,(add-props "itatic" `((0 . 4) :italic t))
+             :display `(,(add-props "italic" `((0 . 6) :italic t))
                         "normal")
              :cursor '(3 . 1)))))
+
+(ert-deftest eat-test-sgr-underline ()
+  "Test SGR underline with no color, 256 colors and 24-bit colors."
+  (eat--tests-with-term '()
+    ;; Without colors.
+    (output "\e[4mdefault line\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line)))
+             :cursor '(2 . 1)))
+    (output "\e[4:0mnormal\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        "normal")
+             :cursor '(3 . 1)))
+    (output "\e[4:1mdefault line\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        "normal"
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line)))
+             :cursor '(4 . 1)))
+    (output "\e[4:2mdefault line\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        "normal"
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line)))
+             :cursor '(5 . 1)))
+    (output "\e[4:3mdefault wave\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        "normal"
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave)))
+             :cursor '(6 . 1)))
+    (output "\e[4:4mdefault wave\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line)))
+             :display `("normal"
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave)))
+             :cursor '(6 . 1)))
+    (output "\e[4:5mdefault wave\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal")
+             :display `(,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave)))
+             :cursor '(6 . 1)))
+    (output "\e[4;58;5;6mcyan line\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line)))
+             :display `(,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "cyan line"
+                          `((0 . 9)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-6
+                                               nil t))))
+             :cursor '(6 . 1)))
+    (output "\e[4:3;58;5;3myellow wave\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line)))
+             :display `(,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "cyan line"
+                          `((0 . 9)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-6
+                                               nil t)))
+                        ,(add-props
+                          "yellow wave"
+                          `((0 . 11)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-3
+                                               nil t))))
+             :cursor '(6 . 1)))
+    (output "\e[4:1;58;5;13mbright magenta line\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave)))
+             :display `(,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "cyan line"
+                          `((0 . 9)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-6
+                                               nil t)))
+                        ,(add-props
+                          "yellow wave"
+                          `((0 . 11)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-3
+                                               nil t)))
+                        ,(add-props
+                          "bright magenta line"
+                          `((0 . 19)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-13
+                                               nil t))))
+             :cursor '(6 . 1)))
+    (output "\e[4:4;58;5;133mcolor-133 wave\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave)))
+             :display `(,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "cyan line"
+                          `((0 . 9)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-6
+                                               nil t)))
+                        ,(add-props
+                          "yellow wave"
+                          `((0 . 11)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-3
+                                               nil t)))
+                        ,(add-props
+                          "bright magenta line"
+                          `((0 . 19)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-13
+                                               nil t)))
+                        ,(add-props
+                          "color-133 wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-133
+                                               nil t))))
+             :cursor '(6 . 1)))
+    (output "\e[4:2;58;2;160;32;240mpurple line\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave)))
+             :display `(,(add-props
+                          "cyan line"
+                          `((0 . 9)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-6
+                                               nil t)))
+                        ,(add-props
+                          "yellow wave"
+                          `((0 . 11)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-3
+                                               nil t)))
+                        ,(add-props
+                          "bright magenta line"
+                          `((0 . 19)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-13
+                                               nil t)))
+                        ,(add-props
+                          "color-133 wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-133
+                                               nil t)))
+                        ,(add-props
+                          "purple line"
+                          `((0 . 11)
+                            :underline-type line
+                            :underline-color "#a020f0")))
+             :cursor '(6 . 1)))
+    (output "\e[4:5;58;2;0;0;139mdark blue wave\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "cyan line"
+                             `((0 . 9)
+                               :underline-type line
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-6
+                                                  nil t))))
+             :display `(,(add-props
+                          "yellow wave"
+                          `((0 . 11)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-3
+                                               nil t)))
+                        ,(add-props
+                          "bright magenta line"
+                          `((0 . 19)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-13
+                                               nil t)))
+                        ,(add-props
+                          "color-133 wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-133
+                                               nil t)))
+                        ,(add-props
+                          "purple line"
+                          `((0 . 11)
+                            :underline-type line
+                            :underline-color "#a020f0"))
+                        ,(add-props
+                          "dark blue wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color "#00008b")))
+             :cursor '(6 . 1)))
+    (output "\e[59mdefault wave\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "cyan line"
+                             `((0 . 9)
+                               :underline-type line
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-6
+                                                  nil t)))
+                           ,(add-props
+                             "yellow wave"
+                             `((0 . 11)
+                               :underline-type wave
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-3
+                                                  nil t))))
+             :display `(,(add-props
+                          "bright magenta line"
+                          `((0 . 19)
+                            :underline-type line
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-13
+                                               nil t)))
+                        ,(add-props
+                          "color-133 wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-133
+                                               nil t)))
+                        ,(add-props
+                          "purple line"
+                          `((0 . 11)
+                            :underline-type line
+                            :underline-color "#a020f0"))
+                        ,(add-props
+                          "dark blue wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color "#00008b"))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave)))
+             :cursor '(6 . 1)))
+    (output "\e[24mnormal\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "cyan line"
+                             `((0 . 9)
+                               :underline-type line
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-6
+                                                  nil t)))
+                           ,(add-props
+                             "yellow wave"
+                             `((0 . 11)
+                               :underline-type wave
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-3
+                                                  nil t)))
+                           ,(add-props
+                             "bright magenta line"
+                             `((0 . 19)
+                               :underline-type line
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-13
+                                                  nil t))))
+             :display `(,(add-props
+                          "color-133 wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-133
+                                               nil t)))
+                        ,(add-props
+                          "purple line"
+                          `((0 . 11)
+                            :underline-type line
+                            :underline-color "#a020f0"))
+                        ,(add-props
+                          "dark blue wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color "#00008b"))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        "normal")
+             :cursor '(6 . 1)))))
+
+(ert-deftest eat-test-sgr-crossed ()
+  "Test SGR crossed attribute."
+  (eat--tests-with-term '()
+    (output "\e[9mcrossed\n")
+    (should (match-term
+             :display `(,(add-props "crossed" `((0 . 7) :crossed t)))
+             :cursor '(2 . 1)))
+    (output "\e[29mnormal\n")
+    (should (match-term
+             :display `(,(add-props "crossed" `((0 . 7) :crossed t))
+                        "normal")
+             :cursor '(3 . 1)))))
+
+(ert-deftest eat-test-sgr-inverse ()
+  "Test SGR inverse attributes."
+  (eat--tests-with-term '()
+    (output "\e[7mdefault\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default"
+                          `((0 . 7)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'default nil t))))
+             :cursor '(2 . 1)))
+    (output "\e[31mred fg\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default"
+                          `((0 . 7)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'default nil t)))
+                        ,(add-props
+                          "red fg"
+                          `((0 . 6)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-1
+                                          nil t))))
+             :cursor '(3 . 1)))
+    (output "\e[42mred fg green bg\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default"
+                          `((0 . 7)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'default nil t)))
+                        ,(add-props
+                          "red fg"
+                          `((0 . 6)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-1
+                                          nil t)))
+                        ,(add-props
+                          "red fg green bg"
+                          `((0 . 15)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-2
+                                          nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-1
+                                          nil t))))
+             :cursor '(4 . 1)))
+    (output "\e[39mgreen bg\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default"
+                          `((0 . 7)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'default nil t)))
+                        ,(add-props
+                          "red fg"
+                          `((0 . 6)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-1
+                                          nil t)))
+                        ,(add-props
+                          "red fg green bg"
+                          `((0 . 15)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-2
+                                          nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-1
+                                          nil t)))
+                        ,(add-props
+                          "green bg"
+                          `((0 . 8)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-2
+                                          nil t)
+                            :background ,(face-foreground
+                                          'default nil t))))
+             :cursor '(5 . 1)))
+    (output "\e[27;49mnormal\n")
+    (should (match-term
+             :display `(,(add-props
+                          "default"
+                          `((0 . 7)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'default nil t)))
+                        ,(add-props
+                          "red fg"
+                          `((0 . 6)
+                            :foreground ,(face-background
+                                          'default nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-1
+                                          nil t)))
+                        ,(add-props
+                          "red fg green bg"
+                          `((0 . 15)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-2
+                                          nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-1
+                                          nil t)))
+                        ,(add-props
+                          "green bg"
+                          `((0 . 8)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-2
+                                          nil t)
+                            :background ,(face-foreground
+                                          'default nil t)))
+                        "normal")
+             :cursor '(6 . 1)))))
 
 (ert-deftest eat-test-sgr-blink ()
   "Test SGR blink attributes (both slow and fast blink)."
@@ -3713,6 +4426,43 @@ automatic scrolling as a side effect."
                             :background ,(face-foreground
                                           'eat-term-color-2
                                           nil t))))
+             :cursor '(6 . 1)))))
+
+(ert-deftest eat-test-sgr-font ()
+  "Test SGR font attributes."
+  (eat--tests-with-term '()
+    (output "font 0\n")
+    (should (match-term
+             :display '("font 0")
+             :cursor '(2 . 1)))
+    (should (match-term
+             :display `(,(add-props "font 0" `((0 . 6) :font 0)))
+             :cursor '(2 . 1)))
+    (output "\e[13mfont 3\n")
+    (should (match-term
+             :display `("font 0"
+                        ,(add-props "font 3" `((0 . 6) :font 3)))
+             :cursor '(3 . 1)))
+    (output "\e[19mfont 9\n")
+    (should (match-term
+             :display `("font 0"
+                        ,(add-props "font 3" `((0 . 6) :font 3))
+                        ,(add-props "font 9" `((0 . 6) :font 9)))
+             :cursor '(4 . 1)))
+    (output "\e[12mfont 2\n")
+    (should (match-term
+             :display `("font 0"
+                        ,(add-props "font 3" `((0 . 6) :font 3))
+                        ,(add-props "font 9" `((0 . 6) :font 9))
+                        ,(add-props "font 2" `((0 . 6) :font 2)))
+             :cursor '(5 . 1)))
+    (output "\e[10mfont 0, normal\n")
+    (should (match-term
+             :display `("font 0"
+                        ,(add-props "font 3" `((0 . 6) :font 3))
+                        ,(add-props "font 9" `((0 . 6) :font 9))
+                        ,(add-props "font 2" `((0 . 6) :font 2))
+                        "font 0, normal")
              :cursor '(6 . 1)))))
 
 
