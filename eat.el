@@ -2752,7 +2752,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
         ('(3)
          (setf (eat--t-face-italic face) 'eat-term-italic))
         ('(4)
-         (setf (eat--t-face-underline face) t))
+         (setf (eat--t-face-underline face) 'line))
         ('(4 0)
          (setf (eat--t-face-underline face) nil))
         ('(4 1)
@@ -2901,9 +2901,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                 (list
                  :underline
                  (list :color (eat--t-face-underline-color face)
-                       :style (if (eq underline t)
-                                  'line
-                                underline))))
+                       :style underline)))
             ,@(when-let ((crossed (eat--t-face-crossed face)))
                 ;; TODO: How about colors?
                 `(:strike-through t))

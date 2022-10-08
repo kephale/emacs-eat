@@ -261,7 +261,7 @@ any of the following properties:
 
 ;;;; Tests.
 
-;;;;; Plain Text Tests.
+;;;;; Text Writing and Insertion Tests.
 
 (ert-deftest eat-test-plain-text ()
   "Test plain text handling.
@@ -275,17 +275,44 @@ margin."
                         :cursor '(1 . 17)))))
 
 (ert-deftest eat-test-auto-margin ()
-  "Test automatic margin.
-
-Send only plain text (i.e. no control sequences, not even newline)
-longer than the terminal width and compare the output with
-the expected output."
+  "Test automatic margin and toggling it."
   (eat--tests-with-term '()
     (should (match-term :cursor '(1 . 1)))
+    ;; Default: Automatic margin enabled.
     (output "some test string... and some more")
     (should (match-term :display '("some test string..."
                                    "and some more")
-                        :cursor '(2 . 14)))))
+                        :cursor '(2 . 14)))
+    ;; Automatic margin disabled.
+    (output "\n\e[?7lsome test string... and some more")
+    (should (match-term :display '("some test string..."
+                                   "and some more"
+                                   "some test string...e")
+                        :cursor '(3 . 20)))
+    ;; Automatic margin enabled.
+    (output "\n\e[?7hsome test string... and some more")
+    (should (match-term :display '("some test string..."
+                                   "and some more"
+                                   "some test string...e"
+                                   "some test string..."
+                                   "and some more")
+                        :cursor '(5 . 14)))))
+
+(ert-deftest eat-test-insert-mode ()
+  "Test automatic margin and toggling it."
+  (eat--tests-with-term '()
+    ;; Default: Insert mode disabled.
+    (output "a\bb")
+    (should (match-term :display '("b")
+                        :cursor '(1 . 2)))
+    ;; Insert mode enabled.
+    (output "\e[4hb\ba")
+    (should (match-term :display '("bab")
+                        :cursor '(1 . 3)))
+    ;; Insert mode disabled.
+    (output "\e[4lc\by")
+    (should (match-term :display '("bay")
+                        :cursor '(1 . 4)))))
 
 
 ;;;;; Cursor Motion Tests.
