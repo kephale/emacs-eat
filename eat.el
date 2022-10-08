@@ -4927,7 +4927,6 @@ END if it's safe to do so."
 (define-derived-mode eat-mode nil "Eat"
   "Major mode for Eat."
   :group 'eat-ui
-  :lighter
   (make-local-variable 'buffer-read-only)
   (make-local-variable 'buffer-undo-list)
   (make-local-variable 'filter-buffer-substring-function)
