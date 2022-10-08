@@ -4208,11 +4208,13 @@ EXCEPTIONS is a list of event, which won't be bound."
       (cl-loop
        for i from ?\  to ?~
        do (unless (or (memq i '(?O ?\[))
-                      (memq i exceptions))
+                      (member (event-convert-list `(meta ,i))
+                              exceptions))
             (define-key esc-map `[,i] input-command)))
       (cl-loop
        for i from ?\C-@ to ?\C-_
-       do (unless (memq i exceptions)
+       do (unless (member (event-convert-list `(meta ,i))
+                          exceptions)
             (define-key esc-map `[,i] input-command))))
     (when (memq :arrow categories)
       (dolist (key '( up down right left
@@ -4310,7 +4312,6 @@ EXCEPTIONS is a list of event, which won't be bound."
     (when (and (memq :mouse-movement categories)
                (not (memq 'mouse-movement exceptions)))
       (define-key map [mouse-movement] input-command))
-    (define-key map '[?\e] esc-map)
     map))
 
 (defun eat-term-name ()
