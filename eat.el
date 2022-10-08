@@ -1982,7 +1982,7 @@ display."
          (n (min (- (eat--t-disp-width disp) (eat--t-cur-x cursor))
                  (max (or n 1) 1))))
     (unless (zerop n)
-      (eat--t-repeated-insert ?  (- n (eat--t-col-motion n)))
+      (eat--t-repeated-insert ?\  (- n (eat--t-col-motion n)))
       (cl-incf (eat--t-cur-x cursor) n))))
 
 (defun eat--t-cur-left (&optional n)
@@ -2375,8 +2375,8 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
            (point-max)))
       (when (eat--t-face-bg face)
         (save-excursion
-          (eat--t-repeated-insert ?  (1+ (- (eat--t-disp-width disp)
-                                            (eat--t-cur-x cursor)))
+          (eat--t-repeated-insert ?\  (1+ (- (eat--t-disp-width disp)
+                                             (eat--t-cur-x cursor)))
                                   (and (eat--t-face-bg face)
                                        (eat--t-face-face face))))))
     (when (memq n '(1 2))
@@ -2385,12 +2385,12 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
         (if (= (point) (point-max))
             (progn
               (delete-region (car (eat--t-bol)) (point))
-              (eat--t-repeated-insert ?  (1- x))))
+              (eat--t-repeated-insert ?\  (1- x))))
         (delete-region (car (eat--t-bol)) (if (= (point) (point-max))
                                               (point)
                                             (1+ (point))))
-        (eat--t-repeated-insert ?  x (and (eat--t-face-bg face)
-                                          (eat--t-face-face face)))
+        (eat--t-repeated-insert ?\  x (and (eat--t-face-bg face)
+                                           (eat--t-face-face face)))
         (backward-char)))))
 
 (defun eat--t-erase-in-disp (&optional n)
@@ -2408,13 +2408,13 @@ to (1, 1).  When N is 3, also erase the scrollback."
        (delete-region (point) (point-max))
        (when (eat--t-face-bg face)
          (let ((pos (point)))
-           (eat--t-repeated-insert ?  (1+ (- (eat--t-disp-width disp)
-                                             (eat--t-cur-x cursor)))
+           (eat--t-repeated-insert ?\  (1+ (- (eat--t-disp-width disp)
+                                              (eat--t-cur-x cursor)))
                                    (eat--t-face-face face))
            (dotimes (_ (- (eat--t-disp-height disp)
                           (eat--t-cur-y cursor)))
              (insert ?\n)
-             (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+             (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                      (eat--t-face-face face)))
            (goto-char pos))))
       (1
@@ -2426,10 +2426,10 @@ to (1, 1).  When N is 3, also erase the scrollback."
          (if (not (eat--t-face-bg face))
              (eat--t-repeated-insert ?\n (1- y))
            (dotimes (_ (1- y))
-             (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+             (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                      (eat--t-face-face face))
              (insert ?\n)))
-         (eat--t-repeated-insert ?  (if incl-point x (1- x))
+         (eat--t-repeated-insert ?\  (if incl-point x (1- x))
                                  (and (eat--t-face-bg face)
                                       (eat--t-face-face face)))
          (when incl-point
@@ -2442,7 +2442,7 @@ to (1, 1).  When N is 3, also erase the scrollback."
            (dotimes (i (eat--t-disp-height disp))
              (unless (zerop i)
                (insert ?\n))
-             (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+             (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                      (eat--t-face-face face)))
            (goto-char pos))))
       (3
@@ -2453,7 +2453,7 @@ to (1, 1).  When N is 3, also erase the scrollback."
            (dotimes (i (eat--t-disp-height disp))
              (unless (zerop i)
                (insert ?\n))
-             (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+             (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                      (eat--t-face-face face)))
            (goto-char pos)))))))
 
@@ -2574,8 +2574,8 @@ position."
                  (max (or n 1) 0))))
     (unless (zerop n)
       (save-excursion
-        (eat--t-repeated-insert ?  n (and (eat--t-face-bg face)
-                                          (eat--t-face-face face)))
+        (eat--t-repeated-insert ?\  n (and (eat--t-face-bg face)
+                                           (eat--t-face-face face)))
         (eat--t-col-motion (- (eat--t-disp-width disp)
                               (+ (1- (eat--t-cur-x cursor)) n)))
         (delete-region (point) (car (eat--t-eol)))))))
@@ -2600,9 +2600,9 @@ position."
                                   (eat--t-cur-x cursor)
                                   (- (point) m)))))
                 (when (> empty n)
-                  (eat--t-repeated-insert ?  (- empty n)))
+                  (eat--t-repeated-insert ?\  (- empty n)))
                 (eat--t-repeated-insert
-                 ?  (min empty n) (eat--t-face-face face))))))))))
+                 ?\  (min empty n) (eat--t-face-face face))))))))))
 
 (defun eat--t-erase-char (n)
   "Make next N character cells empty, preserving cursor."
@@ -2618,8 +2618,8 @@ position."
           (eat--t-col-motion n)
           (delete-region m (point))
           (eat--t-repeated-insert
-           ?  n (and (eat--t-face-bg face)
-                     (eat--t-face-face face)))
+           ?\  n (and (eat--t-face-bg face)
+                      (eat--t-face-face face)))
           (eat--t-col-motion
            (- (eat--t-disp-width disp)
               (+ (1- (eat--t-cur-x cursor)) n))))))))
@@ -2640,7 +2640,7 @@ position."
        (prog1
            (progn
              (eat--t-goto-bol)
-             (eat--t-repeated-insert ?  (1- (eat--t-cur-x cursor))
+             (eat--t-repeated-insert ?\  (1- (eat--t-cur-x cursor))
                                      (and (eat--t-face-bg face)
                                           (eat--t-face-face face)))
              (point))
@@ -2648,10 +2648,10 @@ position."
              (eat--t-repeated-insert ?\n n)
            (dotimes (i n)
              (eat--t-repeated-insert
-              ?  (if (not (zerop i))
-                     (eat--t-disp-width disp)
-                   (1+ (- (eat--t-disp-width disp)
-                          (eat--t-cur-x cursor))))
+              ?\  (if (not (zerop i))
+                      (eat--t-disp-width disp)
+                    (1+ (- (eat--t-disp-width disp)
+                           (eat--t-cur-x cursor))))
               (eat--t-face-face face))
              (insert ?\n)))
          (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin))
@@ -2687,11 +2687,11 @@ position."
             (eat--t-repeated-insert ?\n n)
           (dotimes (_ n)
             (insert ?\n)
-            (eat--t-repeated-insert ?  (eat--t-disp-width disp)
+            (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                     (eat--t-face-face face))))
         (goto-char pos))
       (eat--t-repeated-insert
-       ?  (- (1- x) (eat--t-col-motion (1- x)))))))
+       ?\  (- (1- x) (eat--t-col-motion (1- x)))))))
 
 (defun eat--t-repeat-last-char (&optional n)
   "Repeat last character N times."
@@ -4205,17 +4205,20 @@ EXCEPTIONS is a list of event, which won't be bound."
       (dolist (key '(?\C-- ?\C-? ?\C-\ ))
         (unless (memq key exceptions)
           (define-key map `[,key] input-command)))
-      (cl-loop
-       for i from ?\  to ?~
-       do (unless (or (memq i '(?O ?\[))
-                      (member (event-convert-list `(meta ,i))
-                              exceptions))
-            (define-key esc-map `[,i] input-command)))
-      (cl-loop
-       for i from ?\C-@ to ?\C-_
-       do (unless (member (event-convert-list `(meta ,i))
-                          exceptions)
-            (define-key esc-map `[,i] input-command))))
+      (unless (memq meta-prefix-char exceptions)
+        (message "ping")
+        (cl-loop
+         for i from ?\  to ?~
+         do (unless (or (memq i '(?O ?\[))
+                        (member (event-convert-list `(meta ,i))
+                                exceptions))
+              (define-key esc-map `[,i] input-command)))
+        (cl-loop
+         for i from ?\C-@ to ?\C-_
+         do (unless (member (event-convert-list `(meta ,i))
+                            exceptions)
+              (define-key esc-map `[,i] input-command)))
+        (define-key map `[,meta-prefix-char] esc-map)))
     (when (memq :arrow categories)
       (dolist (key '( up down right left
                       C-up C-down C-right C-left
@@ -4244,10 +4247,6 @@ EXCEPTIONS is a list of event, which won't be bound."
        do (let ((key (intern (format "f%i" i))))
             (unless (member key exceptions)
               (define-key map `[,key] input-command)))))
-    (when (and (or (memq :meta-ascii categories)
-                   (memq :control-meta-ascii categories))
-               (not (memq meta-prefix-char exceptions)))
-      (define-key map `[,meta-prefix-char] esc-map))
     (when (memq :mouse-click categories)
       (dolist (key '(mouse-1 mouse-2 mouse-3))
         (unless (memq key exceptions)
