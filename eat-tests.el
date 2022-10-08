@@ -594,7 +594,7 @@ function is to be invoked."
                         :display '("and some more")
                         :cursor '(4 . 14)))
     (output "\nnew line 1\nnew line 2\nnew line 3\n"
-            "new line 4\nnew line 5\nnew line 6\e[2;5r")
+            "new line 4\nnew line 5\nnew line 6\e[2;4r")
     (should (match-term :scrollback '("some test string..."
                                       "more, more..."
                                       "more, more, more..."
@@ -620,8 +620,8 @@ function is to be invoked."
                         :display '("new line 1"
                                    "new line 3"
                                    "new line 4"
-                                   "new line 5"
                                    ""
+                                   "new line 5"
                                    "new line 6")
                         :cursor '(1 . 1)))
     (output "\e[0S")
@@ -635,8 +635,8 @@ function is to be invoked."
                         :display '("new line 1"
                                    "new line 3"
                                    "new line 4"
-                                   "new line 5"
                                    ""
+                                   "new line 5"
                                    "new line 6")
                         :cursor '(1 . 1)))
     (output "\e[2S")
@@ -648,10 +648,10 @@ function is to be invoked."
                                       ""
                                       "")
                         :display '("new line 1"
+                                   ""
+                                   ""
+                                   ""
                                    "new line 5"
-                                   ""
-                                   ""
-                                   ""
                                    "new line 6")
                         :cursor '(1 . 1)))))
 
@@ -4499,4 +4499,5 @@ Write plain text and newline to move cursor."
                                    "frob")
                         :cursor '(1 . 4)))))
 
+(provide 'eat-tests)
 ;;; eat-tests.el ends here

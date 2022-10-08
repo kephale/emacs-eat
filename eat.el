@@ -2065,12 +2065,14 @@ display."
           ((< n (eat--t-cur-y cursor))
            (eat--t-cur-up (- (eat--t-cur-y cursor) n))))))
 
-(defun eat--t-scroll-up (&optional n preserve-point)
+(defun eat--t-scroll-up (&optional n as-side-effect)
   "Scroll up N lines, preserving cursor position.
 
 N default to 1.  By default, don't change current line and current
-column, but if PRESERVE-POINT is given and non-nil, don't move point
-relative to the text and change current line accordingly."
+column, but if AS-SIDE-EFFECT is given and non-nil, assume that
+scrolling is triggered as a side effect of some other control function
+and don't move the point relative to the text and change current line
+accordingly."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
@@ -2092,14 +2094,19 @@ relative to the text and change current line accordingly."
           (set-marker (eat--t-disp-begin disp) (point)))
         (eat--t-goto-bol (- (1+ (- scroll-end scroll-begin)) n))
         (eat--t-repeated-insert ?\n n))
-      (when (and preserve-point
-                 (<= scroll-begin (eat--t-cur-y cursor) scroll-end))
-        (setf (eat--t-cur-y cursor) (min (- (eat--t-cur-y cursor) n)
-                                         scroll-end)))
-      (let ((y (eat--t-cur-y cursor))
-            (x (eat--t-cur-x cursor)))
-        (eat--t-goto 1 1)
-        (eat--t-goto y x)))))
+      (let ((recalc-point t))
+        (when as-side-effect
+          (if (not (<= scroll-begin (eat--t-cur-y cursor) scroll-end))
+              (setq recalc-point nil)
+            (setq recalc-point (< (- (eat--t-cur-y cursor) n)
+                                  scroll-begin))
+            (setf (eat--t-cur-y cursor)
+                  (max (- (eat--t-cur-y cursor) n) scroll-begin))))
+        (when recalc-point
+          (let ((y (eat--t-cur-y cursor))
+                (x (eat--t-cur-x cursor)))
+            (eat--t-goto 1 1)
+            (eat--t-goto y x)))))))
 
 (defun eat--t-scroll-down (&optional n)
   "Scroll down N lines, preserving cursor position.
@@ -2233,10 +2240,7 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
                 (eat--t-cur-left 1)
               (unless (string-empty-p str)
                 (when (= (eat--t-cur-y cursor) scroll-end)
-                  ;; We need to save the point because otherwise
-                  ;; `eat--t-scroll-up' would move it.
-                  (save-excursion
-                    (eat--t-scroll-up 1 'preserve-point)))
+                  (eat--t-scroll-up 1 'as-side-effect))
                 (if (= (eat--t-cur-y cursor) scroll-end)
                     (eat--t-carriage-return)
                   (if (= (point) (point-max))
@@ -2267,86 +2271,62 @@ N default to 1."
     (eat--t-cur-left (+ (1+ (mod (- (eat--t-cur-x cursor) 2) 8))
                         (* (1- n) 8)))))
 
-(defun eat--t-index (&optional n)
-  "Go to the Nth next line preserving column, scrolling if necessary.
-
-N default to 1."
-  (let* ((n (max (or n 1) 0))
-         (disp (eat--t-term-display eat--t-term))
+(defun eat--t-index ()
+  "Go to the next line preserving column, scrolling if necessary."
+  (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
-         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
-         (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end))
-         (available-lines (- (if in-scroll-region
-                                 scroll-end
-                               (eat--t-disp-height disp))
-                             (eat--t-cur-y cursor)))
-         (scroll (min (max (- n available-lines) 0)
-                      (if in-scroll-region
-                          (1+ (- scroll-end scroll-begin))
-                        (eat--t-disp-height disp)))))
-    (unless (zerop n)
-      (let ((down (- n (max (- n available-lines) 0))))
-        (unless (zerop down)
-          (eat--t-cur-down down)))
-      (when (and (not (zerop scroll)) in-scroll-region)
-        (eat--t-scroll-up scroll)))))
+         (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end)))
+    (if (= (if in-scroll-region scroll-end (eat--t-disp-height disp))
+           (eat--t-cur-y cursor))
+        (eat--t-scroll-up 1)
+      (eat--t-cur-down 1))))
 
 (defun eat--t-carriage-return ()
   "Go to column one."
   (eat--t-cur-horizontal-abs 1))
 
-(defun eat--t-line-feed (&optional n)
-  "Insert line feed (newline) N times, and go to column one.
-
-N default to 1."
+(defun eat--t-line-feed ()
+  "Go to the first column of the next line, scrolling if necessary."
   (if (= (point) (point-max))
-      (let* ((n (max (or n 1) 0))
-             (disp (eat--t-term-display eat--t-term))
+      (let* ((disp (eat--t-term-display eat--t-term))
              (cursor (eat--t-disp-cursor disp))
-             (scroll-begin (eat--t-term-scroll-begin eat--t-term))
              (scroll-end (eat--t-term-scroll-end eat--t-term))
-             (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end))
-             (available-lines (- (if in-scroll-region
-                                     scroll-end
-                                   (eat--t-disp-height disp))
-                                 (eat--t-cur-y cursor)))
-             (scroll (min (max (- n available-lines) 0)
-                          (if in-scroll-region
-                              (1+ (- scroll-end scroll-begin))
-                            (eat--t-disp-height disp)))))
-        (unless (zerop n)
-          (let ((m (- n (max (- n available-lines) 0))))
-            (if (zerop m)
-                (eat--t-carriage-return)
-              (eat--t-repeated-insert ?\n m)
-              (setf (eat--t-cur-x cursor) 1)
-              (cl-incf (eat--t-cur-y cursor) m)))
-          (when (and (not (zerop scroll)) in-scroll-region)
-            (eat--t-scroll-up scroll))))
+             (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end)))
+        (if (= (if in-scroll-region
+                   scroll-end
+                 (eat--t-disp-height disp))
+               (eat--t-cur-y cursor))
+            (progn
+              (eat--t-scroll-up 1 'as-side-effect)
+              (if (= (if in-scroll-region
+                         scroll-end
+                       (eat--t-disp-height disp))
+                     (eat--t-cur-y cursor))
+                  (eat--t-carriage-return)
+                (if (/= (point) (point-max))
+                    (progn
+                      (eat--t-carriage-return)
+                      (eat--t-index))
+                  (insert ?\n)
+                  (setf (eat--t-cur-x cursor) 1)
+                  (cl-incf (eat--t-cur-y cursor)))))
+          (insert ?\n)
+          (setf (eat--t-cur-x cursor) 1)
+          (cl-incf (eat--t-cur-y cursor))))
     (eat--t-carriage-return)
-    (eat--t-index n)))
+    (eat--t-index)))
 
-(defun eat--t-reverse-index (&optional n)
-  "Go to Nth previous line preserving column, scrolling if needed.
-
-N default to 1."
-  (let* ((n (max (or n 1) 0))
-         (disp (eat--t-term-display eat--t-term))
+(defun eat--t-reverse-index ()
+  "Go to the previous line preserving column, scrolling if needed."
+  (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
-         (scroll-end (eat--t-term-scroll-end eat--t-term))
-         (in-scroll-region (<= scroll-begin (eat--t-cur-y cursor)))
-         (available-lines (- (eat--t-cur-y cursor)
-                             (if in-scroll-region scroll-begin 1)))
-         (scroll (min (max (- n available-lines) 0)
-                      (1+ (- scroll-end scroll-begin)))))
-    (unless (zerop n)
-      (let ((up (- n (max (- n available-lines) 0))))
-        (unless (zerop up)
-          (eat--t-cur-up up)))
-      (when (and (not (zerop scroll)) in-scroll-region)
-        (eat--t-scroll-down scroll)))))
+         (in-scroll-region (<= scroll-begin (eat--t-cur-y cursor))))
+    (if (= (if in-scroll-region scroll-begin 1)
+           (eat--t-cur-y cursor))
+        (eat--t-scroll-down 1)
+      (eat--t-cur-up 1))))
 
 (defun eat--t-bell ()
   "Ring the bell."
@@ -2354,7 +2334,7 @@ N default to 1."
 
 (defun eat--t-form-feed ()
   "Insert a vertical tab."
-  (eat--t-index 1))
+  (eat--t-index))
 
 (defun eat--t-save-cur ()
   "Save current cursor position."
@@ -3210,9 +3190,9 @@ DATA is the selection data encoded in base64."
                  (?\t
                   (eat--t-horizontal-tab 1))
                  (?\n
-                  (eat--t-line-feed 1))
+                  (eat--t-line-feed))
                  (?\v
-                  (eat--t-index 1))
+                  (eat--t-index))
                  (?\f
                   (eat--t-form-feed))
                  (?\r
@@ -3270,13 +3250,13 @@ DATA is the selection data encoded in base64."
               (eat--t-restore-cur))
              ;; ESC D.
              (?D
-              (eat--t-index 1))
+              (eat--t-index))
              ;; ESC E.
              (?E
-              (eat--t-line-feed 1))
+              (eat--t-line-feed))
              ;; ESC M.
              (?M
-              (eat--t-reverse-index 1))
+              (eat--t-reverse-index))
              ;; ESC P, or DCS.
              (?P
               (setf (eat--t-term-parser-state eat--t-term)
@@ -5103,7 +5083,9 @@ OS's."
             (eat-term-process-output eat--terminal output)))
         (eat-term-redisplay eat--terminal)
         ;; Truncate output of previous dead processes.
-        (when eat-term-scrollback-size
+        (when (and eat-term-scrollback-size
+                   (< eat-term-scrollback-size
+                      (- (point) (point-min))))
           (delete-region
            (point-min)
            (max (point-min)
