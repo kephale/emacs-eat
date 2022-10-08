@@ -2288,11 +2288,11 @@ N default to 1."
 
 (defun eat--t-line-feed ()
   "Go to the first column of the next line, scrolling if necessary."
-  (if (= (point) (point-max))
-      (let* ((disp (eat--t-term-display eat--t-term))
-             (cursor (eat--t-disp-cursor disp))
-             (scroll-end (eat--t-term-scroll-end eat--t-term))
-             (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end)))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (scroll-end (eat--t-term-scroll-end eat--t-term))
+         (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end)))
+    (if (= (point) (point-max))
         (if (= (if in-scroll-region
                    scroll-end
                  (eat--t-disp-height disp))
@@ -2305,17 +2305,20 @@ N default to 1."
                      (eat--t-cur-y cursor))
                   (eat--t-carriage-return)
                 (if (/= (point) (point-max))
-                    (progn
-                      (eat--t-carriage-return)
-                      (eat--t-index))
+                    (eat--t-beg-of-next-line 1)
                   (insert ?\n)
                   (setf (eat--t-cur-x cursor) 1)
                   (cl-incf (eat--t-cur-y cursor)))))
           (insert ?\n)
           (setf (eat--t-cur-x cursor) 1)
-          (cl-incf (eat--t-cur-y cursor))))
-    (eat--t-carriage-return)
-    (eat--t-index)))
+          (cl-incf (eat--t-cur-y cursor)))
+      (if (/= (if in-scroll-region
+                  scroll-end
+                (eat--t-disp-height disp))
+              (eat--t-cur-y cursor))
+          (eat--t-beg-of-next-line 1)
+        (eat--t-carriage-return)
+        (eat--t-index)))))
 
 (defun eat--t-reverse-index ()
   "Go to the previous line preserving column, scrolling if needed."

@@ -100,7 +100,7 @@ is 26.1 or above.
 
 Vterm is powered by a C library, libvterm.  For this reason, it can
 process huge amount of text quickly.  It is about 2 times faster than
-Eat (byte-compiled or native-compiled) (and about 3.3 faster then Eat
+Eat (byte-compiled or native-compiled) (and about 3 faster then Eat
 without byte-compilation).  But it doesn't have a char mode (however
 you can make a char mode spending some effort).  And it too flickers
 like Term, so despite being much faster that Eat, it seems to be slow.
