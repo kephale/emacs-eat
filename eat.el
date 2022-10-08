@@ -4207,7 +4207,6 @@ EXCEPTIONS is a list of event, which won't be bound."
         (unless (memq key exceptions)
           (define-key map `[,key] input-command)))
       (unless (memq meta-prefix-char exceptions)
-        (message "ping")
         (cl-loop
          for i from ?\  to ?~
          do (unless (or (memq i '(?O ?\[))
