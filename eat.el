@@ -4924,7 +4924,7 @@ END if it's safe to do so."
       (delete-region begin end))
     str))
 
-(define-derived-mode eat-mode nil "Eat"
+(define-derived-mode eat-mode fundamental-mode "Eat"
   "Major mode for Eat."
   :group 'eat-ui
   (make-local-variable 'buffer-read-only)
