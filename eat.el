@@ -4148,10 +4148,10 @@ client process may get confused."
                     (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                             (+ y 32))))))))
           ('(eat-focus-in)
-           (when (eat--t-term-focus-event-mode eat--t-term)
+           (when (eat--t-term-focus-event-mode terminal)
              (send "\e[I")))
           ('(eat-focus-out)
-           (when (eat--t-term-focus-event-mode eat--t-term)
+           (when (eat--t-term-focus-event-mode terminal)
              (send "\e[O"))))))))
 
 (defun eat-send-string-as-yank (terminal args)
