@@ -3885,7 +3885,7 @@ client process may get confused."
     (cl-flet ((send (str)
                 (funcall (eat--t-term-input-fn terminal) terminal str)))
       (dotimes (_ (or n 1))
-        (pcase (or event last-command-event)
+        (pcase event
           ((and (or 'up 'down 'right 'left
                     'C-up 'C-down 'C-right 'C-left
                     'M-up 'M-down 'M-right 'M-left
