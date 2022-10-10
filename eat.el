@@ -4001,22 +4001,31 @@ client process may get confused."
                     (setq tmp (get char 'ascii-character))
                     (setq char tmp))))
            (when (numberp char)
-             (let ((base (event-basic-type char))
-                   (mods (event-modifiers char)))
-               (when (memq 'control mods)
-                 (setq mods (delq 'shift mods)))
-               (let ((ch (event-convert-list
-                          (append (remq 'meta mods) (list base)))))
-                 (send (cond
-                        ((and (memq 'meta mods) (memq ch '(?\[ ?O)))
-                         "\e")
-                        (t
-                         (format (if (memq 'meta mods) "\e%c" "%c")
-                                 (pcase ch
-                                   (?\C-\  ?\C-@)
-                                   (?\C-/ ?\C-?)
-                                   (?\C-- ?\C-_)
-                                   (c c))))))))))
+             (let* ((base (event-basic-type char))
+                    (mods (event-modifiers char)))
+               (if (and (characterp char)
+                        (not (memq 'meta mods))
+                        (not (and (memq 'control mods)
+                                  (memq 'shift mods))))
+                   (send (format "%c" char))
+                 (when (memq 'control mods)
+                   (setq mods (delq 'shift mods)))
+                 (let ((ch (pcase (event-convert-list
+                                   (append (remq 'meta mods)
+                                           (list base)))
+                             (?\C-\  ?\C-@)
+                             (?\C-/ ?\C-?)
+                             (?\C-- ?\C-_)
+                             (c c))))
+                   (when (characterp ch)
+                     (send (cond
+                            ((and (memq 'meta mods)
+                                  (memq ch '(?\[ ?O)))
+                             "\e")
+                            (t
+                             (format
+                              (if (memq 'meta mods) "\e%c" "%c")
+                              ch))))))))))
           ((and mouse
                 (pred eventp)
                 (or (and (let mouse-type (event-basic-type mouse))
