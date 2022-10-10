@@ -224,10 +224,10 @@ any of the following properties:
   `:height'       Height of terminal.  Defaults to 6."
   (declare (indent 1))
   (let ((term (make-symbol "term"))
-        (inputs (make-symbol "inputs")))
+        (input (make-symbol "input")))
     `(with-temp-buffer
        (let ((,term (eat-term-make (current-buffer) (point)))
-             (,inputs nil))
+             (,input ""))
          (unwind-protect
              (progn
                (cl-destructuring-bind
@@ -235,7 +235,7 @@ any of the following properties:
                  (eat-term-resize ,term width height))
                (setf (eat-term-input-function ,term)
                      (lambda (_ str)
-                       (setq ,inputs (append ,inputs (list str)))))
+                       (setq ,input (concat ,input str))))
                (cl-labels
                    ((terminal ()
                       ,term)
@@ -243,10 +243,11 @@ any of the following properties:
                       (dolist (str args)
                         (eat-term-process-output ,term str))
                       (eat-term-redisplay ,term))
-                    (pop-input ()
-                      (pop ,inputs))
-                    (input-empty-p ()
-                      (not ,inputs))
+                    (input-event (event &optional ref-pos n)
+                      (eat-term-input-event ,term n event ref-pos))
+                    (input ()
+                      (prog1 ,input
+                        (setq ,input "")))
                     (match-term (&key scrollback display cursor)
                       (and (eat--tests-compare-scrollback
                             ,term scrollback)
@@ -4526,6 +4527,72 @@ Write plain text and newline to move cursor."
     (should (match-term :display '("foobar"
                                    "frob")
                         :cursor '(1 . 4)))))
+
+
+;;;;; Input Event Tests.
+
+(ert-deftest eat-test-input-character ()
+  "Test character input events.
+
+This includes all events to which `self-insert-command' is bound to by
+default."
+  (eat--tests-with-term '()
+    (dolist (c '(?a ?E ?b ?D ?অ ?আ ?ক ?খ ?ম ?া ?π ?θ ?μ ?Δ))
+      (input-event c)
+      (should (string= (input) (string c))))))
+
+(ert-deftest eat-test-input-character-with-modifier ()
+  "Test character input events with modifiers (`control' and `meta').
+
+This includes all events to which `self-insert-command' is bound to by
+default."
+  (eat--tests-with-term '()
+    (dolist (p '((?\C-\  . "\C-@")
+                 (?\C-a . "\C-a")
+                 (?\C-E . "\C-e")
+                 (?\C-b . "\C-b")
+                 (?\C-D . "\C-d")
+                 (?\M-x . "\ex")
+                 (?\M-O . "\e")
+                 (?\M-\[ . "\e")
+                 (?\M-C . "\eC")
+                 (?\C-\M-U . "\e\C-u")
+                 (?\M-ম . "\eম")
+                 (?\M-া . "\eা")
+                 (?\M-π . "\eπ")
+                 (?\M-θ . "\eθ")))
+      (input-event (car p))
+      (should (string= (input) (cdr p))))))
+
+(ert-deftest eat-test-input-special-keys ()
+  "Test special key input events like arrow keys, backspace, etc."
+  (eat--tests-with-term '()
+    (dolist (p '((backspace . "\C-?")
+                 (C-backspace . "\C-h")
+                 (left . "\e[D")
+                 (C-right . "\e[1;5C")
+                 (M-up . "\e[1;3A")
+                 (S-down . "\e[1;2B")
+                 (C-M-insert . "\e[2;7~")
+                 (C-S-delete . "\e[3;6~")
+                 (M-S-deletechar . "\e[3;4~")
+                 (C-M-S-home . "\e[1;8H")
+                 (C-S-end . "\e[1;6F")
+                 (M-S-prior . "\e[5;4~")
+                 (next . "\e[6~")))
+      (input-event (car p))
+      (should (string= (input) (cdr p))))
+    (output "\e[?1h")
+    (dolist (p '((left . "\eOD")
+                 (up . "\eOA")
+                 (C-right . "\e[1;5C")
+                 (M-up . "\e[1;3A")
+                 (S-down . "\e[1;2B")))
+      (input-event (car p))
+      (should (string= (input) (cdr p))))
+    (output "\e[?1l")
+    (input-event 'up)
+    (should (string= (input) "\e[A"))))
 
 (provide 'eat-tests)
 ;;; eat-tests.el ends here
