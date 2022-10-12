@@ -162,9 +162,11 @@ will return t."
          (nbutlast
           (split-string
            (buffer-substring
-            (point-min) (eat-term-display-beginning terminal))
+            (eat-term-beginning terminal)
+            (eat-term-display-beginning terminal))
            "\n" nil nil))))
-    (and (or (= (eat-term-display-beginning terminal) (point-min))
+    (and (or (= (eat-term-display-beginning terminal)
+                (eat-term-beginning terminal))
              (= (char-before (eat-term-display-beginning terminal))
                 ?\n))
          (= (length scrollback) (length lines))
@@ -178,7 +180,8 @@ will return t."
   (let ((display
          (split-string
           (buffer-substring
-           (eat-term-display-beginning terminal) (point-max))
+           (eat-term-display-beginning terminal)
+           (eat-term-end terminal))
           "\n" nil nil)))
     (and (<= (length display) (cdr (eat-term-size terminal)))
          (cl-every
@@ -4106,7 +4109,7 @@ automatic scrolling as a side effect."
                           `((0 . 12)
                             :underline-type wave)))
              :cursor '(6 . 1)))
-    (output "\e[24mnormal\n")
+    (output "\e[21mdefault line\n")
     (should (match-term
              :scrollback `(,(add-props
                              "default line"
@@ -4175,6 +4178,84 @@ automatic scrolling as a side effect."
                           "default wave"
                           `((0 . 12)
                             :underline-type wave))
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line)))
+             :cursor '(6 . 1)))
+    (output "\e[24mnormal\n")
+    (should (match-term
+             :scrollback `(,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           "normal"
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default line"
+                             `((0 . 12)
+                               :underline-type line))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "default wave"
+                             `((0 . 12)
+                               :underline-type wave))
+                           ,(add-props
+                             "cyan line"
+                             `((0 . 9)
+                               :underline-type line
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-6
+                                                  nil t)))
+                           ,(add-props
+                             "yellow wave"
+                             `((0 . 11)
+                               :underline-type wave
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-3
+                                                  nil t)))
+                           ,(add-props
+                             "bright magenta line"
+                             `((0 . 19)
+                               :underline-type line
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-13
+                                                  nil t)))
+                           ,(add-props
+                             "color-133 wave"
+                             `((0 . 14)
+                               :underline-type wave
+                               :underline-color ,(face-foreground
+                                                  'eat-term-color-133
+                                                  nil t))))
+             :display `(,(add-props
+                          "purple line"
+                          `((0 . 11)
+                            :underline-type line
+                            :underline-color "#a020f0"))
+                        ,(add-props
+                          "dark blue wave"
+                          `((0 . 14)
+                            :underline-type wave
+                            :underline-color "#00008b"))
+                        ,(add-props
+                          "default wave"
+                          `((0 . 12)
+                            :underline-type wave))
+                        ,(add-props
+                          "default line"
+                          `((0 . 12)
+                            :underline-type line))
                         "normal")
              :cursor '(6 . 1)))))
 

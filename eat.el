@@ -1684,6 +1684,7 @@ that point.
 Return the number of lines moved.
 
 Treat LINE FEED (?\\n) as the line delimiter."
+  ;; TODO: Comment.
   (let ((n (or n 0)))
     (cond
      ((> n 0)
@@ -1715,6 +1716,7 @@ that point.
 Return the number of lines moved.
 
 Treat LINE FEED (?\\n) as the line delimiter."
+  ;; TODO: Comment.
   (let ((n (or n 0)))
     (cond
      ((>= n 0)
@@ -1746,9 +1748,10 @@ after `point-max', return a cons cell whose car is that point and cdr
 is number of lines that point is away from current line.
 
 Treat LINE FEED (?\\n) as the line delimiter."
+  ;; Move to the beginning of line, record the point, and return that
+  ;; point and the distance of that point from current line in lines.
   (save-excursion
-    (let* ((n (or n 0))
-           (moved (eat--t-goto-bol n)))
+    (let ((moved (eat--t-goto-bol n)))
       (cons (point) moved))))
 
 (defun eat--t-eol (&optional n)
@@ -1762,9 +1765,10 @@ a cons cell whose car is that point and cdr is number of lines that
 point is away from current line.
 
 Treat LINE FEED (?\\n) as the line delimiter."
+  ;; Move to the beginning of line, record the point, and return that
+  ;; point and the distance of that point from current line in lines.
   (save-excursion
-    (let* ((n (or n 0))
-           (moved (eat--t-goto-eol n)))
+    (let* ((moved (eat--t-goto-eol n)))
       (cons (point) moved))))
 
 (defun eat--t-col-motion (n)
@@ -1777,7 +1781,9 @@ column.  If the specified position is before `point-min' or after
 Return the number of columns moved.
 
 Assume all characters occupy a single column."
+  ;; Record the current position.
   (let ((point (point)))
+    ;; Move to the new position.
     (cond
      ((> n 0)
       (let ((eol (car (eat--t-eol)))
@@ -1787,12 +1793,15 @@ Assume all characters occupy a single column."
       (let ((bol (car (eat--t-bol)))
             (pos (+ (point) n)))
         (goto-char (max pos bol)))))
+    ;; Return the distance from the previous position.
     (- (point) point)))
 
 (defun eat--t-current-col ()
   "Return the current column.
 
 Assume all characters occupy a single column."
+  ;; We assume that that all characters occupy a signle column, so a
+  ;; subtraction should work.
   (- (point) (car (eat--t-bol))))
 
 (defun eat--t-goto-col (n)
@@ -1801,7 +1810,9 @@ Assume all characters occupy a single column."
 Return the current column after moving point.
 
 Assume all characters occupy a single column."
+  ;; Move to column 0.
   (eat--t-goto-bol)
+  ;; Now the target column is N characters away.
   (eat--t-col-motion n))
 
 (defun eat--t-repeated-insert (c n &optional face)
@@ -1816,14 +1827,15 @@ C is a character.  FACE is the face to use, or nil."
 
 For example: \"*foo\\nbar\\nbaz\" is converted to \"foo*bar\\nbaz\",
 where `*' indicates point."
-  (if (get-char-property (point) 'eat--t-wrap-line)
-      (when (< (point) (or limit (point-max)))
-        (delete-char 1))
-    (let ((next (next-single-char-property-change
-                 (point) 'eat--t-wrap-line nil limit)))
-      (goto-char next)
-      (when (< (point) (or limit (point-max)))
-        (delete-char 1)))))
+  ;; Are we already at the end a part of a long line?
+  (unless (get-char-property (point) 'eat--t-wrap-line)
+    ;; Find the next end of a part of a long line.
+    (goto-char (next-single-char-property-change
+                (point) 'eat--t-wrap-line nil limit)))
+  ;; Remove the newline.
+  (when (< (point) (or limit (point-max)))
+    (cl-assert (= (char-after) ?\n))
+    (delete-char 1)))
 
 (defun eat--t-break-long-line (threshold)
   "Break a line longer than THRESHOLD once.
@@ -1831,13 +1843,23 @@ where `*' indicates point."
 For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
 \"foo\\n*barbaz\", where `*' indicates point."
   (let ((loop t))
+    ;; Find a too long line.
     (while (and loop (< (point) (point-max)))
+      ;; Go to the threshold column.
       (eat--t-goto-col threshold)
+      ;; Are we at the end of line?
       (if (eq (char-after) ?\n)
+          ;; We are already at the end of line, so move to the next
+          ;; line and start from the beginning.
           (forward-char)
+        ;; The next character is not a newline, so we must be at a
+        ;; long, or we are the end of the accessible part of the
+        ;; buffer.  Whatever the case, we break the loop, and if it is
+        ;; a long line, we break the line.
+        (setq loop nil)
         (unless (= (point) (point-max))
-          (insert-before-markers (propertize "\n" 'eat--t-wrap-line t)))
-        (setq loop nil)))))
+          (insert-before-markers
+           (propertize "\n" 'eat--t-wrap-line t)))))))
 
 
 ;;;; Emulator.
@@ -1937,6 +1959,8 @@ Don't `set' it, bind it to a value with `let'.")
 (defun eat--t-reset ()
   "Reset terminal."
   (let* ((disp (eat--t-term-display eat--t-term)))
+
+    ;; Reset most of the things to their respective default values.
     (setf (eat--t-term-parser-state eat--t-term) nil)
     (setf (eat--t-disp-begin disp) (point-min-marker))
     (setf (eat--t-disp-old-begin disp) (point-min-marker))
@@ -1964,7 +1988,11 @@ Don't `set' it, bind it to a value with `let'.")
     (setf (eat--t-term-mouse-mode eat--t-term) nil)
     (setf (eat--t-term-mouse-encoding eat--t-term) nil)
     (setf (eat--t-term-focus-event-mode eat--t-term) nil)
+
+    ;; Clear everything.
     (delete-region (point-min) (point-max))
+
+    ;; Inform the UI about our new state.
     (funcall (eat--t-term-grab-mouse-fn eat--t-term) eat--t-term nil)
     (funcall (eat--t-term-set-focus-ev-mode-fn eat--t-term)
              eat--t-term nil)
