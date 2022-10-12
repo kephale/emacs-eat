@@ -2008,8 +2008,8 @@ display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          ;; If N is less than 1, set N to 1.  If N is more than the
-         ;; number of available column on the right side, set N to the
-         ;; maximum possible value.
+         ;; number of available columns on the right side, set N to
+         ;; the maximum possible value.
          (n (min (- (eat--t-disp-width disp) (eat--t-cur-x cursor))
                  (max (or n 1) 1))))
     ;; N is non-zero in most cases, except at the edge of display.
@@ -2027,7 +2027,7 @@ display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          ;; If N is less than 1, set N to 1.  If N is more than the
-         ;; number of available column on the left side, set N to the
+         ;; number of available columns on the left side, set N to the
          ;; maximum possible value.
          (n (min (1- (eat--t-cur-x cursor)) (max (or n 1) 1))))
     ;; N is non-zero in most cases, except at the edge of display.
@@ -2061,17 +2061,31 @@ display."
   "Move to beginning of Nth next line."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; If N is less than 1, set N to 1.  If N is more than the
+         ;; number of available lines below, set N to the maximum
+         ;; possible value.
          (n (min (- (eat--t-disp-height disp) (eat--t-cur-y cursor))
                  (max (or n 1) 1))))
-    (eat--t-repeated-insert ?\n (- n (eat--t-goto-bol n)))
-    (cl-incf (eat--t-cur-y cursor) n)
+    ;; N is non-zero in most cases, except at the edge of display.
+    ;; Whatever the case, we move to the beginning of line.
+    (if (zerop n)
+        (eat--t-goto-bol)
+      ;; Move to the Nth next line, use newlines to reach that line if
+      ;; needed.
+      (eat--t-repeated-insert ?\n (- n (eat--t-goto-bol n)))
+      (cl-incf (eat--t-cur-y cursor) n))
     (setf (eat--t-cur-x cursor) 1)))
 
 (defun eat--t-beg-of-prev-line (n)
   "Move to beginning of Nth previous line."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; If N is less than 1, set N to 1.  If N is more than the
+         ;; number of available lines above, set N to the maximum
+         ;; possible value.
          (n (min (1- (eat--t-cur-y cursor)) (max (or n 1) 1))))
+    ;; Move to the beginning Nth previous line.  Even if there are no
+    ;; line above, move to the beginning of the line.
     (eat--t-goto-bol (- n))
     (cl-decf (eat--t-cur-y cursor) n)
     (setf (eat--t-cur-x cursor) 1)))
@@ -2084,8 +2098,12 @@ display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (x (eat--t-cur-x cursor)))
+    ;; Move to the beginning of target line.
     (eat--t-beg-of-next-line n)
-    (eat--t-cur-horizontal-abs x)))
+    ;; If the cursor wasn't at column one, move the cursor to the
+    ;; cursor to that column.
+    (unless (= x 1)
+      (eat--t-cur-right (1- x)))))
 
 (defun eat--t-cur-up (&optional n)
   "Move cursor N lines up.
@@ -2095,9 +2113,12 @@ display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (x (eat--t-cur-x cursor)))
-
+    ;; Move to the beginning of target line.
     (eat--t-beg-of-prev-line n)
-    (eat--t-cur-horizontal-abs x)))
+    ;; If the cursor wasn't at column one, move the cursor to the
+    ;; cursor to that column.
+    (unless (= x 1)
+      (eat--t-cur-right (1- x)))))
 
 (defun eat--t-cur-vertical-abs (&optional n)
   "Move cursor to Nth line on display.
@@ -2106,7 +2127,10 @@ N default to 1.  If N is out of range, place cursor at the edge of
 display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; If N is out of range, bring it within the bounds of range.
          (n (min (max (or n 1) 1) (eat--t-disp-height disp))))
+    ;; Depending on the current position of cursor, move downward or
+    ;; upward.
     (cond ((< (eat--t-cur-y cursor) n)
            (eat--t-cur-down (- n (eat--t-cur-y cursor))))
           ((< n (eat--t-cur-y cursor))
