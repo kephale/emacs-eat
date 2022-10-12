@@ -2643,12 +2643,12 @@ to (1, 1).  When N is 3, also erase the scrollback."
            (when incl-point
              (backward-char)))))
       ((or 2 3)
-       ;; Move to the display beginning.
-       (eat--t-goto 1 1)
        ;; Delete everything in the display, and if N is 3, also delete
        ;; everything in the scrollback area.
        (delete-region (if (= n 2) (point) (point-min))
                       (point-max))
+       ;; Move to the display beginning.
+       (eat--t-goto 1 1)
        ;; If the SGR background attribute is set, fill the display
        ;; with that background.
        (when (eat--t-face-bg face)
@@ -2716,8 +2716,11 @@ STATE one of the `:default', `:invisible', `:very-visible'."
 
 (defun eat--t-enable-alt-disp ()
   "Enable alternative display."
+  ;; Effective only when alternative display is enabled by user.
   (when eat-enable-alternative-display
+    ;; Make sure we not already in the alternative display.
     (unless (eat--t-term-main-display eat--t-term)
+      ;; Store the current display, including scrollback.
       (let ((main-disp (eat--t-copy-disp
                         (eat--t-term-display eat--t-term))))
         (setf (eat--t-disp-begin main-disp)
@@ -2732,6 +2735,7 @@ STATE one of the `:default', `:invisible', `:very-visible'."
               (- (point) (point-min)))
         (setf (eat--t-term-main-display eat--t-term)
               (cons main-disp (buffer-string)))
+        ;; Delete everything, and move to the beginning of terminal.
         (delete-region (point-min) (point-max))
         (eat--t-goto 1 1)))))
 
@@ -2740,6 +2744,7 @@ STATE one of the `:default', `:invisible', `:very-visible'."
 
 If DONT-MOVE-CURSOR is non-nil, don't move cursor from current
 position."
+  ;; Make sure we in the alternative display.
   (when (eat--t-term-main-display eat--t-term)
     (let* ((main-disp (eat--t-term-main-display eat--t-term))
            (old-y (eat--t-cur-y
@@ -2752,7 +2757,9 @@ position."
                    (eat--t-term-display eat--t-term)))
            (height (eat--t-disp-height
                     (eat--t-term-display eat--t-term))))
+      ;; Delete everything.
       (delete-region (point-min) (point-max))
+      ;; Restore the main display.
       (insert (cdr main-disp))
       (setf (eat--t-disp-begin (car main-disp))
             (copy-marker (+ (point-min)
@@ -2766,10 +2773,13 @@ position."
                              (eat--t-disp-cursor (car main-disp))))))
       (setf (eat--t-term-display eat--t-term) (car main-disp))
       (setf (eat--t-term-main-display eat--t-term) nil)
-      (eat--t-resize width height)
       (goto-char (eat--t-cur-position
                   (eat--t-disp-cursor
                    (eat--t-term-display eat--t-term))))
+      ;; Maybe the terminal was resized after enabling alternative
+      ;; display, so we have to resize again.
+      (eat--t-resize width height)
+      ;; Restore cursor position if DONT-MOVE-CURSOR is non-nil.
       (when dont-move-cursor
         (eat--t-goto old-y old-x)))))
 
@@ -2778,13 +2788,20 @@ position."
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; Make sure N is non-negative.  If N is more than the number
+         ;; of available columns available, set N to the maximum
+         ;; possible value.
          (n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
                  (max (or n 1) 0))))
+    ;; Return if N is zero.
     (unless (zerop n)
       (save-excursion
+        ;; Insert N spaces, with SGR background if that attribute is
+        ;; set.
         (eat--t-repeated-insert ?\  n (and (eat--t-face-bg face)
                                            (eat--t-face-face face)))
+        ;; Remove the characters that went beyond the edge of display.
         (eat--t-col-motion (- (eat--t-disp-width disp)
                               (+ (1- (eat--t-cur-x cursor)) n)))
         (delete-region (point) (car (eat--t-eol)))))))
@@ -2794,22 +2811,32 @@ position."
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; Make sure N is non-negative.  If N is more than the number
+         ;; of available columns available, set N to the maximum
+         ;; possible value.
          (n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
                  (max (or n 1) 0))))
+    ;; Return if N is zero.
     (unless (zerop n)
       (save-excursion
         (let ((m (point)))
+          ;; Delete N character on current line.
           (eat--t-col-motion n)
           (delete-region m (point))
+          ;; If SGR background attribute is set, fill N characters at
+          ;; the right edge of display with that background.
           (when (eat--t-face-bg face)
             (save-excursion
               (eat--t-goto-eol)
               (let ((empty (1+ (- (eat--t-disp-width disp)
                                   (eat--t-cur-x cursor)
                                   (- (point) m)))))
+                ;; Reach the position from where to start filling.
+                ;; Use spaces if needed.
                 (when (> empty n)
                   (eat--t-repeated-insert ?\  (- empty n)))
+                ;; Fill with background.
                 (eat--t-repeated-insert
                  ?\  (min empty n) (eat--t-face-face face))))))))))
 
@@ -2818,20 +2845,24 @@ position."
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; Make sure N is non-negative.  If N is more than the number
+         ;; of available columns available, set N to the maximum
+         ;; possible value.
          (n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
                  (max (or n 1) 0))))
+    ;; Return if N is zero.
     (unless (zerop n)
       (save-excursion
         (let ((m (point)))
+          ;; Delete N character on current line.
           (eat--t-col-motion n)
           (delete-region m (point))
+          ;; Insert N spaces, with background if SGR background
+          ;; attribute is set.
           (eat--t-repeated-insert
            ?\  n (and (eat--t-face-bg face)
-                      (eat--t-face-face face)))
-          (eat--t-col-motion
-           (- (eat--t-disp-width disp)
-              (+ (1- (eat--t-cur-x cursor)) n))))))))
+                      (eat--t-face-face face))))))))
 
 (defun eat--t-insert-line (n)
   "Insert N empty lines, preserving cursor."
