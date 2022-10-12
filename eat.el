@@ -2160,7 +2160,7 @@ accordingly."
         (if (or (eat--t-term-main-display eat--t-term)
                 (> scroll-begin 1))
             (delete-region (point) (car (eat--t-bol n)))
-          ;; Otherwise, send the text to the scrollback region by
+          ;; Otherwise, send the text to the scrollback area by
           ;; advancing the display beginning marker.
           (eat--t-goto-bol n)
           ;; Make sure we're at the beginning of a line, because we
@@ -2534,33 +2534,53 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp)))
-    (when (or (not n) (> n 2) (memq n '(0 2)))
-      ;; Erase point to end of line.
-      (delete-region
-       (point)
-       (or (save-excursion
-             (when-let ((pos (search-forward "\n" nil t)))
-               (1- pos)))
-           (point-max)))
-      (when (eat--t-face-bg face)
-        (save-excursion
-          (eat--t-repeated-insert ?\  (1+ (- (eat--t-disp-width disp)
-                                             (eat--t-cur-x cursor)))
-                                  (and (eat--t-face-bg face)
-                                       (eat--t-face-face face))))))
-    (when (memq n '(1 2))
-      ;; Erase beginning of line to point.
-      (let ((x (eat--t-cur-x cursor)))
-        (if (= (point) (point-max))
-            (progn
-              (delete-region (car (eat--t-bol)) (point))
-              (eat--t-repeated-insert ?\  (1- x))))
-        (delete-region (car (eat--t-bol)) (if (= (point) (point-max))
-                                              (point)
-                                            (1+ (point))))
-        (eat--t-repeated-insert ?\  x (and (eat--t-face-bg face)
-                                           (eat--t-face-face face)))
-        (backward-char)))))
+    (pcase n
+      ((or 0 'nil (pred (< 2)))
+       ;; Delete cursor position (inclusive) to end of line.
+       (delete-region (point) (car (eat--t-eol)))
+       ;; If the SGR background attribute is set, we need to fill the
+       ;; erased area with that background.
+       (when (eat--t-face-bg face)
+         (save-excursion
+           (eat--t-repeated-insert
+            ?\  (1+ (- (eat--t-disp-width disp)
+                       (eat--t-cur-x cursor)))
+            (and (eat--t-face-bg face)
+                 (eat--t-face-face face))))))
+      (1
+       ;; Delete beginning of line to cursor position (inclusive).
+       (delete-region (car (eat--t-bol))
+                      (if (or (= (point) (point-max))
+                              (= (char-after) ?\n))
+                          (point)
+                        (1+ (point))))
+       ;; Fill the region with spaces, use SGR background attribute
+       ;; if set.
+       (eat--t-repeated-insert ?\  (eat--t-cur-x cursor)
+                               (and (eat--t-face-bg face)
+                                    (eat--t-face-face face)))
+       ;; We erased the character at the cursor position, so after
+       ;; fill with spaces we are still off by one column; so move a
+       ;; column backward.
+       (backward-char))
+      (2
+       ;; Delete whole line.
+       (delete-region (car (eat--t-bol)) (car (eat--t-eol)))
+       ;; Fill the region before cursor position with spaces, use SGR
+       ;; background attribute if set.
+       (eat--t-repeated-insert ?\  (1- (eat--t-cur-x cursor))
+                               (and (eat--t-face-bg face)
+                                    (eat--t-face-face face)))
+       ;; If the SGR background attribute is set, we need to fill the
+       ;; erased area including and after cursor position with that
+       ;; background.
+       (when (eat--t-face-bg face)
+         (save-excursion
+           (eat--t-repeated-insert
+            ?\  (1+ (- (eat--t-disp-width disp)
+                       (eat--t-cur-x cursor)))
+            (and (eat--t-face-bg face)
+                 (eat--t-face-face face)))))))))
 
 (defun eat--t-erase-in-disp (&optional n)
   "Erase part of display.
@@ -2574,56 +2594,74 @@ to (1, 1).  When N is 3, also erase the scrollback."
          (cursor (eat--t-disp-cursor disp)))
     (pcase n
       ((or 0 'nil (pred (< 3)))
+       ;; Delete from cursor position (inclusive) to end of terminal.
        (delete-region (point) (point-max))
+       ;; If the SGR background attribute is set, we need to fill the
+       ;; erased area with that background.
        (when (eat--t-face-bg face)
+         ;; `save-excursion' probably uses marker to save point, which
+         ;; doesn't work in this case.  So we the store the point as a
+         ;; integer.
          (let ((pos (point)))
+           ;; Fill current line.
            (eat--t-repeated-insert ?\  (1+ (- (eat--t-disp-width disp)
                                               (eat--t-cur-x cursor)))
                                    (eat--t-face-face face))
+           ;; Fill the following lines.
            (dotimes (_ (- (eat--t-disp-height disp)
                           (eat--t-cur-y cursor)))
              (insert ?\n)
              (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                      (eat--t-face-face face)))
+           ;; Restore position.
            (goto-char pos))))
       (1
        (let* ((y (eat--t-cur-y cursor))
               (x (eat--t-cur-x cursor))
+              ;; Should we erase including the cursor position?
               (incl-point (/= (point) (point-max))))
+         ;; Delete the region to be erased.
          (delete-region (eat--t-disp-begin disp)
                         (if incl-point (1+ (point)) (point)))
+         ;; If the SGR background attribute isn't set, insert
+         ;; newlines, otherwise fill the erased area above the current
+         ;; line with background color.
          (if (not (eat--t-face-bg face))
              (eat--t-repeated-insert ?\n (1- y))
            (dotimes (_ (1- y))
              (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                      (eat--t-face-face face))
              (insert ?\n)))
-         (eat--t-repeated-insert ?\  (if incl-point x (1- x))
-                                 (and (eat--t-face-bg face)
-                                      (eat--t-face-face face)))
-         (when incl-point
-           (backward-char))))
-      (2
+         ;; Fill the current line to keep the cursor unmoved.
+         (if (not (eat--t-face-bg face))
+             (eat--t-repeated-insert ?\  (1- x))
+           ;; Fill with background.
+           (eat--t-repeated-insert ?\  x
+                                   (and (eat--t-face-bg face)
+                                        (eat--t-face-face face)))
+           ;; We are off by one column; so move a column backward.
+           (when incl-point
+             (backward-char)))))
+      ((or 2 3)
+       ;; Move to the display beginning.
        (eat--t-goto 1 1)
-       (delete-region (point) (point-max))
+       ;; Delete everything in the display, and if N is 3, also delete
+       ;; everything in the scrollback area.
+       (delete-region (if (= n 2) (point) (point-min))
+                      (point-max))
+       ;; If the SGR background attribute is set, fill the display
+       ;; with that background.
        (when (eat--t-face-bg face)
+         ;; `save-excursion' probably uses marker to save point, which
+         ;; doesn't work in this case.  So we the store the point as a
+         ;; integer.
          (let ((pos (point)))
            (dotimes (i (eat--t-disp-height disp))
              (unless (zerop i)
                (insert ?\n))
              (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                      (eat--t-face-face face)))
-           (goto-char pos))))
-      (3
-       (eat--t-goto 1 1)
-       (delete-region (point-min) (point-max))
-       (when (eat--t-face-bg face)
-         (let ((pos (point)))
-           (dotimes (i (eat--t-disp-height disp))
-             (unless (zerop i)
-               (insert ?\n))
-             (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
-                                     (eat--t-face-face face)))
+           ;; Restore point.
            (goto-char pos)))))))
 
 (defun eat--t-device-status-report ()
@@ -2639,7 +2677,9 @@ to (1, 1).  When N is 3, also erase the scrollback."
 
 STATE one of the `:default', `:invisible', `:very-visible'."
   (unless (eq (eat--t-term-cur-state eat--t-term) state)
+    ;; Update state.
     (setf (eat--t-term-cur-state eat--t-term) state)
+    ;; Inform the UI.
     (funcall (eat--t-term-set-cursor-fn eat--t-term) eat--t-term
              state)))
 
@@ -2661,7 +2701,7 @@ STATE one of the `:default', `:invisible', `:very-visible'."
     (eat--t-set-cursor-state :very-visible)))
 
 (defun eat--t-non-blinking-cursor ()
-  "Make the cursor blink."
+  "Make the cursor not blink."
   (setf (eat--t-term-cur-blinking-p eat--t-term) nil)
   (when (eq (eat--t-term-cur-state eat--t-term) :very-visible)
     (eat--t-set-cursor-state :default)))
