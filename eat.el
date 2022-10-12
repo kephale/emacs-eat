@@ -2007,9 +2007,15 @@ N default to 1.  If N is out of range, place cursor at the edge of
 display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; If N is less than 1, set N to 1.  If N is more than the
+         ;; number of available column on the right side, set N to the
+         ;; maximum possible value.
          (n (min (- (eat--t-disp-width disp) (eat--t-cur-x cursor))
                  (max (or n 1) 1))))
+    ;; N is non-zero in most cases, except at the edge of display.
     (unless (zerop n)
+      ;; Move to the Nth next column, use spaces to reach that column
+      ;; if needed.
       (eat--t-repeated-insert ?\  (- n (eat--t-col-motion n)))
       (cl-incf (eat--t-cur-x cursor) n))))
 
@@ -2020,8 +2026,18 @@ N default to 1.  If N is out of range, place cursor at the edge of
 display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; If N is less than 1, set N to 1.  If N is more than the
+         ;; number of available column on the left side, set N to the
+         ;; maximum possible value.
          (n (min (1- (eat--t-cur-x cursor)) (max (or n 1) 1))))
+    ;; N is non-zero in most cases, except at the edge of display.
     (unless (zerop n)
+      ;; Move to the Nth previous column.
+      ;; REVIEW: We are sure that trying to go to the Nth previous
+      ;; column won't cross the line beginning, so we should probably
+      ;; replace the `eat--t-col-motion' call with (backward-char N),
+      ;; because the former does addition checks which we don't need.
+      (cl-assert (>= (eat--t-current-col) n))
       (eat--t-col-motion (- n))
       (cl-decf (eat--t-cur-x cursor) n))))
 
@@ -2032,7 +2048,10 @@ N default to 1.  If N is out of range, place cursor at the edge of
 display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
+         ;; If N is out of range, bring it within the bounds of range.
          (n (min (max (or n 1) 1) (eat--t-disp-width disp))))
+    ;; Depending on the current position of cursor, move right or
+    ;; left.
     (cond ((< (eat--t-cur-x cursor) n)
            (eat--t-cur-right (- n (eat--t-cur-x cursor))))
           ((< n (eat--t-cur-x cursor))
