@@ -2241,18 +2241,18 @@ of range, place cursor at the edge of display."
         (setf (eat--t-cur-x cursor) 1))
     ;; Move to column one, go to Yth line and move to Xth column.
     ;; REVIEW: We move relative to cursor position, which faster for
-    ;; positions near the point (usually the case), but slower for
-    ;; positions far away from the point.  There are only two cursor
-    ;; positions whose exact position is known here, the cursor (whose
-    ;; position is (point)) and (1, 1) (whose position is the display
-    ;; beginning).  There are almost always some points which are at
-    ;; more distance from current position than from the display
-    ;; beginning (the only exception is when the cursor is at the
-    ;; display beginning).  So first moving to the display beginning
-    ;; and then moving to those point will be faster than moving from
-    ;; cursor (except a small (perhaps negligible) overhead of
-    ;; `goto-char').  What we don't have is a formula the calculate
-    ;; the distance between two positions.
+    ;; positions near the point (usually), but slower for positions
+    ;; far away from the point.  There are only two cursor positions
+    ;; whose exact position is known beforehand, the cursor (whose
+    ;; position is (point)) and (1, 1) (the display beginning).  There
+    ;; are almost always some points which are at more distance from
+    ;; current position than from the display beginning (the only
+    ;; exception is when the cursor is at the display beginning).  So
+    ;; first moving to the display beginning and then moving to those
+    ;; point will be faster than moving from cursor (except a small
+    ;; (perhaps negligible) overhead of `goto-char').  What we don't
+    ;; have is a formula the calculate the distance between two
+    ;; positions.
     (eat--t-cur-horizontal-abs 1)
     (eat--t-cur-vertical-abs y)
     (eat--t-cur-horizontal-abs x)))
@@ -2666,6 +2666,7 @@ to (1, 1).  When N is 3, also erase the scrollback."
 
 (defun eat--t-device-status-report ()
   "Send the current Y and X coordinate to client."
+  ;; TODO: Is this really device status report function?
   (let ((cursor (eat--t-disp-cursor
                  (eat--t-term-display eat--t-term))))
     (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
@@ -2871,29 +2872,48 @@ position."
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
+         ;; N should be non-negative and shouldn't exceed the number
+         ;; of lines below cursor position and inside current scroll
+         ;; region.
          (n (min (- (1+ (- scroll-end scroll-begin))
                     (1- (eat--t-cur-y cursor)))
                  (max (or n 1) 0))))
+    ;; Make sure we are in the scroll region and N is positive, return
+    ;; on failure.
     (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
                (not (zerop n)))
       (goto-char
        (prog1
            (progn
+             ;; This function doesn't move the cursor, but pushes all
+             ;; the line below and including current line.  So to keep
+             ;; the cursor unmoved, go to the beginning of line and
+             ;; insert enough spaces to not move the cursor.
              (eat--t-goto-bol)
              (eat--t-repeated-insert ?\  (1- (eat--t-cur-x cursor))
                                      (and (eat--t-face-bg face)
                                           (eat--t-face-face face)))
              (point))
+         ;; Insert N lines.
          (if (not (eat--t-face-bg face))
              (eat--t-repeated-insert ?\n n)
+           ;; SGR background attribute set, so fill the inserted lines
+           ;; with background.
            (dotimes (i n)
+             ;; Fill a line.
              (eat--t-repeated-insert
               ?\  (if (not (zerop i))
                       (eat--t-disp-width disp)
+                    ;; The first inserted line is already filled
+                    ;; partially, so calculate the number columns left
+                    ;; to fill.
                     (1+ (- (eat--t-disp-width disp)
                            (eat--t-cur-x cursor))))
               (eat--t-face-face face))
+             ;; New line.
              (insert ?\n)))
+         ;; Delete the lines that were just pushed beyond the end of
+         ;; scroll region.
          (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin))
                              (+ (- (eat--t-cur-y cursor)
                                    (1- scroll-begin))
@@ -2908,28 +2928,45 @@ position."
          (x (eat--t-cur-x cursor))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
+         ;; N should be non-negative and shouldn't exceed the number
+         ;; of lines below cursor position and inside current scroll
+         ;; region.
          (n (min (- (1+ (- scroll-end scroll-begin))
                     (1- (eat--t-cur-y cursor)))
                  (max (or n 1) 0))))
+    ;; Make sure we are in the scroll region and N is positive, return
+    ;; on failure.
     (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
                (not (zerop n)))
+      ;; Delete N lines (including the current one).
       (eat--t-goto-bol)
       (save-excursion
         (let ((m (point)))
           (eat--t-goto-bol n)
           (delete-region m (point))))
-      (let ((pos (point))
-            (move (- (1+ (- scroll-end scroll-begin))
-                     (- (+ (eat--t-cur-y cursor) n)
-                        (1- scroll-begin)))))
-        (eat--t-repeated-insert ?\n (- move (eat--t-goto-eol move)))
-        (if (not (eat--t-face-bg face))
-            (eat--t-repeated-insert ?\n n)
-          (dotimes (_ n)
-            (insert ?\n)
-            (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
-                                    (eat--t-face-face face))))
-        (goto-char pos))
+      ;; Keep the lines beyond end of scroll region unmoved.
+      (when (or (< scroll-end (eat--t-disp-height disp))
+                (eat--t-face-bg face))
+        (let* ((pos (point))
+               (move (- (1+ (- scroll-end scroll-begin))
+                        (- (+ (eat--t-cur-y cursor) n)
+                           (1- scroll-begin))))
+               (moved (eat--t-goto-eol move)))
+          (when (or (/= (point) (point-max))
+                    (eat--t-face-bg face))
+            ;; Move to the end of scroll region.
+            (eat--t-repeated-insert ?\n (- move moved))
+            ;; Insert enough new lines, fill them when SGR background
+            ;; attribute is set.
+            (if (not (eat--t-face-bg face))
+                (eat--t-repeated-insert ?\n n)
+              (dotimes (_ n)
+                (insert ?\n)
+                (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
+                                        (eat--t-face-face face)))))
+          (goto-char pos)))
+      ;; Go to column where cursor is to preserve cursor position, use
+      ;; spaces if needed to reach the position.
       (eat--t-repeated-insert
        ?\  (- (1- x) (eat--t-col-motion (1- x)))))))
 
@@ -2937,11 +2974,16 @@ position."
   "Repeat last character N times."
   (let ((disp (eat--t-term-display eat--t-term)))
     (let ((char
+           ;; Get the character before cursor.
            (when (< (eat--t-disp-begin disp) (point))
              (if (get-text-property (1- (point)) 'eat--t-wrap-line)
+                 ;; The character before cursor is a newline to break
+                 ;; a long line, so use the character before that.
                  (when (< (eat--t-disp-begin disp) (1- (point)))
                    (char-before (1- (point))))
                (char-before)))))
+      ;; Insert `char' N times.  Make sure `char' is a non-nil and not
+      ;; a newline.
       (when (and char (/= char ?\n))
         (eat--t-write (make-string n char))))))
 
@@ -2952,9 +2994,11 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
   (let* ((disp (eat--t-term-display eat--t-term))
          (top (or top 1))
          (bottom (or bottom (eat--t-disp-height disp))))
-    (when (and (<= 1 top)
-               (< top bottom)
-               (<= bottom (eat--t-disp-height disp)))
+    ;; According to DEC's documentation (found somewhere on the
+    ;; internet, but can't remember where), TOP and BOTTOM must be
+    ;; within display, and BOTTOM must be below TOP.  Otherwise the
+    ;; control function is a nop.
+    (when (< 0 top bottom (1+ (eat--t-disp-height disp)))
       (setf (eat--t-term-scroll-begin eat--t-term) top)
       (setf (eat--t-term-scroll-end eat--t-term) bottom)
       (eat--t-goto 1 1))))
@@ -2971,6 +3015,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
   "Set SGR parameters PARAMS."
   (let ((params (or params '((0))))
         (face (eat--t-term-face eat--t-term)))
+    ;; Set attributes.
     (while params
       (pcase (pop params)
         ('(0)
@@ -3117,6 +3162,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                (face-foreground
                 (intern (format "eat-term-color-%i" (- color 92)))
                 nil t)))))
+    ;; Update face according to the attributes.
     (setf (eat--t-face-face face)
           `(,@(when-let ((fg (or (if (eat--t-face-conceal face)
                                      (eat--t-face-bg face)
@@ -3176,11 +3222,15 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
 MODE should be one of nil and `x10', `normal', `button-event',
 `any-event'."
   (setf (eat--t-term-mouse-mode eat--t-term) mode)
+  ;; When MODE is nil, disable mouse.
   (unless mode
     (eat--t-disable-sgr-mouse-encoding))
+  ;; `x10' mouse mode doesn't need to keep track of the mouse buttons
+  ;; pressed.
   (when (or (not mode)
             (eq mode 'x10))
     (setf (eat--t-term-mouse-pressed eat--t-term) nil))
+  ;; Inform the UI.
   (funcall (eat--t-term-grab-mouse-fn eat--t-term) eat--t-term
            (pcase mode
              ('x10 :click)
@@ -3222,7 +3272,9 @@ MODE should be one of nil and `x10', `normal', `button-event',
 
 (defun eat--t-set-title (title)
   "Set the title of terminal to TITLE."
+  ;; Update title.
   (setf (eat--t-term-title eat--t-term) title)
+  ;; Inform the UI.
   (funcall (eat--t-term-set-title-fn eat--t-term) eat--t-term title))
 
 (defun eat--t-send-device-attrs (params format)
@@ -3268,6 +3320,8 @@ DATA is the selection data encoded in base64."
   (when (string-empty-p targets)
     (setq targets "s0"))
   (if (string= data "?")
+      ;; The client is requesting for clipboard content, let's try to
+      ;; fulfill the request.
       (funcall
        (eat--t-term-input-fn eat--t-term) eat--t-term
        (let ((str nil)
@@ -3277,6 +3331,8 @@ DATA is the selection data encoded in base64."
            (setq
             str
             (pcase (aref targets n)
+              ;; c, p, q and s targets are handled by the UI, and they
+              ;; might refuse to give the clipboard content.
               (?c
                (funcall
                 (eat--t-term-manipulate-selection-fn eat--t-term)
@@ -3293,24 +3349,33 @@ DATA is the selection data encoded in base64."
                (funcall
                 (eat--t-term-manipulate-selection-fn eat--t-term)
                 eat--t-term :select t))
+              ;; 0 to 9 targets are handled by us, and always work.
               ((and (pred (<= ?0))
                     (pred (>= ?9))
                     i)
                (aref (eat--t-term-cut-buffers eat--t-term)
                      (- i ?0)))))
+           ;; If we got a string to send, record the source to inform
+           ;; the client.
            (when str
              (setq source (string (aref targets n))))
            (cl-incf n))
+         ;; No string to send, so send an empty string and an empty
+         ;; target string meaning that we don't have any answer.
          (unless str
            (setq str "")
            (setq source ""))
          (format "\e]52;%s;%s\e\\" source
                  (base64-encode-string str))))
+    ;; The client is requesting to set clipboard content, let's try to
+    ;; fulfill the request.
     (let ((str (ignore-error error
                  (decode-coding-string (base64-decode-string data)
                                        locale-coding-system))))
       (seq-doseq (target targets)
         (pcase target
+          ;; c, p, q and s targets are handled by the UI, and they
+          ;; might reject the new clipboard content.
           (?c
            (funcall (eat--t-term-manipulate-selection-fn eat--t-term)
                     eat--t-term :clipboard str))
@@ -3323,6 +3388,7 @@ DATA is the selection data encoded in base64."
           (?s
            (funcall (eat--t-term-manipulate-selection-fn eat--t-term)
                     eat--t-term :select str))
+          ;; 0 to 9 targets are handled by us, and always work.
           ((and (pred (<= ?0))
                 (pred (>= ?9))
                 i)
@@ -3331,6 +3397,7 @@ DATA is the selection data encoded in base64."
 
 (defun eat--t-set-modes (params format)
   "Set modes according to PARAMS in format FORMAT."
+  ;; Dispatch the request to appropriate function.
   (pcase format
     ('nil
      (while params
@@ -3369,6 +3436,7 @@ DATA is the selection data encoded in base64."
 
 (defun eat--t-reset-modes (params format)
   "Reset modes according to PARAMS in format FORMAT."
+  ;; Dispatch the request to appropriate function.
   (pcase format
     ('nil
      (while params
@@ -3407,50 +3475,57 @@ DATA is the selection data encoded in base64."
     (while (< index (length output))
       (pcase (eat--t-term-parser-state eat--t-term)
         ('nil
+         ;; Regular expression to find the end of plain text.
          (let ((match (string-match (rx (or ?\0 ?\a ?\b ?\t ?\n ?\v
                                             ?\f ?\r ?\C-n ?\C-o ?\e
                                             #x7f))
                                     output index)))
            (if (not match)
+               ;; The regex didn't match, so everything left to handle
+               ;; is just plain text.
                (progn
                  (eat--t-write (substring output index))
                  (setq index (length output)))
-             (if (/= match index)
-                 (progn
-                   (eat--t-write (substring output index match))
-                   (setq index match))
-               (cl-incf index)
-               (pcase (aref output (1- index))
-                 (?\a
-                  (eat--t-bell))
-                 (?\b
-                  (eat--t-cur-left 1))
-                 (?\t
-                  (eat--t-horizontal-tab 1))
-                 (?\n
-                  (eat--t-line-feed))
-                 (?\v
-                  (eat--t-index))
-                 (?\f
-                  (eat--t-form-feed))
-                 (?\r
-                  ;; Avoid going to line home just before a line feed,
-                  ;; we can just insert a new line if we are at the
-                  ;; end of display.
-                  (unless (and (/= index (length output))
-                               (= (aref output index) ?\n))
-                    (eat--t-carriage-return)))
-                 (?\C-n
-                  (eat--t-change-charset 'g1))
-                 (?\C-o
-                  (eat--t-change-charset 'g0))
-                 (?\e
-                  (setf (eat--t-term-parser-state eat--t-term)
-                        '(read-esc))))))))
+             (when (/= match index)
+               ;; The regex matched, and the position is after the
+               ;; current position.  Process the plain text between
+               ;; them and advance to the control sequence.
+               (eat--t-write (substring output index match))
+               (setq index match))
+             ;; Dispatch control sequence.
+             (cl-incf index)
+             (pcase (aref output (1- index))
+               (?\a
+                (eat--t-bell))
+               (?\b
+                (eat--t-cur-left 1))
+               (?\t
+                (eat--t-horizontal-tab 1))
+               (?\n
+                (eat--t-line-feed))
+               (?\v
+                (eat--t-index))
+               (?\f
+                (eat--t-form-feed))
+               (?\r
+                ;; Avoid going to line home just before a line feed,
+                ;; we can just insert a new line if we are at the
+                ;; end of display.
+                (unless (and (/= index (length output))
+                             (= (aref output index) ?\n))
+                  (eat--t-carriage-return)))
+               (?\C-n
+                (eat--t-change-charset 'g1))
+               (?\C-o
+                (eat--t-change-charset 'g0))
+               (?\e
+                (setf (eat--t-term-parser-state eat--t-term)
+                      '(read-esc)))))))
         ('(read-esc)
          (let ((type (aref output index)))
            (cl-incf index)
            (setf (eat--t-term-parser-state eat--t-term) nil)
+           ;; Dispatch control sequence.
            (pcase type
              ;; ESC (.
              (?\(
@@ -3652,21 +3727,21 @@ DATA is the selection data encoded in base64."
                ;; CSI <n> d.
                (`("d" nil ,(and (pred listp) params))
                 (eat--t-cur-vertical-abs (caar params)))
-               ;; CSI ... h
-               ;; CSI ? ... h
+               ;; CSI ... h.
+               ;; CSI ? ... h.
                (`("h" ,format ,(and (pred listp) params))
                 (eat--t-set-modes params format))
-               ;; CSI ... l
-               ;; CSI ? ... l
+               ;; CSI ... l.
+               ;; CSI ? ... l.
                (`("l" ,format ,(and (pred listp) params))
                 (eat--t-reset-modes params format))
-               ;; CSI ... m
+               ;; CSI ... m.
                (`("m" nil ,(and (pred listp) params))
                 (eat--t-set-sgr-params params))
-               ;; CSI 6 n
+               ;; CSI 6 n.
                ('("n" nil ((6)))
                 (eat--t-device-status-report))
-               ;; CSI <n> ; <n> r
+               ;; CSI <n> ; <n> r.
                (`("r" nil ,(and (pred listp) params))
                 (eat--t-change-scroll-region (caar params)
                                              (caadr params)))
@@ -3679,28 +3754,37 @@ DATA is the selection data encoded in base64."
         (`(,(and (or 'read-dcs 'read-sos 'read-osc 'read-pm 'read-apc)
                  state)
            ,buf)
+         ;; Find the end of string.
          (let ((match (string-match (if (eq state 'read-osc)
                                         (rx (or ?\a ?\\))
                                       (rx ?\\))
                                     output index)))
            (if (not match)
                (progn
+                 ;; Not found, store the text to process it later when
+                 ;; we get the end of string.
                  (setf (eat--t-term-parser-state eat--t-term)
                        `(,state ,(concat buf (substring output
                                                         index))))
                  (setq index (length output)))
+             ;; Matched!  Get the string from the output and previous
+             ;; runs.
              (let ((str (concat buf (substring output index
                                                match))))
                (setq index (match-end 0))
+               ;; Is it really the end of string?
                (if (and (= (aref output match) ?\\)
                         (not (or (zerop (length str))
                                  (= (aref str (1- (length str)))
                                     ?\e))))
+                   ;; No.  Push the '\' character to process later.
                    (setf (eat--t-term-parser-state eat--t-term)
                          `(,state ,(concat str "\\")))
+                 ;; Yes!  It's the end!  We can parse it.
                  (when (= (aref output match) ?\\)
                    (setq str (substring str 0 (1- (length str)))))
                  (setf (eat--t-term-parser-state eat--t-term) nil)
+                 ;; Dispatch control sequence.
                  (pcase state
                    ('read-osc
                     (pcase str
@@ -3727,40 +3811,46 @@ DATA is the selection data encoded in base64."
                        (eat--t-manipulate-selection
                         targets data))))))))))
         (`(read-charset-standard ,slot ,buf)
+         ;; Find the end.
          (let ((match (string-match (rx (any ?0 ?2 ?4 ?5 ?6 ?7 ?9 ?<
                                              ?= ?> ?? ?A ?B ?C ?E ?H
                                              ?K ?Q ?R ?Y ?Z ?f))
                                     output index)))
            (if (not match)
                (progn
+                 ;; Not found, store the text to process it later when
+                 ;; we find the end.
                  (setf (eat--t-term-parser-state eat--t-term)
                        `(read-charset-standard
                          ,slot ,(concat buf (substring
                                              output index))))
                  (setq index (length output)))
+             ;; Got the end!
              (let ((str (concat buf (substring output index
                                                (match-end 0)))))
                (setq index (match-end 0))
                (setf (eat--t-term-parser-state eat--t-term) nil)
-               (pcase str
-                 ;; ESC ( 0
-                 ;; ESC ) 0
-                 ;; ESC * 0
-                 ;; ESC + 0
-                 ("0"
-                  (eat--t-set-charset slot 'dec-line-drawing))
-                 ;; ESC ( B
-                 ;; ESC ) B
-                 ;; ESC * B
-                 ;; ESC + B
-                 ("B"
-                  (eat--t-set-charset slot 'us-ascii)))))))
+               ;; Set the character set.
+               (eat--t-set-charset
+                slot
+                (pcase str
+                  ;; ESC ( 0.
+                  ;; ESC ) 0.
+                  ;; ESC * 0.
+                  ;; ESC + 0.
+                  ("0" 'dec-line-drawing)
+                  ;; ESC ( B.
+                  ;; ESC ) B.
+                  ;; ESC * B.
+                  ;; ESC + B.
+                  ("B" 'us-ascii)))))))
         (`(read-charset-vt300 ,_slot)
          (let ((_charset (aref output index)))
            (cl-incf index)
            (setf (eat--t-term-parser-state eat--t-term) nil)
            (pcase charset
-             ;; IGNORED.  TODO.
+             ;; TODO: Currently ignored.  It is here just to recognize
+             ;; the control sequence.
              )))))))
 
 (defun eat--t-resize (width height)
