@@ -1800,7 +1800,7 @@ Assume all characters occupy a single column."
   "Return the current column.
 
 Assume all characters occupy a single column."
-  ;; We assume that that all characters occupy a signle column, so a
+  ;; We assume that that all characters occupy a single column, so a
   ;; subtraction should work.
   (- (point) (car (eat--t-bol))))
 
@@ -1959,7 +1959,6 @@ Don't `set' it, bind it to a value with `let'.")
 (defun eat--t-reset ()
   "Reset terminal."
   (let* ((disp (eat--t-term-display eat--t-term)))
-
     ;; Reset most of the things to their respective default values.
     (setf (eat--t-term-parser-state eat--t-term) nil)
     (setf (eat--t-disp-begin disp) (point-min-marker))
@@ -1988,10 +1987,8 @@ Don't `set' it, bind it to a value with `let'.")
     (setf (eat--t-term-mouse-mode eat--t-term) nil)
     (setf (eat--t-term-mouse-encoding eat--t-term) nil)
     (setf (eat--t-term-focus-event-mode eat--t-term) nil)
-
     ;; Clear everything.
     (delete-region (point-min) (point-max))
-
     ;; Inform the UI about our new state.
     (funcall (eat--t-term-grab-mouse-fn eat--t-term) eat--t-term nil)
     (funcall (eat--t-term-set-focus-ev-mode-fn eat--t-term)
@@ -2148,14 +2145,23 @@ accordingly."
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
+         ;; N shouldn't be more more than the number of lines in
+         ;; scroll region.
          (n (min (max (or n 1) 0) (1+ (- scroll-end scroll-begin)))))
+    ;; Make sure that N is positive.
     (unless (zerop n)
+      ;; Try to not point relative to the text.
       (save-excursion
         (goto-char (eat--t-disp-begin disp))
+        ;; Move to the beginning of scroll region.
         (eat--t-goto-bol (1- scroll-begin))
+        ;; If the first line on display isn't in scroll region or
+        ;; if this is the alternative display, delete text.
         (if (or (eat--t-term-main-display eat--t-term)
                 (> scroll-begin 1))
             (delete-region (point) (car (eat--t-bol n)))
+          ;; Otherwise, send the text to the scrollback region by
+          ;; advancing the display beginning marker.
           (eat--t-goto-bol n)
           ;; Make sure we're at the beginning of a line, because we
           ;; might be at `point-max'.
@@ -2163,17 +2169,28 @@ accordingly."
                       (= (char-before) ?\n))
             (insert ?\n))
           (set-marker (eat--t-disp-begin disp) (point)))
-        (eat--t-goto-bol (- (1+ (- scroll-end scroll-begin)) n))
-        (eat--t-repeated-insert ?\n n))
-      (let ((recalc-point t))
-        (when as-side-effect
-          (if (not (<= scroll-begin (eat--t-cur-y cursor) scroll-end))
-              (setq recalc-point nil)
-            (setq recalc-point (< (- (eat--t-cur-y cursor) n)
-                                  scroll-begin))
-            (setf (eat--t-cur-y cursor)
-                  (max (- (eat--t-cur-y cursor) n) scroll-begin))))
+        ;; Is the last line on display in scroll region?
+        (when (< scroll-begin (eat--t-disp-width disp))
+          ;; Go to the end of scroll region (before deleting or moving
+          ;; texts).
+          (eat--t-goto-bol (- (1+ (- scroll-end scroll-begin)) n))
+          ;; If there is anything after the scroll region, insert
+          ;; newlines to keep that text unmoved.
+          (when (< (point) (point-max))
+            (eat--t-repeated-insert ?\n n))))
+      ;; Recalculate point if needed.
+      (let ((recalc-point
+             (<= scroll-begin (eat--t-cur-y cursor) scroll-end)))
+        ;; If recalc-point is non-nil, and AS-SIDE-EFFECT is non-nil,
+        ;; update cursor position so that it is unmoved relative to
+        ;; surrounding text and reconsider point recalculation.
+        (when (and recalc-point as-side-effect)
+          (setq recalc-point (< (- (eat--t-cur-y cursor) n)
+                                scroll-begin))
+          (setf (eat--t-cur-y cursor)
+                (max (- (eat--t-cur-y cursor) n) scroll-begin)))
         (when recalc-point
+          ;; Recalculate point.
           (let ((y (eat--t-cur-y cursor))
                 (x (eat--t-cur-x cursor)))
             (eat--t-goto 1 1)
@@ -2187,14 +2204,22 @@ N default to 1."
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
+         ;; N shouldn't be more more than the number of lines in
+         ;; scroll region.
          (n (min (max (or n 1) 0) (1+ (- scroll-end scroll-begin)))))
+    ;; Make sure that N is positive.
     (unless (zerop n)
-      (save-excursion
-        (goto-char (eat--t-disp-begin disp))
-        (eat--t-goto-bol (1- scroll-begin))
-        (eat--t-repeated-insert ?\n n)
-        (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin)) (1+ n)))
+      ;; Move to the beginning of scroll region.
+      (goto-char (eat--t-disp-begin disp))
+      (eat--t-goto-bol (1- scroll-begin))
+      ;; Insert newlines to push text downwards.
+      (eat--t-repeated-insert ?\n n)
+      ;; Go to the end scroll region (after inserting newlines).
+      (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin)) (1+ n)))
+      ;; Delete the text that was pushed out of scroll region.
+      (when (< (point) (point-max))
         (delete-region (point) (car (eat--t-eol n))))
+      ;; The cursor mustn't move, so we have to recalculate point.
       (let ((y (eat--t-cur-y cursor))
             (x (eat--t-cur-x cursor)))
         (eat--t-goto 1 1)
@@ -2205,23 +2230,43 @@ N default to 1."
 
 Y and X default to 1.  Y and X are one-based.  If Y and/or X are out
 of range, place cursor at the edge of display."
+  ;; Important special case: if Y and X are both one, move to the
+  ;; display beginning.
   (if (and (or (not y) (eql y 1))
            (or (not x) (eql x 1)))
       (let* ((disp (eat--t-term-display eat--t-term))
              (cursor (eat--t-disp-cursor disp)))
         (goto-char (eat--t-disp-begin disp))
         (setf (eat--t-cur-y cursor) 1)
-        (setf (eat--t-cur-x cursor) 1)))
-  (eat--t-cur-horizontal-abs 1)
-  (eat--t-cur-vertical-abs y)
-  (eat--t-cur-horizontal-abs x))
+        (setf (eat--t-cur-x cursor) 1))
+    ;; Move to column one, go to Yth line and move to Xth column.
+    ;; REVIEW: We move relative to cursor position, which faster for
+    ;; positions near the point (usually the case), but slower for
+    ;; positions far away from the point.  There are only two cursor
+    ;; positions whose exact position is known here, the cursor (whose
+    ;; position is (point)) and (1, 1) (whose position is the display
+    ;; beginning).  There are almost always some points which are at
+    ;; more distance from current position than from the display
+    ;; beginning (the only exception is when the cursor is at the
+    ;; display beginning).  So first moving to the display beginning
+    ;; and then moving to those point will be faster than moving from
+    ;; cursor (except a small (perhaps negligible) overhead of
+    ;; `goto-char').  What we don't have is a formula the calculate
+    ;; the distance between two positions.
+    (eat--t-cur-horizontal-abs 1)
+    (eat--t-cur-vertical-abs y)
+    (eat--t-cur-horizontal-abs x)))
 
 (defun eat--t-enable-auto-margin ()
   "Enable automatic margin."
+  ;; Set the automatic margin flag to t, the rest of code will take
+  ;; care of the effects.
   (setf (eat--t-term-auto-margin eat--t-term) t))
 
 (defun eat--t-disable-auto-margin ()
   "Disable automatic margin."
+  ;; Set the automatic margin flag to nil, the rest of code will take
+  ;; care of the effects.
   (setf (eat--t-term-auto-margin eat--t-term) nil))
 
 (defun eat--t-set-charset (slot charset)
@@ -2238,10 +2283,19 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
 (defun eat--t-write (str)
   "Write STR on display."
   (let* ((str
+          ;; Convert STR according to the current character set.
           (pcase (alist-get (car (eat--t-term-charset eat--t-term))
                             (cdr (eat--t-term-charset eat--t-term)))
+            ;; For `us-ascii', the default, no conversion is
+            ;; necessary.
             ('us-ascii
              str)
+            ;; `dec-line-drawing' contains various characters useful
+            ;; for drawing line diagram, so it is a must.  This is
+            ;; also possible with `us-ascii', thanks to Unicode, but
+            ;; the character set `dec-line-drawing' is usually less
+            ;; expensive in terms of bytes needed to transfer than
+            ;; `us-ascii'.
             ('dec-line-drawing
              (let ((s (copy-sequence str)))
                (dotimes (i (length s))
@@ -2251,7 +2305,7 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
                                                  (?- . ?↑)
                                                  (?. . ?↓)
                                                  (?0 . ?█)
-                                                 (?` . ?�)
+                                                 (?\` . ?�)
                                                  (?a . ?▒)
                                                  (?f . ?°)
                                                  (?g . ?±)
@@ -2283,9 +2337,11 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
                s))
             (_
              str)))
+         ;; Add `face' property.
          (str (propertize str 'face
                           (eat--t-face-face
                            (eat--t-term-face eat--t-term)))))
+    ;; TODO: Comment.
     ;; REVIEW: This probably needs to be updated.
     (let* ((disp (eat--t-term-display eat--t-term))
            (cursor (eat--t-disp-cursor disp))
@@ -2326,9 +2382,11 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
   "Go to the Nth next tabulation stop.
 
 N default to 1."
-  (let* ((n (max (or n 1) 1))
+  (let* ((n (max (or n 1) 1))           ; N must be positive.
          (disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp)))
+    ;; Do some math calculate the distance of the Nth next tabulation
+    ;; stop from cursor, and go there.
     (eat--t-cur-right (+ (- 8 (mod (1- (eat--t-cur-x cursor)) 8))
                          (* (1- n) 8)))))
 
@@ -2336,9 +2394,11 @@ N default to 1."
   "Go to the Nth previous tabulation stop.
 
 N default to 1."
-  (let* ((n (max (or n 1) 1))
+  (let* ((n (max (or n 1) 1))           ; N must be positive.
          (disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp)))
+    ;; Do some math calculate the distance of the Nth next tabulation
+    ;; stop from cursor, and go there.
     (eat--t-cur-left (+ (1+ (mod (- (eat--t-cur-x cursor) 2) 8))
                         (* (1- n) 8)))))
 
@@ -2347,7 +2407,10 @@ N default to 1."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
+         ;; Are we inside scroll region?
          (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end)))
+    ;; If this is the last line (of the scroll region or the display),
+    ;; scroll up, otherwise move cursor downward.
     (if (= (if in-scroll-region scroll-end (eat--t-disp-height disp))
            (eat--t-cur-y cursor))
         (eat--t-scroll-up 1)
@@ -2362,32 +2425,53 @@ N default to 1."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
+         ;; Are we inside scroll region?
          (in-scroll-region (<= (eat--t-cur-y cursor) scroll-end)))
+    ;; If we are at the very end of the terminal, we might have some
+    ;; optimizations.
     (if (= (point) (point-max))
-        (if (= (if in-scroll-region
-                   scroll-end
-                 (eat--t-disp-height disp))
-               (eat--t-cur-y cursor))
+        ;; If the cursor is above the last line of the scroll region
+        ;; (or the display, if we are outside the scroll region), we
+        ;; can simply insert a newline and update the cursor position.
+        (if (/= (if in-scroll-region
+                    scroll-end
+                  (eat--t-disp-height disp))
+                (eat--t-cur-y cursor))
             (progn
-              (eat--t-scroll-up 1 'as-side-effect)
-              (if (= (if in-scroll-region
-                         scroll-end
-                       (eat--t-disp-height disp))
-                     (eat--t-cur-y cursor))
-                  (eat--t-carriage-return)
-                (if (/= (point) (point-max))
-                    (eat--t-beg-of-next-line 1)
-                  (insert ?\n)
-                  (setf (eat--t-cur-x cursor) 1)
-                  (cl-incf (eat--t-cur-y cursor)))))
-          (insert ?\n)
-          (setf (eat--t-cur-x cursor) 1)
-          (cl-incf (eat--t-cur-y cursor)))
+              (insert ?\n)
+              (setf (eat--t-cur-x cursor) 1)
+              (cl-incf (eat--t-cur-y cursor)))
+          ;; This is the last line.  We need to scroll up.
+          (eat--t-scroll-up 1 'as-side-effect)
+          ;; If we're still at the last line (only happens when the
+          ;; display has only a single line), go to column one of it.
+          (if (= (if in-scroll-region
+                     scroll-end
+                   (eat--t-disp-height disp))
+                 (eat--t-cur-y cursor))
+              (eat--t-carriage-return)
+            ;; If we are somehow moved from the end of terminal,
+            ;; `eat--t-beg-of-next-line' is the best option.
+            (if (/= (point) (point-max))
+                (eat--t-beg-of-next-line 1)
+              ;; We are still at the end!  We can can simply insert a
+              ;; newline and update the cursor position.
+              (insert ?\n)
+              (setf (eat--t-cur-x cursor) 1)
+              (cl-incf (eat--t-cur-y cursor)))))
+      ;; We are not at the end of terminal.  But we still have a last
+      ;; chance.  `eat--t-beg-of-next-line' is usually faster than
+      ;; `eat--t-carriage-return' followed by `eat--t-index', so if
+      ;; there is at least a single line (in the scroll region, if the
+      ;; cursor in the scroll region, otherwise in the display)
+      ;; underneath the cursor, we can use `eat--t-beg-of-next-line'.
       (if (/= (if in-scroll-region
                   scroll-end
                 (eat--t-disp-height disp))
               (eat--t-cur-y cursor))
           (eat--t-beg-of-next-line 1)
+        ;; We don't have any other option, so we must use the most
+        ;; time-expensive option.
         (eat--t-carriage-return)
         (eat--t-index)))))
 
@@ -2396,7 +2480,10 @@ N default to 1."
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+         ;; Are we in the scroll region?
          (in-scroll-region (<= scroll-begin (eat--t-cur-y cursor))))
+    ;; If this is the first line (of the scroll region or the
+    ;; display), scroll down, otherwise move cursor upward.
     (if (= (if in-scroll-region scroll-begin 1)
            (eat--t-cur-y cursor))
         (eat--t-scroll-down 1)
@@ -2404,10 +2491,12 @@ N default to 1."
 
 (defun eat--t-bell ()
   "Ring the bell."
+  ;; Call the UI's bell handler.
   (funcall (eat--t-term-bell-fn eat--t-term) eat--t-term))
 
 (defun eat--t-form-feed ()
   "Insert a vertical tab."
+  ;; Form feed is same as `eat--t-index'.
   (eat--t-index))
 
 (defun eat--t-save-cur ()
@@ -2415,9 +2504,13 @@ N default to 1."
   (let ((disp (eat--t-term-display eat--t-term))
         (saved-face (eat--t-copy-face
                      (eat--t-term-face eat--t-term))))
+    ;; Save cursor position.
     (setf (eat--t-disp-saved-cursor disp)
           (eat--t-copy-cur (eat--t-disp-cursor disp)))
+    ;; Save SGR attributes.
     (setf (eat--t-term-saved-face eat--t-term) saved-face)
+    ;; We use side-effects, so make sure the saved face doesn't share
+    ;; structure with the current face.
     (setf (eat--t-face-face saved-face)
           (copy-tree (eat--t-face-face saved-face)))
     (setf (eat--t-face-underline-color saved-face)
@@ -2427,7 +2520,9 @@ N default to 1."
   "Restore previously save cursor position."
   (let ((saved (eat--t-disp-saved-cursor
                 (eat--t-term-display eat--t-term))))
+    ;; Restore cursor position.
     (eat--t-goto (eat--t-cur-y saved) (eat--t-cur-x saved))
+    ;; Restore SGR attributes.
     (setf (eat--t-term-face eat--t-term)
           (eat--t-term-saved-face eat--t-term))))
 
