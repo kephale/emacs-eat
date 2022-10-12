@@ -26,9 +26,9 @@
 
 ;;; Commentary:
 
-;; Eat's name self-explainary, it stands "Emulate A Terminal".  Eat is
-;; a terminal emulator.  It can run most (if not all) full-screen
-;; terminal programs, including Emacs.
+;; Eat's name self-explainary, it stands for "Emulate A Terminal".
+;; Eat is a terminal emulator.  It can run most (if not all)
+;; full-screen terminal programs, including Emacs.
 
 ;; It is pretty fast, more than three times faster than Term, despite
 ;; being implemented entirely in Emacs Lisp.  So fast that you can
@@ -2241,12 +2241,12 @@ of range, place cursor at the edge of display."
         (setf (eat--t-cur-x cursor) 1))
     ;; Move to column one, go to Yth line and move to Xth column.
     ;; REVIEW: We move relative to cursor position, which faster for
-    ;; positions near the point (usually), but slower for positions
-    ;; far away from the point.  There are only two cursor positions
-    ;; whose exact position is known beforehand, the cursor (whose
-    ;; position is (point)) and (1, 1) (the display beginning).  There
-    ;; are almost always some points which are at more distance from
-    ;; current position than from the display beginning (the only
+    ;; positions near the point (usually the case), but slower for
+    ;; positions far away from the point.  There are only two cursor
+    ;; positions whose exact position is known beforehand, the cursor
+    ;; (whose position is (point)) and (1, 1) (the display beginning).
+    ;; There are almost always some points which are at more distance
+    ;; from current position than from the display beginning (the only
     ;; exception is when the cursor is at the display beginning).  So
     ;; first moving to the display beginning and then moving to those
     ;; point will be faster than moving from cursor (except a small
@@ -3855,58 +3855,82 @@ DATA is the selection data encoded in base64."
 
 (defun eat--t-resize (width height)
   "Resize terminal to WIDTH x HEIGHT."
+  ;; REVIEW: This works, but it is very simple.  Most terminals have
+  ;; more sophisticated mechanisms to do this.  It would be nice thing
+  ;; have them here.
   (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp)))
-    (when (and (>= width 1)
-               (>= height 1)
-               (or (not (eq (eat--t-disp-width disp) width))
-                   (not (eq (eat--t-disp-height disp) height))))
+         (cursor (eat--t-disp-cursor disp))
+         (old-width (eat--t-disp-width disp))
+         (old-height (eat--t-disp-height disp)))
+    ;; Don't do anything if size hasn't changed, or the new size is
+    ;; too small.
+    (when (and (not (and (eq old-width width)
+                         (eq old-height height)))
+               (>= width 1)
+               (>= height 1))
       (save-excursion
+        ;; Update state.
         (setf (eat--t-disp-width disp) width)
         (setf (eat--t-disp-height disp) height)
         (setf (eat--t-term-scroll-begin eat--t-term) 1)
         (setf (eat--t-term-scroll-end eat--t-term)
               (eat--t-disp-height disp))
-        (goto-char (eat--t-disp-begin disp))
+        (set-marker (eat--t-cur-position cursor) (point))
         (if (eat--t-term-main-display eat--t-term)
-            (dotimes (l height)
-              (eat--t-col-motion width)
-              (delete-region (point) (car (eat--t-eol)))
-              (if (< (1+ l) height)
-                  (eat--t-goto-bol 1)
-                (delete-region (point) (point-max))
-                (let ((y (eat--t-cur-y cursor))
-                      (x (eat--t-cur-x cursor)))
-                  (eat--t-goto 1 1)
-                  (eat--t-goto y x)))))
-        (unless (bobp)
-          (backward-char))
-        (while (not (eobp))
-          (eat--t-join-long-line))
-        (goto-char (eat--t-disp-begin disp))
-        (while (not (eobp))
-          (eat--t-break-long-line (eat--t-disp-width disp)))
-        (goto-char (eat--t-cur-position cursor))
-        (let* ((disp-begin (car (eat--t-bol (- (1- height))))))
-          (when (< (eat--t-disp-begin disp) disp-begin)
-            (goto-char (max (- (eat--t-disp-begin disp) 1)
-                            (point-min)))
-            (set-marker (eat--t-disp-begin disp) disp-begin)
-            (while (< (point) (1- (eat--t-disp-begin disp)))
-              (eat--t-join-long-line
-               (1- (eat--t-disp-begin disp))))))
-        (goto-char (eat--t-cur-position cursor))
-        (setf (eat--t-cur-x cursor) (1+ (eat--t-current-col)))
-        (goto-char (eat--t-disp-begin disp))
-        (setf (eat--t-cur-y cursor)
-              (let ((y 0))
-                (while (< (point) (eat--t-cur-position cursor))
-                  (condition-case nil
-                      (search-forward "\n")
-                    (search-failed
-                     (goto-char (point-max))))
-                  (cl-incf y))
-                (max y 1)))))))
+            ;; For alternative display, just delete the part of the
+            ;; display that went out of the edges.  So if the terminal
+            ;; was enlarged, we don't have anything to do.
+            (when (or (< old-width width)
+                      (< old-height height))
+              ;; Go to the beginning of display.
+              (goto-char (eat--t-disp-begin disp))
+              (dotimes (l height)
+                (eat--t-col-motion width)
+                (delete-region (point) (car (eat--t-eol)))
+                (if (< (1+ l) height)
+                    (eat--t-goto-bol 1)
+                  (delete-region (point) (point-max))
+                  (let ((y (eat--t-cur-y cursor))
+                        (x (eat--t-cur-x cursor)))
+                    (eat--t-goto 1 1)
+                    (eat--t-goto y x)))))
+          ;; Go to the beginning of display.
+          (goto-char (eat--t-disp-begin disp))
+          ;; Try to move to the end of previous line, maybe that's a
+          ;; part of a too long line.
+          (unless (bobp)
+            (backward-char))
+          ;; Join all long lines.
+          (while (not (eobp))
+            (eat--t-join-long-line))
+          ;; Go to display beginning again and break long lines.
+          (goto-char (eat--t-disp-begin disp))
+          (while (not (eobp))
+            (eat--t-break-long-line (eat--t-disp-width disp)))
+          ;; Calculate the beginning position of display.
+          (goto-char (eat--t-cur-position cursor))
+          ;; TODO: This part need explanation.
+          (let* ((disp-begin (car (eat--t-bol (- (1- height))))))
+            (when (< (eat--t-disp-begin disp) disp-begin)
+              (goto-char (max (- (eat--t-disp-begin disp) 1)
+                              (point-min)))
+              (set-marker (eat--t-disp-begin disp) disp-begin)
+              (while (< (point) (1- (eat--t-disp-begin disp)))
+                (eat--t-join-long-line
+                 (1- (eat--t-disp-begin disp))))))
+          ;; Update the coordinates of cursor.
+          (goto-char (eat--t-cur-position cursor))
+          (setf (eat--t-cur-x cursor) (1+ (eat--t-current-col)))
+          (goto-char (eat--t-disp-begin disp))
+          (setf (eat--t-cur-y cursor)
+                (let ((y 0))
+                  (while (< (point) (eat--t-cur-position cursor))
+                    (condition-case nil
+                        (search-forward "\n")
+                      (search-failed
+                       (goto-char (point-max))))
+                    (cl-incf y))
+                  (max y 1))))))))
 
 ;;;###autoload
 (defun eat-term-make (buffer position)
@@ -3921,6 +3945,28 @@ DATA is the selection data encoded in base64."
              :cursor (eat--t-make-cur
                       :position (copy-marker position)))))
 
+(defmacro eat--t-with-env (terminal &rest body)
+  "Setup the environment for TERMINAL and eval BODY in it."
+  (declare (indent 1))
+  `(let ((eat--t-term ,terminal))
+     (with-current-buffer (eat--t-term-buffer eat--t-term)
+       (save-excursion
+         (save-restriction
+           (narrow-to-region (eat--t-term-begin eat--t-term)
+                             (eat--t-term-end eat--t-term))
+           (goto-char (eat--t-cur-position
+                       (eat--t-disp-cursor
+                        (eat--t-term-display eat--t-term))))
+           (unwind-protect
+               (progn ,@body)
+             (set-marker (eat--t-cur-position
+                          (eat--t-disp-cursor
+                           (eat--t-term-display eat--t-term)))
+                         (point))
+             (set-marker (eat--t-term-begin eat--t-term) (point-min))
+             (set-marker (eat--t-term-end eat--t-term)
+                         (point-max))))))))
+
 (defun eat-term-delete (terminal)
   "Delete TERMINAL and do any cleanup to do."
   (let ((inhibit-quit t)
@@ -3931,29 +3977,20 @@ DATA is the selection data encoded in base64."
           (narrow-to-region (eat--t-term-begin eat--t-term)
                             (eat--t-term-end eat--t-term))
           (eat--t-set-cursor-state :default)
+          ;; Go to the beginning of display.
           (goto-char (eat--t-disp-begin
                       (eat--t-term-display eat--t-term)))
-          (when (< (point-min) (point))
+          ;; Join all long lines.
+          (unless (bobp)
             (backward-char))
           (while (not (eobp))
             (eat--t-join-long-line)))))))
 
 (defun eat-term-reset (terminal)
   "Reset TERMINAL."
-  (let ((inhibit-quit t)
-        (eat--t-term terminal))
-    (with-current-buffer (eat--t-term-buffer eat--t-term)
-      (save-excursion
-        (save-restriction
-          (narrow-to-region (eat--t-term-begin eat--t-term)
-                            (eat--t-term-end eat--t-term))
-          (eat--t-reset)
-          (set-marker (eat--t-cur-position
-                       (eat--t-disp-cursor
-                        (eat--t-term-display eat--t-term)))
-                      (point))
-          (set-marker (eat--t-term-begin eat--t-term) (point-min))
-          (set-marker (eat--t-term-end eat--t-term) (point-max)))))))
+  (let ((inhibit-quit t))
+    (eat--t-with-env terminal
+      (eat--t-reset))))
 
 (defun eat-term-input-function (terminal)
   "Return the function used to send input from TERMINAL.
@@ -4128,28 +4165,6 @@ you need the position."
         (1- (eat--t-cur-position cursor))
       (eat--t-cur-position cursor))))
 
-(defmacro eat--t-with-env (terminal &rest body)
-  "Setup the environment for TERMINAL and eval BODY in it."
-  (declare (indent 1))
-  `(let ((eat--t-term ,terminal))
-     (with-current-buffer (eat--t-term-buffer eat--t-term)
-       (save-excursion
-         (save-restriction
-           (narrow-to-region (eat--t-term-begin eat--t-term)
-                             (eat--t-term-end eat--t-term))
-           (goto-char (eat--t-cur-position
-                       (eat--t-disp-cursor
-                        (eat--t-term-display eat--t-term))))
-           (unwind-protect
-               (progn ,@body)
-             (set-marker (eat--t-cur-position
-                          (eat--t-disp-cursor
-                           (eat--t-term-display eat--t-term)))
-                         (point))
-             (set-marker (eat--t-term-begin eat--t-term) (point-min))
-             (set-marker (eat--t-term-end eat--t-term)
-                         (point-max))))))))
-
 (defun eat-term-process-output (terminal output)
   "Process OUTPUT from client and show it on TERMINAL's display."
   (let ((inhibit-quit t))
@@ -4208,9 +4223,11 @@ given.
 For mouse events, events should be sent on both mouse button press and
 release unless the mouse grabing mode is `:click', otherwise the
 client process may get confused."
+  ;; TODO: Comment.
   (let ((disp (eat--t-term-display terminal)))
     (cl-flet ((send (str)
-                (funcall (eat--t-term-input-fn terminal) terminal str)))
+                (funcall (eat--t-term-input-fn terminal)
+                         terminal str)))
       (dotimes (_ (or n 1))
         (pcase event
           ((and (or 'up 'down 'right 'left
@@ -4415,7 +4432,8 @@ client process may get confused."
                     ((memq 'down modifiers)
                      (when (< (logand button) 3)
                        (setf (eat--t-term-mouse-pressed terminal)
-                             (nconc (eat--t-term-mouse-pressed terminal)
+                             (nconc (eat--t-term-mouse-pressed
+                                     terminal)
                                     (list button))))
                      (send
                       (if (eq (eat--t-term-mouse-encoding terminal)
@@ -4520,10 +4538,14 @@ EXCEPTIONS is a list of event, which won't be bound."
                (not (member [remap self-insert-command] exceptions)))
       (define-key map [remap self-insert-command] input-command))
     (when (memq :ascii categories)
+      ;; Bind ASCII characters except ESC and DEL.
       (cl-loop
-       for i from ?\  to ?~
-       do (unless (memq i exceptions)
+       for i from ?\C-@ to ?~
+       do (unless (or (= i meta-prefix-char)
+                      (memq i exceptions))
             (define-key map `[,i] input-command)))
+      ;; Bind `backspace', `delete', `deletechar', and all modified
+      ;; variants.
       (dolist (key '( backspace C-backspace
                       insert C-insert M-insert S-insert C-M-insert
                       C-S-insert M-S-insert C-M-S-insert
@@ -4534,25 +4556,17 @@ EXCEPTIONS is a list of event, which won't be bound."
                       M-S-deletechar C-M-S-deletechar))
         (unless (memq key exceptions)
           (define-key map `[,key] input-command)))
-      (cl-loop
-       for i from ?\C-@ to ?\C-_
-       do (unless (or (= i ?\e)
-                      (memq i exceptions))
-            (define-key map `[,i] input-command)))
+      ;; Bind these non-encodable keys.  They are translated.
       (dolist (key '(?\C-- ?\C-? ?\C-\ ))
         (unless (memq key exceptions)
           (define-key map `[,key] input-command)))
+      ;; Bind M-<ASCII> keys.
       (unless (memq meta-prefix-char exceptions)
         (cl-loop
-         for i from ?\  to ?~
+         for i from ?\C-@ to ?~
          do (unless (or (memq i '(?O ?\[))
                         (member (event-convert-list `(meta ,i))
                                 exceptions))
-              (define-key esc-map `[,i] input-command)))
-        (cl-loop
-         for i from ?\C-@ to ?\C-_
-         do (unless (member (event-convert-list `(meta ,i))
-                            exceptions)
               (define-key esc-map `[,i] input-command)))
         (define-key map `[,meta-prefix-char] esc-map)))
     (when (memq :arrow categories)
