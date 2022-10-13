@@ -4575,6 +4575,125 @@ automatic scrolling as a side effect."
                         "font 0, normal")
              :cursor '(6 . 1)))))
 
+(ert-deftest eat-test-sgr-reset ()
+  "Test SGR attributes reset sequence."
+  (eat--tests-with-term '(:width 30 :height 10)
+    (output "\e[1;3;4:3;6;7;9;15;33;105;"
+            "58;5;10mcrazy text 1\n")
+    (should (match-term
+             :display `(,(add-props
+                          "crazy text 1"
+                          `((0 . 12)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-13
+                                          nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-3
+                                          nil t)
+                            :intensity bold
+                            :italic t
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-10
+                                               nil t)
+                            :blink fast
+                            :crossed t
+                            :font 5)))
+             :cursor '(2 . 1)))
+    (output "\e[0mnormal text 1\r\n")
+    (should (match-term
+             :display `(,(add-props
+                          "crazy text 1"
+                          `((0 . 12)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-13
+                                          nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-3
+                                          nil t)
+                            :intensity bold
+                            :italic t
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-10
+                                               nil t)
+                            :blink fast
+                            :crossed t
+                            :font 5))
+                        "normal text 1")
+             :cursor '(3 . 1)))
+    (output "\e[2;3;4:1;5;7;8;9;18;"
+            "38;2;50;90;100;48;2;100;50;9;"
+            "58;2;10;90;45mcrazy text 2\n")
+    (should (match-term
+             :display `(,(add-props
+                          "crazy text 1"
+                          `((0 . 12)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-13
+                                          nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-3
+                                          nil t)
+                            :intensity bold
+                            :italic t
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-10
+                                               nil t)
+                            :blink fast
+                            :crossed t
+                            :font 5))
+                        "normal text 1"
+                        ,(add-props
+                          "crazy text 2"
+                          `((0 . 12)
+                            :foreground "#643209"
+                            :background "#643209"
+                            :intensity faint
+                            :italic t
+                            :underline-type line
+                            :underline-color "#0a5a2d"
+                            :blink slow
+                            :crossed t
+                            :font 8)))
+             :cursor '(4 . 1)))
+    (output "\e[mnormal text 2\n")
+    (should (match-term
+             :display `(,(add-props
+                          "crazy text 1"
+                          `((0 . 12)
+                            :foreground ,(face-foreground
+                                          'eat-term-color-13
+                                          nil t)
+                            :background ,(face-foreground
+                                          'eat-term-color-3
+                                          nil t)
+                            :intensity bold
+                            :italic t
+                            :underline-type wave
+                            :underline-color ,(face-foreground
+                                               'eat-term-color-10
+                                               nil t)
+                            :blink fast
+                            :crossed t
+                            :font 5))
+                        "normal text 1"
+                        ,(add-props
+                          "crazy text 2"
+                          `((0 . 12)
+                            :foreground "#643209"
+                            :background "#643209"
+                            :intensity faint
+                            :italic t
+                            :underline-type line
+                            :underline-color "#0a5a2d"
+                            :blink slow
+                            :crossed t
+                            :font 8))
+                        "normal text 2")
+             :cursor '(5 . 1)))))
+
 
 ;;;;; Miscellaneous Tests.
 

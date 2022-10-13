@@ -1834,7 +1834,7 @@ where `*' indicates point."
                 (point) 'eat--t-wrap-line nil limit)))
   ;; Remove the newline.
   (when (< (point) (or limit (point-max)))
-    (cl-assert (= (char-after) ?\n))
+    (1value (cl-assert (1value (= (1value (char-after)) ?\n))))
     (delete-char 1)))
 
 (defun eat--t-break-long-line (threshold)
@@ -1880,7 +1880,9 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (width 80 :documentation "Width of display.")
   (height 24 :documentation "Height of display.")
   (cursor nil :documentation "Cursor.")
-  (saved-cursor (eat--t-make-cur) :documentation "Saved cursor.")
+  (saved-cursor
+   (1value (eat--t-make-cur))
+   :documentation "Saved cursor.")
   (old-begin
    nil
    :documentation
@@ -1911,16 +1913,26 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (begin nil :documentation "Beginning of terminal.")
   (end nil :documentation "End of terminal area.")
   (title "" :documentation "The title of the terminal.")
-  (bell-fn #'ignore :documentation "Function to ring the bell.")
-  (input-fn #'ignore :documentation "Function to send input.")
-  (set-cursor-fn #'ignore :documentation "Function to set cursor.")
+  (bell-fn
+   (1value #'ignore)
+   :documentation "Function to ring the bell.")
+  (input-fn
+   (1value #'ignore)
+   :documentation "Function to send input.")
+  (set-cursor-fn
+   (1value #'ignore)
+   :documentation "Function to set cursor.")
   (manipulate-selection-fn
-   #'ignore
+   (1value #'ignore)
    :documentation "Function to manipulate selection.")
-  (set-title-fn #'ignore :documentation "Function to set title.")
-  (grab-mouse-fn #'ignore :documentation "Function to grab mouse.")
+  (set-title-fn
+   (1value #'ignore)
+   :documentation "Function to set title.")
+  (grab-mouse-fn
+   (1value #'ignore)
+   :documentation "Function to grab mouse.")
   (set-focus-ev-mode-fn
-   #'ignore
+   (1value #'ignore)
    :documentation "Function to set focus event mode.")
   (parser-state nil :documentation "State of parser.")
   (scroll-begin 1 :documentation "First line of scroll region.")
@@ -1929,7 +1941,9 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (main-display nil :documentation "Main display.
 
 Nil when not in alternative display mode.")
-  (face (eat--t-make-face) :documentation "Display attributes.")
+  (face
+   (1value (eat--t-make-face))
+   :documentation "Display attributes.")
   (auto-margin t :documentation "State of auto margin mode.")
   (ins-mode nil :documentation "State of insert mode.")
   (charset
@@ -1941,7 +1955,7 @@ Nil when not in alternative display mode.")
   (cur-state :default :documentation "Current state of cursor.")
   (cur-blinking-p nil :documentation "Is the cursor blinking?")
   (saved-face
-   (eat--t-make-face)
+   (1value (eat--t-make-face))
    :documentation "Saved SGR attributes.")
   (bracketed-yank nil :documentation "State of bracketed yank mode.")
   (keypad-mode nil :documentation "State of keypad mode.")
@@ -1949,7 +1963,9 @@ Nil when not in alternative display mode.")
   (mouse-pressed nil :documentation "Pressed mouse buttons.")
   (mouse-encoding nil :documentation "Current mouse event encoding.")
   (focus-event-mode nil :documentation "Whether to send focus event.")
-  (cut-buffers (make-vector 10 nil) :documentation "Cut buffers."))
+  (cut-buffers
+   (1value (make-vector 10 nil))
+   :documentation "Cut buffers."))
 
 (defvar eat--t-term nil
   "The current terminal.
@@ -2030,12 +2046,8 @@ display."
     ;; N is non-zero in most cases, except at the edge of display.
     (unless (zerop n)
       ;; Move to the Nth previous column.
-      ;; REVIEW: We are sure that trying to go to the Nth previous
-      ;; column won't cross the line beginning, so we should probably
-      ;; replace the `eat--t-col-motion' call with (backward-char N),
-      ;; because the former does addition checks which we don't need.
-      (cl-assert (>= (eat--t-current-col) n))
-      (eat--t-col-motion (- n))
+      (cl-assert (1value (>= (eat--t-current-col) n)))
+      (backward-char n)
       (cl-decf (eat--t-cur-x cursor) n))))
 
 (defun eat--t-cur-horizontal-abs (&optional n)
@@ -2066,12 +2078,12 @@ display."
     ;; N is non-zero in most cases, except at the edge of display.
     ;; Whatever the case, we move to the beginning of line.
     (if (zerop n)
-        (eat--t-goto-bol)
+        (1value (eat--t-goto-bol))
       ;; Move to the Nth next line, use newlines to reach that line if
       ;; needed.
       (eat--t-repeated-insert ?\n (- n (eat--t-goto-bol n)))
       (cl-incf (eat--t-cur-y cursor) n))
-    (setf (eat--t-cur-x cursor) 1)))
+    (1value (setf (eat--t-cur-x cursor) 1))))
 
 (defun eat--t-beg-of-prev-line (n)
   "Move to beginning of Nth previous line."
@@ -2085,7 +2097,7 @@ display."
     ;; line above, move to the beginning of the line.
     (eat--t-goto-bol (- n))
     (cl-decf (eat--t-cur-y cursor) n)
-    (setf (eat--t-cur-x cursor) 1)))
+    (1value (setf (eat--t-cur-x cursor) 1))))
 
 (defun eat--t-cur-down (&optional n)
   "Move cursor N lines down.
@@ -2237,8 +2249,8 @@ of range, place cursor at the edge of display."
       (let* ((disp (eat--t-term-display eat--t-term))
              (cursor (eat--t-disp-cursor disp)))
         (goto-char (eat--t-disp-begin disp))
-        (setf (eat--t-cur-y cursor) 1)
-        (setf (eat--t-cur-x cursor) 1))
+        (1value (setf (eat--t-cur-y cursor) 1))
+        (1value (setf (eat--t-cur-x cursor) 1)))
     ;; Move to column one, go to Yth line and move to Xth column.
     ;; REVIEW: We move relative to cursor position, which faster for
     ;; positions near the point (usually the case), but slower for
@@ -2261,13 +2273,13 @@ of range, place cursor at the edge of display."
   "Enable automatic margin."
   ;; Set the automatic margin flag to t, the rest of code will take
   ;; care of the effects.
-  (setf (eat--t-term-auto-margin eat--t-term) t))
+  (1value (setf (eat--t-term-auto-margin eat--t-term) t)))
 
 (defun eat--t-disable-auto-margin ()
   "Disable automatic margin."
   ;; Set the automatic margin flag to nil, the rest of code will take
   ;; care of the effects.
-  (setf (eat--t-term-auto-margin eat--t-term) nil))
+  (1value (setf (eat--t-term-auto-margin eat--t-term) nil)))
 
 (defun eat--t-set-charset (slot charset)
   "SLOT's character set to CHARSET."
@@ -2283,7 +2295,8 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
 (defun eat--t-write (str)
   "Write STR on display."
   (let* ((str
-          ;; Convert STR according to the current character set.
+          ;; Convert STR to Unicode according to the current character
+          ;; set.
           (pcase (alist-get (car (eat--t-term-charset eat--t-term))
                             (cdr (eat--t-term-charset eat--t-term)))
             ;; For `us-ascii', the default, no conversion is
@@ -2375,7 +2388,7 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
                     (put-text-property (point) (1+ (point))
                                        'eat--t-wrap-line t)
                     (forward-char))
-                  (setf (eat--t-cur-x cursor) 1)
+                  (1value (setf (eat--t-cur-x cursor) 1))
                   (cl-incf (eat--t-cur-y cursor)))))))))))
 
 (defun eat--t-horizontal-tab (&optional n)
@@ -2524,7 +2537,10 @@ N default to 1."
     (eat--t-goto (eat--t-cur-y saved) (eat--t-cur-x saved))
     ;; Restore SGR attributes.
     (setf (eat--t-term-face eat--t-term)
-          (eat--t-term-saved-face eat--t-term))))
+          (copy-tree (eat--t-term-saved-face eat--t-term)))
+    (setf (eat--t-face-underline-color (eat--t-term-face eat--t-term))
+          (copy-tree (eat--t-face-underline-color
+                      (eat--t-term-face eat--t-term))))))
 
 (defun eat--t-erase-in-line (&optional n)
   "Erase part of current line, but don't move cursor.
@@ -3019,67 +3035,67 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
     (while params
       (pcase (pop params)
         ('(0)
-         (setf (eat--t-face-fg face) nil)
-         (setf (eat--t-face-bg face) nil)
-         (setf (eat--t-face-intensity face) nil)
-         (setf (eat--t-face-italic face) nil)
-         (setf (eat--t-face-underline face) nil)
-         (setf (eat--t-face-underline-color face) nil)
-         (setf (eat--t-face-crossed face) nil)
-         (setf (eat--t-face-conceal face) nil)
-         (setf (eat--t-face-inverse face) nil)
-         (setf (eat--t-face-blink face) nil)
-         (setf (eat--t-face-font face) 'eat-term-font-0))
+         (1value (setf (eat--t-face-fg face) nil))
+         (1value (setf (eat--t-face-bg face) nil))
+         (1value (setf (eat--t-face-intensity face) nil))
+         (1value (setf (eat--t-face-italic face) nil))
+         (1value (setf (eat--t-face-underline face) nil))
+         (1value (setf (eat--t-face-underline-color face) nil))
+         (1value (setf (eat--t-face-crossed face) nil))
+         (1value (setf (eat--t-face-conceal face) nil))
+         (1value (setf (eat--t-face-inverse face) nil))
+         (1value (setf (eat--t-face-blink face) nil))
+         (1value (setf (eat--t-face-font face) 'eat-term-font-0)))
         ('(1)
-         (setf (eat--t-face-intensity face) 'eat-term-bold))
+         (1value (setf (eat--t-face-intensity face) 'eat-term-bold)))
         ('(2)
-         (setf (eat--t-face-intensity face) 'eat-term-faint))
+         (1value (setf (eat--t-face-intensity face) 'eat-term-faint)))
         ('(3)
-         (setf (eat--t-face-italic face) 'eat-term-italic))
+         (1value (setf (eat--t-face-italic face) 'eat-term-italic)))
         ('(4)
-         (setf (eat--t-face-underline face) 'line))
+         (1value (setf (eat--t-face-underline face) 'line)))
         ('(4 0)
-         (setf (eat--t-face-underline face) nil))
+         (1value (setf (eat--t-face-underline face) nil)))
         ('(4 1)
-         (setf (eat--t-face-underline face) 'line))
+         (1value (setf (eat--t-face-underline face) 'line)))
         ('(4 2)
-         (setf (eat--t-face-underline face) 'line))
+         (1value (setf (eat--t-face-underline face) 'line)))
         ('(4 3)
-         (setf (eat--t-face-underline face) 'wave))
+         (1value (setf (eat--t-face-underline face) 'wave)))
         ('(4 4)
-         (setf (eat--t-face-underline face) 'wave))
+         (1value (setf (eat--t-face-underline face) 'wave)))
         ('(4 5)
-         (setf (eat--t-face-underline face) 'wave))
+         (1value (setf (eat--t-face-underline face) 'wave)))
         ('(5)
-         (setf (eat--t-face-blink face) 'eat-term-slow-blink))
+         (1value (setf (eat--t-face-blink face) 'eat-term-slow-blink)))
         ('(6)
          (setf (eat--t-face-blink face) 'eat-term-fast-blink))
         ('(7)
-         (setf (eat--t-face-inverse face) t))
+         (1value (1value (setf (eat--t-face-inverse face) t))))
         ('(8)
-         (setf (eat--t-face-conceal face) t))
+         (1value (setf (eat--t-face-conceal face) t)))
         ('(9)
-         (setf (eat--t-face-crossed face) t))
+         (1value (setf (eat--t-face-crossed face) t)))
         (`(,(and (pred (lambda (font) (<= 10 font 19)))
                  font))
          (setf (eat--t-face-font face)
                (intern (format "eat-term-font-%i" (- font 10)))))
         ('(21)
-         (setf (eat--t-face-underline face) 'line))
+         (1value (setf (eat--t-face-underline face) 'line)))
         ('(22)
-         (setf (eat--t-face-intensity face) nil))
+         (1value (setf (eat--t-face-intensity face) nil)))
         ('(23)
-         (setf (eat--t-face-italic face) nil))
+         (1value (setf (eat--t-face-italic face) nil)))
         ('(24)
-         (setf (eat--t-face-underline face) nil))
+         (1value (setf (eat--t-face-underline face) nil)))
         ('(25)
-         (setf (eat--t-face-blink face) nil))
+         (1value (setf (eat--t-face-blink face) nil)))
         ('(27)
-         (setf (eat--t-face-inverse face) nil))
+         (1value (setf (eat--t-face-inverse face) nil)))
         ('(28)
-         (setf (eat--t-face-conceal face) nil))
+         (1value (setf (eat--t-face-conceal face) nil)))
         ('(29)
-         (setf (eat--t-face-crossed face) nil))
+         (1value (setf (eat--t-face-crossed face) nil)))
         (`(,(and (pred (lambda (color) (<= 30 color 37)))
                  color))
          (setf (eat--t-face-fg face)
@@ -3105,7 +3121,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                        (intern (format "eat-term-color-%i" color))
                        nil t)))))))
         ('(39)
-         (setf (eat--t-face-fg face) nil))
+         (1value (setf (eat--t-face-fg face) nil)))
         (`(,(and (pred (lambda (color) (<= 40 color 47)))
                  color))
          (setf (eat--t-face-bg face)
@@ -3130,7 +3146,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                        (intern (format "eat-term-color-%i" color))
                        nil t)))))))
         ('(49)
-         (setf (eat--t-face-bg face) nil))
+         (1value (setf (eat--t-face-bg face) nil)))
         ('(58)
          (setf (eat--t-face-underline-color face)
                (pcase (pop params)
@@ -3149,7 +3165,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                        (intern (format "eat-term-color-%i" color))
                        nil t)))))))
         ('(59)
-         (setf (eat--t-face-underline-color face) nil))
+         (1value (setf (eat--t-face-underline-color face) nil)))
         (`(,(and (pred (lambda (color) (<= 90 color 97)))
                  color))
          (setf (eat--t-face-fg face)
@@ -3189,24 +3205,28 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                  (list :color (eat--t-face-underline-color face)
                        :style underline)))
             ,@(when-let ((crossed (eat--t-face-crossed face)))
-                ;; TODO: How about colors?
+                ;; REVIEW: How about colors?  No terminal supports
+                ;; crossed attribute with colors, so we'll need to be
+                ;; creative to add the feature.
                 `(:strike-through t))
             :inherit
             (,@(when-let ((intensity (eat--t-face-intensity face)))
                  (list intensity))
              ,@(when-let ((italic (eat--t-face-italic face)))
-                 (list italic))
+                 (cl-assert (1value (eq (1value italic)
+                                        'eat-term-italic)))
+                 (list (1value italic)))
              ,@(when-let ((blink (eat--t-face-blink face)))
                  (list blink))
              ,(eat--t-face-font face))))))
 
 (defun eat--t-enable-keypad ()
   "Enable keypad."
-  (setf (eat--t-term-keypad-mode eat--t-term) t))
+  (1value (setf (eat--t-term-keypad-mode eat--t-term) t)))
 
 (defun eat--t-disable-keypad ()
   "Disable keypad."
-  (setf (eat--t-term-keypad-mode eat--t-term) nil))
+  (1value (setf (eat--t-term-keypad-mode eat--t-term) nil)))
 
 (defun eat--t-enable-sgr-mouse-encoding ()
   "Arrange that the following mouse events will be encoded like SGR."
@@ -3260,13 +3280,13 @@ MODE should be one of nil and `x10', `normal', `button-event',
 
 (defun eat--t-enable-focus-event ()
   "Enable sending focus events."
-  (setf (eat--t-term-focus-event-mode eat--t-term) t)
+  (1value (setf (eat--t-term-focus-event-mode eat--t-term) t))
   (funcall (eat--t-term-set-focus-ev-mode-fn eat--t-term) eat--t-term
            t))
 
 (defun eat--t-disable-focus-event ()
   "Disable sending focus events."
-  (setf (eat--t-term-focus-event-mode eat--t-term) nil)
+  (1value (setf (eat--t-term-focus-event-mode eat--t-term) nil))
   (funcall (eat--t-term-set-focus-ev-mode-fn eat--t-term) eat--t-term
            nil))
 
@@ -3476,10 +3496,11 @@ DATA is the selection data encoded in base64."
       (pcase (eat--t-term-parser-state eat--t-term)
         ('nil
          ;; Regular expression to find the end of plain text.
-         (let ((match (string-match (rx (or ?\0 ?\a ?\b ?\t ?\n ?\v
-                                            ?\f ?\r ?\C-n ?\C-o ?\e
-                                            #x7f))
-                                    output index)))
+         (let ((match (string-match
+                       (1value (rx (or ?\0 ?\a ?\b ?\t ?\n ?\v
+                                       ?\f ?\r ?\C-n ?\C-o ?\e
+                                       #x7f)))
+                       output index)))
            (if (not match)
                ;; The regex didn't match, so everything left to handle
                ;; is just plain text.
@@ -3519,12 +3540,12 @@ DATA is the selection data encoded in base64."
                (?\C-o
                 (eat--t-change-charset 'g0))
                (?\e
-                (setf (eat--t-term-parser-state eat--t-term)
-                      '(read-esc)))))))
+                (1value (setf (eat--t-term-parser-state eat--t-term)
+                              '(read-esc))))))))
         ('(read-esc)
          (let ((type (aref output index)))
            (cl-incf index)
-           (setf (eat--t-term-parser-state eat--t-term) nil)
+           (1value (setf (eat--t-term-parser-state eat--t-term) nil))
            ;; Dispatch control sequence.
            (pcase type
              ;; ESC (.
@@ -3572,28 +3593,28 @@ DATA is the selection data encoded in base64."
               (eat--t-reverse-index))
              ;; ESC P, or DCS.
              (?P
-              (setf (eat--t-term-parser-state eat--t-term)
-                    '(read-dcs "")))
+              (1value (setf (eat--t-term-parser-state eat--t-term)
+                            '(read-dcs ""))))
              ;; ESC X, or SOS.
              (?X
-              (setf (eat--t-term-parser-state eat--t-term)
-                    '(read-sos "")))
+              (1value (setf (eat--t-term-parser-state eat--t-term)
+                            '(read-sos ""))))
              ;; ESC [, or CSI.
              (?\[
-              (setf (eat--t-term-parser-state eat--t-term)
-                    '(read-csi "")))
+              (1value (setf (eat--t-term-parser-state eat--t-term)
+                            '(read-csi ""))))
              ;; ESC ], or OSC.
              (?\]
-              (setf (eat--t-term-parser-state eat--t-term)
-                    '(read-osc "")))
+              (1value (setf (eat--t-term-parser-state eat--t-term)
+                            '(read-osc ""))))
              ;; ESC ^, or PM.
              (?^
-              (setf (eat--t-term-parser-state eat--t-term)
-                    '(read-pm "")))
+              (1value (setf (eat--t-term-parser-state eat--t-term)
+                            '(read-pm ""))))
              ;; ESC _, or APC.
              (?_
-              (setf (eat--t-term-parser-state eat--t-term)
-                    '(read-apc "")))
+              (1value (setf (eat--t-term-parser-state eat--t-term)
+                            '(read-apc ""))))
              ;; ESC c.
              (?c
               (eat--t-reset))
@@ -3855,9 +3876,6 @@ DATA is the selection data encoded in base64."
 
 (defun eat--t-resize (width height)
   "Resize terminal to WIDTH x HEIGHT."
-  ;; REVIEW: This works, but it is very simple.  Most terminals have
-  ;; more sophisticated mechanisms to do this.  It would be nice thing
-  ;; have them here.
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (old-width (eat--t-disp-width disp))
@@ -3894,6 +3912,9 @@ DATA is the selection data encoded in base64."
                         (x (eat--t-cur-x cursor)))
                     (eat--t-goto 1 1)
                     (eat--t-goto y x)))))
+          ;; REVIEW: This works, but it is very simple.  Most
+          ;; terminals have more sophisticated mechanisms to do this.
+          ;; It would be nice thing have them here.
           ;; Go to the beginning of display.
           (goto-char (eat--t-disp-begin disp))
           ;; Try to move to the end of previous line, maybe that's a
@@ -3909,7 +3930,7 @@ DATA is the selection data encoded in base64."
             (eat--t-break-long-line (eat--t-disp-width disp)))
           ;; Calculate the beginning position of display.
           (goto-char (eat--t-cur-position cursor))
-          ;; TODO: This part need explanation.
+          ;; TODO: This part needs explanation.
           (let* ((disp-begin (car (eat--t-bol (- (1- height))))))
             (when (< (eat--t-disp-begin disp) disp-begin)
               (goto-char (max (- (eat--t-disp-begin disp) 1)
@@ -4161,6 +4182,8 @@ you need the position."
   "Return the cursor's current position on TERMINAL's display."
   (let* ((disp (eat--t-term-display terminal))
          (cursor (eat--t-disp-cursor disp)))
+    ;; The cursor might be after the edge of the display.  But we
+    ;; don't want the UI to show that, so show cursor at the edge.
     (if (> (eat--t-cur-x cursor) (eat--t-disp-width disp))
         (1- (eat--t-cur-position cursor))
       (eat--t-cur-position cursor))))
@@ -4223,13 +4246,14 @@ given.
 For mouse events, events should be sent on both mouse button press and
 release unless the mouse grabing mode is `:click', otherwise the
 client process may get confused."
-  ;; TODO: Comment.
   (let ((disp (eat--t-term-display terminal)))
     (cl-flet ((send (str)
                 (funcall (eat--t-term-input-fn terminal)
                          terminal str)))
       (dotimes (_ (or n 1))
         (pcase event
+          ;; Arrow key, `insert', `delete', `deletechar', `home',
+          ;; `end', `prior', `next' and their modifier variants.
           ((and (or 'up 'down 'right 'left
                     'C-up 'C-down 'C-right 'C-left
                     'M-up 'M-down 'M-right 'M-left
@@ -4308,6 +4332,7 @@ client process may get confused."
            (send "\C-?"))
           ('C-backspace
            (send "\C-h"))
+          ;; Function keys.
           ((and (pred symbolp)
                 fn-key
                 (let (rx string-start "f"
@@ -4347,6 +4372,7 @@ client process may get confused."
            (when (numberp char)
              (let* ((base (event-basic-type char))
                     (mods (event-modifiers char)))
+               ;; Try to avoid event-convert-list if possible.
                (if (and (characterp char)
                         (not (memq 'meta mods))
                         (not (and (memq 'control mods)
@@ -4370,7 +4396,9 @@ client process may get confused."
                              (format
                               (if (memq 'meta mods) "\e%c" "%c")
                               ch))))))))))
-          ((and mouse
+          ;; Mouse handling.
+          ((and (guard (eat--t-term-mouse-mode terminal))
+                mouse
                 (pred eventp)
                 (or (and (let mouse-type (event-basic-type mouse))
                          (let (rx string-start "mouse-"
@@ -4390,78 +4418,77 @@ client process may get confused."
                          (let mouse-num 6))
                     (and (let 'wheel-left (event-basic-type mouse))
                          (let mouse-num 7))))
-           (when (eat--t-term-mouse-mode terminal)
-             (let* ((modifiers (event-modifiers mouse))
-                    (pos (if (memq 'drag modifiers)
-                             (event-end mouse)
-                           (event-start mouse)))
-                    (x (1+ (car (posn-col-row pos))))
-                    (y (1+ (cdr (posn-col-row pos))))
-                    (button
-                     (let ((b (aref
-                               [0 1 2 64 65 66 67 128 129 130 131]
-                               (1- mouse-num))))
-                       (when (memq 'shift modifiers)
-                         (cl-incf b 4)
-                         (setq b (+ b 4)))
-                       (when (memq 'meta modifiers)
-                         (cl-incf b 8))
-                       (when (memq 'control modifiers)
-                         (cl-incf b 16))
-                       b)))
-               (when ref-pos
-                 (cl-decf x (car (posn-col-row ref-pos)))
-                 (cl-decf y (cdr (posn-col-row ref-pos))))
-               (when (and (<= 1 x (eat--t-disp-width disp))
-                          (<= 1 y (eat--t-disp-height disp))
-                          (or (eat--t-term-mouse-encoding terminal)
-                              (and (<= x 95)
-                                   (<= y 95)
-                                   (<= button 95))))
-                 (if (eq (eat--t-term-mouse-mode terminal) 'x10)
-                     (when (and (< button 3)
-                                (or (memq 'click modifiers)
-                                    (memq 'drag modifiers)))
-                       (send
-                        (if (eq (eat--t-term-mouse-encoding terminal)
-                                'sgr)
-                            (format "\e[<%i;%i;%iM" button x y)
-                          (format "\e[M%c%c%c" (+ button 32) (+ x 32)
-                                  (+ y 32)))))
-                   (cond
-                    ((memq 'down modifiers)
-                     (when (< (logand button) 3)
-                       (setf (eat--t-term-mouse-pressed terminal)
-                             (nconc (eat--t-term-mouse-pressed
-                                     terminal)
-                                    (list button))))
+           (let* ((modifiers (event-modifiers mouse))
+                  (pos (if (memq 'drag modifiers)
+                           (event-end mouse)
+                         (event-start mouse)))
+                  (x (1+ (car (posn-col-row pos))))
+                  (y (1+ (cdr (posn-col-row pos))))
+                  (button
+                   (let ((b (aref
+                             [0 1 2 64 65 66 67 128 129 130 131]
+                             (1- mouse-num))))
+                     (when (memq 'shift modifiers)
+                       (cl-incf b 4)
+                       (setq b (+ b 4)))
+                     (when (memq 'meta modifiers)
+                       (cl-incf b 8))
+                     (when (memq 'control modifiers)
+                       (cl-incf b 16))
+                     b)))
+             (when ref-pos
+               (cl-decf x (car (posn-col-row ref-pos)))
+               (cl-decf y (cdr (posn-col-row ref-pos))))
+             (when (and (<= 1 x (eat--t-disp-width disp))
+                        (<= 1 y (eat--t-disp-height disp))
+                        (or (eat--t-term-mouse-encoding terminal)
+                            (and (<= x 95)
+                                 (<= y 95)
+                                 (<= button 95))))
+               (if (eq (eat--t-term-mouse-mode terminal) 'x10)
+                   (when (and (< button 3)
+                              (or (memq 'click modifiers)
+                                  (memq 'drag modifiers)))
                      (send
                       (if (eq (eat--t-term-mouse-encoding terminal)
                               'sgr)
                           (format "\e[<%i;%i;%iM" button x y)
                         (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                                 (+ y 32)))))
-                    ((and (or (memq 'click modifiers)
-                              (memq 'drag modifiers))
-                          (< mouse-num 3))
+                 (cond
+                  ((memq 'down modifiers)
+                   (when (< (logand button) 3)
                      (setf (eat--t-term-mouse-pressed terminal)
-                           (cl-delete-if
-                            (lambda (b)
-                              (= (logand b 3) (logand button 3)))
-                            (eat--t-term-mouse-pressed terminal)))
-                     (send
-                      (if (eq (eat--t-term-mouse-encoding terminal)
-                              'sgr)
-                          (format "\e[<%i;%i;%im" button x y)
-                        (format "\e[M%c%c%c" (+ (logior button 3) 32)
-                                (+ x 32) (+ y 32)))))
-                    (t
-                     (send
-                      (if (eq (eat--t-term-mouse-encoding terminal)
-                              'sgr)
-                          (format "\e[<%i;%i;%im" button x y)
-                        (format "\e[M%c%c%c" (+ button 32) (+ x 32)
-                                (+ y 32)))))))))))
+                           (nconc (eat--t-term-mouse-pressed terminal)
+                                  (list button))))
+                   (send
+                    (if (eq (eat--t-term-mouse-encoding terminal)
+                            'sgr)
+                        (format "\e[<%i;%i;%iM" button x y)
+                      (format "\e[M%c%c%c" (+ button 32) (+ x 32)
+                              (+ y 32)))))
+                  ((and (or (memq 'click modifiers)
+                            (memq 'drag modifiers))
+                        (< mouse-num 3))
+                   (setf (eat--t-term-mouse-pressed terminal)
+                         (cl-delete-if
+                          (lambda (b)
+                            (= (logand b 3) (logand button 3)))
+                          (eat--t-term-mouse-pressed terminal)))
+                   (send
+                    (if (eq (eat--t-term-mouse-encoding terminal)
+                            'sgr)
+                        (format "\e[<%i;%i;%im" button x y)
+                      (format "\e[M%c%c%c" (+ (logior button 3) 32)
+                              (+ x 32) (+ y 32)))))
+                  (t
+                   (send
+                    (if (eq (eat--t-term-mouse-encoding terminal)
+                            'sgr)
+                        (format "\e[<%i;%i;%im" button x y)
+                      (format "\e[M%c%c%c" (+ button 32) (+ x 32)
+                              (+ y 32))))))))))
+          ;; Mouse movement tracking.
           ((and (pred mouse-movement-p)
                 movement)
            (when (memq (eat--t-term-mouse-mode terminal)
@@ -4492,6 +4519,7 @@ client process may get confused."
                       (format "\e[<%i;%i;%iM" button x y)
                     (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                             (+ y 32))))))))
+          ;; Focus events.
           ('(eat-focus-in)
            (when (eat--t-term-focus-event-mode terminal)
              (send "\e[I")))
@@ -4508,8 +4536,10 @@ Each argument in ARGS can be either string or character."
                                    (if (stringp s) s (string s)))
                                  args "")))
              (if (eat--t-term-bracketed-yank terminal)
-                 ;; NOTE: What if `str' itself contains these escape
-                 ;; sequences?
+                 ;; REVIEW: What if `str' itself contains these escape
+                 ;; sequences?  St doesn't care and just wraps the
+                 ;; string with these magic escape sequences, while
+                 ;; Kitty tries to be smart.
                  (format "\e[200~%s\e[201~" str)
                str))))
 
