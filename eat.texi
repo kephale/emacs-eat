@@ -2,7 +2,7 @@
 
 @comment %**start of header
 @setfilename eat.info
-@set UPDATED 13 October 2022
+@set UPDATED 14 October 2022
 @set UPDATED-MONTH October 2022
 @set EDITION 0.1
 @set VERSION 0.1
@@ -98,10 +98,10 @@ comfort of Emacs to use Emacs.
 Secondly, it's easy and convenient to use.  It is tries to stay out of
 your way, allow you to maximize your productivity.
 
-Finally, special care has been taken while designing keybindings, so
-that the terminal doesn't conflict with Emacs default keybindings on
-both graphical display and text display, while still allowing you to
-run full screen programs like Emacs within the terminal.
+Finally, special care has been taken while designing the keybindings,
+so that the terminal doesn't conflict with Emacs default keybindings
+on both graphical display and text display, while still allowing you
+to run full screen programs like Emacs within the terminal.
 
 @node Hello Terminal
 @cindex hello terminal
@@ -112,20 +112,20 @@ run full screen programs like Emacs within the terminal.
 The terminal can be started with @kbd{M-x eat}.  It would prompt you
 for the program to run in the terminal, with a reasonable default
 value already filled in.  You can specify a program path, or a shell
-command.  After you hit @key{@key{RET}}, you will see a terminal, and
+command.  After you hit @kbd{@key{RET}}, you will see a terminal, and
 the program you chose will be run within the terminal in the current
 directory.  You can interact with it.  If you started a shell, you
 should get a shell prompt and you should be able to write commands and
 execute them.  Full screen programs like @samp{htop}, @samp{lynx} and
-Emacs will work inside it, just other any other terminal.
+Emacs will work inside it, just like other any other terminal.
 
-If a Eat terminal already exists, @kbd{M-x eat} will switch to it.  To
-create a new terminal, call it with a prefix argument like this,
+If an Eat terminal already exists, @kbd{M-x eat} will switch to it.
+To create a new terminal, call it with a prefix argument like this,
 @kbd{C-u M-x eat}.
 
 If you give it a numeric argument N, for example @kbd{C-u 42 M-x eat},
-it'll switch to a terminal in @file{*eat*<N>}, e.g. @file{*eat*<42>},
-and it'll create a new terminal if that doesn't exist.
+it'll switch to a terminal in @file{*eat*<N>}, @file{*eat*<42>} for
+example, and it'll create a new terminal if that doesn't exist.
 
 @node Project-local Terminal
 @cindex project-local terminal
@@ -137,9 +137,9 @@ and it'll create a new terminal if that doesn't exist.
 
 @findex eat-project
 Usually, you don't use a single terminal for everything, instead you
-open a terminal for each that needs it.  So there is command named
-@command{eat-project}.  It opens a new terminal in project root
-directory, or switch to a already existing project terminal.  It too
+open a terminal for each project that needs it.  So there is command
+named @command{eat-project}.  It opens a new terminal in project root
+directory, or switches to a already existing project terminal.  It too
 accepts prefix argument, just like the ordinary @command{eat} command.
 
 @node Eshell Terminal
@@ -160,7 +160,7 @@ you can run any full screen terminal program in Eshell.
 @findex eat-eshell-mode
 To enable terminal emulation in Eshell, enable the global minor mode
 @command{eat-eshell-mode}.  It will enable Eat's terminal emulation in
-Eshell.  To disable the terminal emulation, disable the mode.
+Eshell.  To disable the terminal emulation, disable the minor mode.
 
 You can't toggle the global minor mode while any Eshell command is
 running, so terminate any Eshell command or wait them to finish before
@@ -177,14 +177,14 @@ Eat terminal also applies to Eshell terminal emulation.
 
 Just like any other text terminal, the primary interaction device with
 Eat terminal is the keyboard.  Eat forwards all supported keyboard
-events like @kbd{a}, @kbd{A}, @kbd{RET}, @kbd{C-a} to the terminal.
+events like @kbd{a}, @kbd{E}, @kbd{RET}, @kbd{C-a} to the terminal.
 
 However, this conflict with Emacs keybinding conventions, and makes it
 almost impossible to call any other Emacs command.  So, by default,
 Eat doesn't intercept the key sequences beginning with the following
 keys and lets Emacs to handle them: @kbd{C-\}, @kbd{C-c}, @kbd{C-x},
 @kbd{C-g}, @kbd{C-h}, @kbd{C-M-c}, @kbd{C-u}, @kbd{C-q}, @kbd{M-x},
-@kbd{M-:}, @kbd{M-!}, @kbd{M-&}.
+@kbd{M-:}, @kbd{M-!} and @kbd{M-&}.
 
 To input the above key sequences, prefix them with @kbd{C-q}.
 @kbd{C-q} reads the next event and sends to directly to the terminal.
@@ -199,8 +199,8 @@ For an alternative way to input these exceptional characters,
 
 Eat supports mouse tracking.  That means in programs like Emacs,
 @samp{htop}, etc, that support mouse, you can hover and click on
-text and buttons.  You can also scrolling events to scroll text, if
-the program supports it.
+text and buttons.  You can also use your mouse wheel to scroll text,
+if the program supports it.
 
 @xref{Mouse Tracking} to configure mouse tracking.
 
@@ -212,8 +212,8 @@ the program supports it.
 @chapter Input Modes
 
 By default, Eat forwards all supported keys to terminals, except some
-exceptions, @pxref{Keyboard}.  It is possible to input them with
-@kbd{C-q}, but it is not very convenient.
+exceptions.  It is possible to input them with @kbd{C-q}, but it is
+not very convenient.
 
 To conveniently input those character, they should be bound to input
 themselves to the terminal (i.e. pressing @kbd{M-x} will input
@@ -244,12 +244,14 @@ next input event and sends that as the input.  For example, the key
 sequences @kbd{C-q M-:} inputs @kbd{M-:}.
 
 Input methods (@pxref{Input Methods,,, emacs, GNU Emacs Manual}) work
-in this mode, so you can input keys that are not on your keyboard.
+in this mode, so, unlike Term (@pxref{Terminal emulator, Emacs
+Terminal Emulator, Emacs Terminal Emulator, emacs, GNU Emacs Manual}),
+Emacs built-in terminal emulator, you can still input any character.
 
 @kindex C-c C-c @r{(``semi-char mode'')}
 @kindex C-c C-k @r{(``semi-char mode'')}
-In ``semi-char mode'', @kbd{C-c C-c} sends @kbd{C-c} and @kbd{C-c C-k}
-kill the terminal process.
+In ``semi-char mode'', @kbd{C-c C-c} sends a @kbd{C-c}, just for
+convenience, and @kbd{C-c C-k} kills the terminal program.
 
 @anchor{Char Mode}
 @cindex char mode
@@ -264,7 +266,8 @@ forwards all supported keys to terminals, except some exceptions,
 @pxref{Semi-char Mode}.  It is possible to input them with @kbd{C-q},
 but it is not very convenient.
 
-To overcome this problem, Eat implements another input mode call
+@kindex C-c C-j @r{(``semi-char mode'')}
+To overcome this problem, Eat implements another input mode called
 ``char mode''.  To switch to ``char mode'', press @kbd{C-c C-j} in
 ``semi-char mode''.
 
@@ -289,8 +292,13 @@ In ``emacs mode'', no input events are send to the terminal.  In this
 mode, you can interact with the terminal buffer just like a regular
 buffer.  However, you are not allowed to change the buffer contents.
 
+@kindex C-c C-e @r{(``semi-char mode'')}
+To switch to ``emacs mode'', press @kbd{C-c C-e} from ``semi-char
+mode''.
+
 @kindex C-c C-k @r{(``emacs mode'')}
-In this mode, @kbd{C-c C-k} kill the terminal process.
+In this mode, @kbd{C-c C-k} kills the terminal program like in
+``semi-char mode''.
 
 @kindex C-c C-s @r{(``emacs mode'')}
 @kindex C-c C-j @r{(``emacs mode'')}
@@ -305,11 +313,13 @@ From ``emacs mode'', you can switch to ``semi-char mode'' with
 
 Display is the region you see on the terminal.  The program writes to
 the display and manipulates the text on the display.  The display can
-be of any size.  The cursor is always on display.
+be of any size.  The cursor is always on the display (though it might
+be invisible sometimes, @pxref{Cursor Types}).
 
-You can resize the display by resizing the window where the terminal
-is shown.  The display size is controlled by the Emacs user option
-@code{window-adjust-process-window-size-function}.  @xref{Process
+@vindex window-adjust-process-window-size-function
+You can resize the display by resizing the terminal window.  The
+display size is controlled by the Emacs user option
+@code{window-adjust-process-window-size-function}. @xref{Process
 Buffers,,, elisp, GNU Emacs Lisp Reference Manual} for the possible
 values of the user option.
 
@@ -317,12 +327,12 @@ values of the user option.
 @cindex scrollback
 @chapter Scrollback
 
-When you write go too downward on the terminal, the terminal starts to
-scroll.  This causes the line at the upper side of the terminal to go
-out of the display.  But these line are not deleted, they are just put
-in the scrollback region.
+When you go too downward on the terminal, the terminal starts to
+``scroll''.  This causes the line at the upper side of the terminal to
+go out of the display and become hidden.  But these line are not
+deleted, they are just put in the scrollback region.
 
-Scrollback region is a area just above the display of the terminal.
+Scrollback region is a region just above the display of the terminal.
 This contains the lines that went out of display due to scrolling up.
 
 Scrollback region is not unlimited by default, to avoid using too much
@@ -346,7 +356,7 @@ scrollback region is unlimited.
 @chapter Cursor Types
 
 In terminal, cursor can be of up to three type: ``visible'',
-``invisible'' and ``very visible''.  ``visible'' is the default cursor
+``invisible'' and ``very visible''.  ``Visible'' is the default cursor
 type, which is the cursor you usually see in a shell (unless the shell
 changes the cursor type).  ``Invisible'' is, as the name suggests,
 invisible, you can't see it.  ``Very visible'' cursor is a blinking
@@ -367,21 +377,24 @@ This control the cursor shape of ``invisible'' cursor type.
 
 @vindex eat-very-visible-cursor-type
 @defopt eat-very-visible-cursor-type
-This control the cursor shape of ``very visible'' cursor type.
+This control the cursor shape of ``very visible'' cursor type.  This
+cursor blinks, switching between the default cursor shape and a hollow
+box.
 @end defopt
 
-The value type of these user options is list.  The list is of form
+The value type of these user options is a list.  The list is of form
 (@var{cursor-on} @var{blinking-frequency} @var{cursor-off}).
-@var{cursor-on} is the default cursor, it is shown on the display.
-This uses the same format as Emacs's @code{cursor-type} user option
-(@pxref{Cursor Display,,, emacs, GNU Emacs Manual}).
 @var{blinking-frequency} is the frequency of blinking of cursor.  It
-is a number, controlling how many times the cursor will blink.  This
-can also be @code{nil}, this will disable cursor blinking.  When
+is a number, controlling how many times the cursor will blink a
+second.  This can also be @code{nil}, this will disable cursor
+blinking.  @var{cursor-on} is the default cursor shape, only this
+shape is shown on the display when blinking is disabled.  This uses
+the same format as Emacs's @code{cursor-type} user option
+(@pxref{Cursor Display,,, emacs, GNU Emacs Manual}).  When
 @var{blinking-frequency} is a number, Eat will consult to the third
 element of the list, @var{cursor-off}, whose format same as
 @var{cursor-on}.  The blinking cursor switches between @var{cursor-on}
-and @var{cursor-off} cursor type.
+and @var{cursor-off} cursor shape.
 
 @node Mouse Tracking
 @cindex mouse tracking
@@ -390,12 +403,13 @@ and @var{cursor-off} cursor type.
 
 Eat tracks mouse by default, when the program supports mouse.  But
 sometimes, you may want to avoid using mouse, or you might not have a
-mouse at all.  So mouse tracking can toggled.
+mouse at all.  So mouse tracking can be toggled.
 
 @vindex eat-enable-mouse
 @defopt eat-enable-mouse
-This user option controls mouse tracking.  This is set to @code{t} by
-default.  Set to this to @code{nil} to disable mouse tracking.
+This user option controls mouse tracking.  When set to non-@code{nil},
+mouse tracking is enabled.  Set to this to @code{nil} to disable mouse
+tracking.  This is enabled by default.
 @end defopt
 
 @node Clipboard
@@ -444,8 +458,8 @@ disabled by default for security reasons.
 @chapter Colors
 
 Eat can show more than 16 million colors (16,777,216 colors exactly).
-Eat also has a palette of 256 colors, which is more than enough for
-most applications.  Programs usually use these 256 colors.  Each of
+Eat has also a palette of 256 colors, which is more than enough for
+most applications.  Programs usually use this color palette.  Each of
 these 256 colors can customized.
 
 There are 256 faces for the 256 colors, one face for each color.  They
@@ -455,7 +469,7 @@ color @var{n}, and @var{n} can be any number between 0 and 255
 @code{eat-term-color-42}.
 
 The foreground attribute contains the color value to use for the
-corresponding color.  Other attribute are currently ignored and
+corresponding color.  Other attributes are currently ignored and
 reserved for future changes.
 
 @cindex color aliases
@@ -492,9 +506,11 @@ color codes.
 Eat doesn't always advertise color support depending on the display
 Eat is running.  For example, if you are on a Linux console which
 supports only eight colors, Eat will advertise eight color support to
-the programs, because although Eat supports more colors, the display
-doesn't support them.
+the programs, while on graphical displays with 24-bit color support,
+Eat will report 24-bit color support.  This is because Eat supports
+more colors, the display doesn't always support them.
 
+@vindex TERM
 @cindex @env{TERM} environment variable
 @cindex environment variable, @env{TERM}
 Eat does the trick by setting the @env{TERM} environment variable of
@@ -547,11 +563,11 @@ uses the same font, the default font, regardless of the font requested
 by the program, by default.
 
 @cindex customizing font families
-There are ten faces for ten fonts, one face for each font.  They are
-named like @code{eat-term-font-@var{n}}, which corresponds to color
-@var{n}, and @var{n} can be any number between 0 and 9 (inclusive).
-For example, color 42 is can be changed by customizing
-@code{eat-term-color-42}.
+There are ten faces for ten fonts, one face for each.  They are named
+like @code{eat-term-font-@var{n}}, which corresponds to color @var{n},
+and @var{n} can be any number between 0 and 9 (inclusive).  For
+example, the font 6 is can be changed by customizing
+@code{eat-term-font-6}.  Font 0 is the default font.
 
 @node Blinking Text
 @cindex blinking text
@@ -631,16 +647,18 @@ before sending the input.
 Programs also break large output into smaller chunks before sending
 it to the terminal, for same reason.  Eat doesn't suffer from the
 problem, but there isn't any standard way to inform programs about
-this.  This small chunks create another problem for Eat, flickering.
-When updating the whole display, the output is usually pretty large
-and the programs break them into smaller chunks.  Each of the chunks
-update the display partially.  After receiving the last chunks, the
-update is complete and the display can be updated.  But it is
-impossible for Eat to guess the last chunk, so Eat has to redisplay or
-update the display after receiving each chunk.  This is the reason why
-sometimes the terminal shows some old contents and some new.  This
+this, and usually there are other obstructions sending large amount of
+data at once.  These small chunks create another problem for Eat,
+flickering.  When updating the whole display, the output is usually
+pretty large and the programs break them into smaller chunks.  Each of
+the chunks update the display partially.  After receiving the last
+chunk, the update is complete and the display can be updated.  But it
+is impossible for Eat to guess the last chunk, so Eat has to redisplay
+or update the display after receiving each chunk.  This is the reason
+why sometimes the terminal shows some old contents and some new.  This
 only lasts for a fraction of a second until the next chunk is received
-and processed.  This is flickering.
+and processed.  This is flickering.  This also degrades performance,
+because redisplay is an expensive process and takes some time.
 
 @cindex fixing flickering
 @cindex flickering fix
@@ -648,11 +666,11 @@ and processed.  This is flickering.
 Fixing the flickering completely is not possible.  Eat tries to
 decrease flickering by deferring redisplay.  After receiving a chunk,
 Eat waits for a tiny fraction of a second.  If another chunk arrives
-within the times, redisplay is postponed.  Then Eat waits for the same
-amount of time and this goes on.  When timeout occurs, Eat processing
-the output and displays the output.  This causes a small latency
-between output arrive and redisplay, but this is usually not long
-enough for human eyes to catch it.  This waiting time can be
+within the time, the redisplay is postponed.  Then Eat waits for the
+same amount of time and this goes on.  When timeout occurs, Eat
+processing the output and displays the output.  This causes a small
+latency between output arrive and redisplay, but this is usually not
+long enough for human eyes to catch it.  This waiting time can be
 configured with the following user option:
 
 @vindex eat-minimum-latency
@@ -660,7 +678,7 @@ configured with the following user option:
 The value is the time in seconds to wait for the next chunk to arrive.
 This is the minimum latency between the first chunk after a redisplay
 and the next redisplay.  For example, if you press @kbd{@key{RET}} in
-a empty Bash prompt, the next prompt won't appear before this much
+an empty Bash prompt, the next prompt won't appear before this much
 time.
 
 You should set the time to something comfortable for you.  You can
@@ -668,27 +686,27 @@ also set this to zero is disable waiting and showing the output
 instantly, but this would likely cause a lot of flickering.
 @end defopt
 
-However, this waiting raising another problem.  What if you execute
-the POSIX command @samp{yes} in the terminal?  It will write infinite
+However, this waiting raises another problem.  What if you execute the
+POSIX command @samp{yes} in the terminal?  It will write infinite
 ``y''s in the terminal without any delay between them anywhere.  Eat
 will wait indefinitely for a delay between two chunks, which will
 never happen, unless the program is executed remotely and the
-connection is very slow.  So Eat has a maximum waiting time, the
-display will be always be updated after this time.  This time also
+connection is slow enough.  So Eat has a limit for waiting, the
+display will be always be updated after this time.  This limit also
 customizable:
 
 @vindex eat-maximum-latency
 @defopt eat-maximum-latency
 The value is the time in seconds to wait at most for chunk.  In case
 of large burst of output, redisplay is never deferred more than this
-many seconds.
+many seconds, and cause a latency of up to this many seconds.
 
 You should set the time to something comfortable for you.  You can
 also set this to zero is disable waiting and showing the output
 instantly, but this would likely cause a lot of flickering.
 @end defopt
 
-This user option described in this chapter have reasonable default
+The user option described in this chapter have reasonable default
 values, but they may change anytime.
 
 @part Part IV:@* Appendices
