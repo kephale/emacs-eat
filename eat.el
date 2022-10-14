@@ -2657,16 +2657,13 @@ to (1, 1).  When N is 3, also erase the scrollback."
              (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
                                      (eat--t-face-face face))
              (insert ?\n)))
-         ;; Fill the current line to keep the cursor unmoved.
-         (if (not (eat--t-face-bg face))
-             (eat--t-repeated-insert ?\  (1- x))
-           ;; Fill with background.
-           (eat--t-repeated-insert ?\  x
-                                   (and (eat--t-face-bg face)
-                                        (eat--t-face-face face)))
-           ;; We are off by one column; so move a column backward.
-           (when incl-point
-             (backward-char)))))
+         ;; Fill the current line to keep the cursor unmoved.  Use
+         ;; background if the corresponding SGR attribute is set.
+         (eat--t-repeated-insert ?\  x (and (eat--t-face-bg face)
+                                            (eat--t-face-face face)))
+         ;; We are off by one column; so move a column backward.
+         (when incl-point
+           (backward-char))))
       ((or 2 3)
        ;; Move to the display beginning.
        (eat--t-goto 1 1)

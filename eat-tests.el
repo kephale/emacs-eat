@@ -530,8 +530,8 @@ function is to be invoked."
     (output "   \e[E")
     (should (match-term :cursor '(1 . 1)))))
 
-(ert-deftest eat-test-horizontal-position-absolute ()
-  "Test horizontal position absolute control function."
+(ert-deftest eat-test-cursor-character-absolute ()
+  "Test cursor character absolute control function."
   (eat--tests-with-term '()
     (output "\e[5G")
     (should (match-term :cursor '(1 . 5)))
@@ -540,6 +540,18 @@ function is to be invoked."
     (output "\e[15G")
     (should (match-term :cursor '(1 . 15)))
     (output "\e[G")
+    (should (match-term :cursor '(1 . 1)))))
+
+(ert-deftest eat-test-character-position-absolute ()
+  "Test character position absolute control function."
+  (eat--tests-with-term '()
+    (output "\e[5`")
+    (should (match-term :cursor '(1 . 5)))
+    (output "\e[0`")
+    (should (match-term :cursor '(1 . 1)))
+    (output "\e[15`")
+    (should (match-term :cursor '(1 . 15)))
+    (output "\e[`")
     (should (match-term :cursor '(1 . 1)))))
 
 (ert-deftest eat-test-line-position-absolute ()
@@ -4585,11 +4597,9 @@ automatic scrolling as a side effect."
                           "crazy text 1"
                           `((0 . 12)
                             :foreground ,(face-foreground
-                                          'eat-term-color-13
-                                          nil t)
+                                          'eat-term-color-13 nil t)
                             :background ,(face-foreground
-                                          'eat-term-color-3
-                                          nil t)
+                                          'eat-term-color-3 nil t)
                             :intensity bold
                             :italic t
                             :underline-type wave
@@ -4606,11 +4616,9 @@ automatic scrolling as a side effect."
                           "crazy text 1"
                           `((0 . 12)
                             :foreground ,(face-foreground
-                                          'eat-term-color-13
-                                          nil t)
+                                          'eat-term-color-13 nil t)
                             :background ,(face-foreground
-                                          'eat-term-color-3
-                                          nil t)
+                                          'eat-term-color-3 nil t)
                             :intensity bold
                             :italic t
                             :underline-type wave
@@ -4630,11 +4638,9 @@ automatic scrolling as a side effect."
                           "crazy text 1"
                           `((0 . 12)
                             :foreground ,(face-foreground
-                                          'eat-term-color-13
-                                          nil t)
+                                          'eat-term-color-13 nil t)
                             :background ,(face-foreground
-                                          'eat-term-color-3
-                                          nil t)
+                                          'eat-term-color-3 nil t)
                             :intensity bold
                             :italic t
                             :underline-type wave
@@ -4664,11 +4670,9 @@ automatic scrolling as a side effect."
                           "crazy text 1"
                           `((0 . 12)
                             :foreground ,(face-foreground
-                                          'eat-term-color-13
-                                          nil t)
+                                          'eat-term-color-13 nil t)
                             :background ,(face-foreground
-                                          'eat-term-color-3
-                                          nil t)
+                                          'eat-term-color-3 nil t)
                             :intensity bold
                             :italic t
                             :underline-type wave
@@ -4693,6 +4697,419 @@ automatic scrolling as a side effect."
                             :font 8))
                         "normal text 2")
              :cursor '(5 . 1)))))
+
+
+;;;;; Text Manipulation Tests.
+
+(ert-deftest eat-test-erase-in-line ()
+  "Test erase in line control function."
+  (eat--tests-with-term '()
+    ;; Without background.
+    (output "foo bar baz\e[6G")
+    (should (match-term :display '("foo bar baz")
+                        :cursor '(1 . 6)))
+    (output "\e[K")
+    (should (match-term :display '("foo b")
+                        :cursor '(1 . 6)))
+    (output "\nbar baz foo\e[6G")
+    (should (match-term :display '("foo b"
+                                   "bar baz foo")
+                        :cursor '(2 . 6)))
+    (output "\e[1K")
+    (should (match-term :display '("foo b"
+                                   "      z foo")
+                        :cursor '(2 . 6)))
+    (output "\nbaz foo bar\e[6G")
+    (should (match-term :display '("foo b"
+                                   "      z foo"
+                                   "baz foo bar")
+                        :cursor '(3 . 6)))
+    (output "\e[0K")
+    (should (match-term :display '("foo b"
+                                   "      z foo"
+                                   "baz f")
+                        :cursor '(3 . 6)))
+    (output "\nfoo bar baz\e[6G")
+    (should (match-term :display '("foo b"
+                                   "      z foo"
+                                   "baz f"
+                                   "foo bar baz")
+                        :cursor '(4 . 6)))
+    (output "\e[2K")
+    (should (match-term :display '("foo b"
+                                   "      z foo"
+                                   "baz f")
+                        :cursor '(4 . 6)))
+    ;; Without background.
+    (output "\nfoo bar baz\e[6G")
+    (should (match-term :display '("foo b"
+                                   "      z foo"
+                                   "baz f"
+                                   ""
+                                   "foo bar baz")
+                        :cursor '(5 . 6)))
+    (output "\e[47m\e[K\e[m")
+    (should (match-term
+             :display `("foo b"
+                        "      z foo"
+                        "baz f"
+                        ""
+                        ,(add-props
+                          "foo b               "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-7 nil t))))
+             :cursor '(5 . 6)))
+    (output "\nbar baz foo\e[6G")
+    (should (match-term
+             :display `("foo b"
+                        "      z foo"
+                        "baz f"
+                        ""
+                        ,(add-props
+                          "foo b               "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-7 nil t)))
+                        "bar baz foo")
+             :cursor '(6 . 6)))
+    (output "\e[100m\e[1K\e[m")
+    (should (match-term
+             :display `("foo b"
+                        "      z foo"
+                        "baz f"
+                        ""
+                        ,(add-props
+                          "foo b               "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-7 nil t)))
+                        ,(add-props
+                          "      z foo"
+                          `((0 . 6)
+                            :background ,(face-background
+                                          'eat-term-color-8 nil t))))
+             :cursor '(6 . 6)))
+    (output "\nbaz foo bar\e[6G")
+    (should (match-term
+             :scrollback '("foo b")
+             :display `("      z foo"
+                        "baz f"
+                        ""
+                        ,(add-props
+                          "foo b               "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-7 nil t)))
+                        ,(add-props
+                          "      z foo"
+                          `((0 . 6)
+                            :background ,(face-background
+                                          'eat-term-color-8 nil t)))
+                        "baz foo bar")
+             :cursor '(6 . 6)))
+    (output "\e[48;5;55m\e[0K\e[m")
+    (should (match-term
+             :scrollback '("foo b")
+             :display `("      z foo"
+                        "baz f"
+                        ""
+                        ,(add-props
+                          "foo b               "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-7 nil t)))
+                        ,(add-props
+                          "      z foo"
+                          `((0 . 6)
+                            :background ,(face-background
+                                          'eat-term-color-8 nil t)))
+                        ,(add-props
+                          "baz f                 "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-55 nil t))))
+             :cursor '(6 . 6)))
+    (output "\nfoo bar baz\e[6G")
+    (should (match-term
+             :scrollback '("foo b"
+                           "      z foo")
+             :display `("baz f"
+                        ""
+                        ,(add-props
+                          "foo b               "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-7 nil t)))
+                        ,(add-props
+                          "      z foo"
+                          `((0 . 6)
+                            :background ,(face-background
+                                          'eat-term-color-8 nil t)))
+                        ,(add-props
+                          "baz f                 "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-55 nil t)))
+                        "foo bar baz")
+             :cursor '(6 . 6)))
+    (output "\e[48;2;255;255;255m\e[2K")
+    (should (match-term
+             :scrollback '("foo b"
+                           "      z foo")
+             :display `("baz f"
+                        ""
+                        ,(add-props
+                          "foo b               "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-7 nil t)))
+                        ,(add-props
+                          "      z foo"
+                          `((0 . 6)
+                            :background ,(face-background
+                                          'eat-term-color-8 nil t)))
+                        ,(add-props
+                          "baz f                 "
+                          `((5 . 20)
+                            :background ,(face-background
+                                          'eat-term-color-55 nil t)))
+                        ,(add-props
+                          "                      "
+                          `((0 . 20)
+                            :background "#ffffff")))
+             :cursor '(6 . 6)))))
+
+(ert-deftest eat-test-erase-in-display ()
+  "Test erase in display control function."
+  (eat--tests-with-term '()
+    ;; Without background.
+    (output "foo bar baz\nbar baz foo\nbaz foo bar\e[2;6H")
+    (should (match-term :display '("foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[J")
+    (should (match-term :display '("foo bar baz"
+                                   "bar b")
+                        :cursor '(2 . 6)))
+    (output "\e[Hfoo bar baz\nbar baz foo\nbaz foo bar\e[2;6H")
+    (should (match-term :display '("foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[1J")
+    (should (match-term :display '(""
+                                   "      z foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[Hfoo bar baz\nbar baz foo\nbaz foo bar\e[2;6H")
+    (should (match-term :display '("foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[0J")
+    (should (match-term :display '("foo bar baz"
+                                   "bar b")
+                        :cursor '(2 . 6)))
+    (output "\e[Hfoo bar baz\nbar baz foo\nbaz foo bar\e[2;6H")
+    (should (match-term :display '("foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[2J")
+    (should (match-term :cursor '(1 . 1)))
+    (output "foo bar baz\nbar baz foo\nbaz foo bar\n"
+            "foo bar baz\nbar baz foo\nbaz foo bar\n")
+    (should (match-term :scrollback '("foo bar baz")
+                        :display '("bar baz foo"
+                                   "baz foo bar"
+                                   "foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(6 . 1)))
+    (output "\e[3J")
+    (should (match-term :cursor '(1 . 1)))
+    ;; With background.
+    (output "foo bar baz\nbar baz foo\nbaz foo bar\e[2;6H")
+    (should (match-term :display '("foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[11;33;44m\e[J\e[m")
+    (should (match-term
+             :display `("foo bar baz"
+                        ,(add-props
+                          "bar b               "
+                          `((5 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :font 1))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :font 1))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :font 1))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :font 1))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :font 1)))
+             :cursor '(2 . 6)))
+    (output "\e[2Jfoo bar baz\nbar baz foo\nbaz foo bar\e[2;6H")
+    (should (match-term :display '("foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[1;97;103m\e[1J\e[m")
+    (should (match-term
+             :display `(,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-15 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-11 nil t)
+                            :intensity bold))
+                        ,(add-props
+                          "      z foo"
+                          `((0 . 6)
+                            :foreground ,(face-background
+                                          'eat-term-color-15 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-11 nil t)
+                            :intensity bold))
+                        "baz foo bar")
+             :cursor '(2 . 6)))
+    (output "\e[2Jfoo bar baz\nbar baz foo\nbaz foo bar\e[2;6H")
+    (should (match-term :display '("foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[11;34;43m\e[0J\e[m")
+    (should (match-term
+             :display `("foo bar baz"
+                        ,(add-props
+                          "bar b               "
+                          `((5 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :font 1))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :font 1))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :font 1))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :font 1))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20)
+                            :foreground ,(face-background
+                                          'eat-term-color-4 nil t)
+                            :background ,(face-background
+                                          'eat-term-color-3 nil t)
+                            :font 1)))
+             :cursor '(2 . 6)))
+    (output "\e[2Jfoo bar baz\nbar baz foo\nbaz foo bar\e[2;6H")
+    (should (match-term :display '("foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(2 . 6)))
+    (output "\e[48;2;50;200;100m\e[2J\e[m")
+    (should (match-term
+             :display `(,(add-props
+                          "                    "
+                          `((0 . 20) :background "#32c864"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#32c864"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#32c864"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#32c864"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#32c864"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#32c864")))
+             :cursor '(1 . 1)))
+    (output "\e[2Jfoo bar baz\nbar baz foo\nbaz foo bar\n"
+            "foo bar baz\nbar baz foo\nbaz foo bar\n")
+    (should (match-term :scrollback '("foo bar baz")
+                        :display '("bar baz foo"
+                                   "baz foo bar"
+                                   "foo bar baz"
+                                   "bar baz foo"
+                                   "baz foo bar")
+                        :cursor '(6 . 1)))
+    (output "\e[48;2;20;5;200m\e[3J\e[m")
+    (should (match-term
+             :display `(,(add-props
+                          "                    "
+                          `((0 . 20) :background "#1405c8"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#1405c8"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#1405c8"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#1405c8"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#1405c8"))
+                        ,(add-props
+                          "                    "
+                          `((0 . 20) :background "#1405c8")))
+             :cursor '(1 . 1)))))
 
 
 ;;;;; Miscellaneous Tests.

@@ -60,12 +60,12 @@ Introduction
 * Project-local Terminal::  One project, one terminal.
 * Eshell Terminal::     Eat's terminal emulation in Eshell.
 
-Basics
+Basic Operations
 * Keyboard::            Most keyboard keys are captured by Eat.
 * Mouse::               Eat supports mouse.
 * Input Modes::         Input modes for various use-cases.
 
-Advanced
+Advanced Customizations
 * Display::             The region where everything is shown.
 * Scrollback::          Region for things that went out of display.
 * Cursor Types::        Cursor can displayed in many forms.
@@ -80,6 +80,8 @@ Appendices
 * GNU Free Documentation License::  Copying conditions.
 * Index::                           A list of various things.
 @end menu
+
+@part Part I:@* Introduction
 
 @node Intro
 @cindex introduction
@@ -166,6 +168,8 @@ toggling the mode.
 
 Unless stated otherwise, everything described in this manual about
 Eat terminal also applies to Eshell terminal emulation.
+
+@part Part II:@* Basic Operations
 
 @node Keyboard
 @cindex keyboard
@@ -292,6 +296,8 @@ In this mode, @kbd{C-c C-k} kill the terminal process.
 @kindex C-c C-j @r{(``emacs mode'')}
 From ``emacs mode'', you can switch to ``semi-char mode'' with
 @kbd{C-c C-s} and to ``char mode'' with @kbd{C-c C-j}.
+
+@part Part III:@* Advanced Customizations
 
 @node Display
 @cindex display
@@ -684,6 +690,8 @@ instantly, but this would likely cause a lot of flickering.
 
 This user option described in this chapter have reasonable default
 values, but they may change anytime.
+
+@part Part IV:@* Appendices
 
 @node GNU Free Documentation License
 @cindex GNU Free Documentation License
