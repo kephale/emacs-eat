@@ -26,9 +26,9 @@ To start Eat, run =M-x eat=.  Eat has three keybinding modes:
   - =C-c C-k=: Kill process.
 
 - "semi-char" mode: Most keys are bound to send the key to the
-  terminal, except the following keys: =C-\= =C-c= =C-x= =C-g= =C-h=
-  =C-M-c= =C-u= =M-x= =M-:= =M-!= =M-&=.  The following special
-  keybinding are available:
+  terminal, except the following keys: =C-\=, =C-c=, =C-x=, =C-g=,
+  =C-h=, =C-M-c=, =C-u=, =C-q=, =M-x=, =M-:=, =M-!=, =M-&=.  The
+  following special keybinding are available:
 
   - =C-q=: Send next key to the terminal.
   - =C-y=: Like `yank', but send the text to the terminal.

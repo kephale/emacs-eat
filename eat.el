@@ -50,9 +50,9 @@
 ;;       * `C-c' `C-k': Kill process.
 
 ;;   * "semi-char" mode: Most keys are bound to send the key to the
-;;     terminal, except the following keys: `C-\' `C-c' `C-x' `C-g'
-;;     `C-h' `C-M-c' `C-u' `M-x' `M-:' `M-!' `M-&'.  The following
-;;     special keybinding are available:
+;;     terminal, except the following keys: `C-\', `C-c', `C-x',
+;;     `C-g', `C-h', `C-M-c', `C-u', `M-x', `M-:', `M-!', `M-&'.  The
+;;     following special keybinding are available:
 
 ;;       * `C-q': Send next key to the terminal.
 ;;       * `C-y': Like `yank', but send the text to the terminal.
@@ -139,50 +139,59 @@ This is left disabled for security reasons."
   :group 'eat-eshell)
 
 (defconst eat--cursor-type-value-type
-  '(cons
-    (choice
-     (const :tag "Frame default" t)
-     (const :tag "Filled box" box)
-     (cons :tag "Box with specified size" (const box) integer)
-     (const :tag "Hollow cursor" hollow)
-     (const :tag "Vertical bar" bar)
-     (cons :tag "Vertical bar with specified height" (const bar)
-           integer)
-     (const :tag "Horizontal bar" hbar)
-     (cons :tag "Horizontal bar with specified width"
-           (const hbar) integer)
-     (const :tag "None " nil))
-    (choice
-     (const :tag "No blinking" nil)
-     (number :tag "Blinking frequency")))
+  (let ((cur-type
+         '(choice
+           (const :tag "Frame default" t)
+           (const :tag "Filled box" box)
+           (cons :tag "Box with specified size" (const box) integer)
+           (const :tag "Hollow cursor" hollow)
+           (const :tag "Vertical bar" bar)
+           (cons :tag "Vertical bar with specified height" (const bar)
+                 integer)
+           (const :tag "Horizontal bar" hbar)
+           (cons :tag "Horizontal bar with specified width"
+                 (const hbar) integer)
+           (const :tag "None " nil))))
+    `(list
+      ,cur-type
+      (choice
+       (const :tag "No blinking" nil)
+       (number :tag "Blinking frequency"))
+      ,cur-type))
   "Custom type specification for Eat's cursor type variables.")
 
 (defcustom eat-default-cursor-type
-  (cons (default-value 'cursor-type) nil)
+  `(,(default-value 'cursor-type) nil nil)
   "Cursor to use in Eat buffer.
 
-When the cursor is visible, the car of the value is used as
-`cursor-type', which see.  The cdr of the value, when non-nil, is the
-blinking frequency of cursor."
+The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
+
+When the cursor is on, CURSOR-ON is used as `cursor-type', which see.
+BLINKING-FREQUENCY is the blinking frequency of cursor's blinking.
+When the cursor is off, CURSOR-OFF is used as `cursor-type'.  This
+should be nil when cursor is not blinking."
   :type eat--cursor-type-value-type
   :group 'eat-ui
   :group 'eat-ehell)
 
-(defcustom eat-invisible-cursor-type '(nil . nil)
-  "Cursor to use in Eat buffer.
+(defcustom eat-invisible-cursor-type '(nil nil nil)
+  "Invisible cursor to use in Eat buffer.
 
-When the cursor is invisible, the car of the value is used as
-`cursor-type', which see.  The cdr of the value, when non-nil, is the
-blinking frequency of cursor."
+The value is a list of form (CURSOR-ON BLINKING-FREQUENCY CURSOR-OFF).
+
+When the cursor is on, CURSOR-ON is used as `cursor-type', which see.
+BLINKING-FREQUENCY is the blinking frequency of cursor's blinking.
+When the cursor is off, CURSOR-OFF is used as `cursor-type'.  This
+should be nil when cursor is not blinking."
   :type eat--cursor-type-value-type
   :group 'eat-ui
   :group 'eat-ehell)
 
 (defcustom eat-very-visible-cursor-type
-  (cons (default-value 'cursor-type) 2)
-  "Cursor to use in Eat buffer.
+  `(,(default-value 'cursor-type) 2 hollow)
+  "Very visible cursor to use in Eat buffer.
 
-When the cursor is very visible, the car of the value is used as
+When the cursor is invisible, the car of the value is used as
 `cursor-type', which see.  The cdr of the value, when non-nil, is the
 blinking frequency of cursor."
   :type eat--cursor-type-value-type
@@ -2659,12 +2668,12 @@ to (1, 1).  When N is 3, also erase the scrollback."
            (when incl-point
              (backward-char)))))
       ((or 2 3)
+       ;; Move to the display beginning.
+       (eat--t-goto 1 1)
        ;; Delete everything in the display, and if N is 3, also delete
        ;; everything in the scrollback area.
        (delete-region (if (= n 2) (point) (point-min))
                       (point-max))
-       ;; Move to the display beginning.
-       (eat--t-goto 1 1)
        ;; If the SGR background attribute is set, fill the display
        ;; with that background.
        (when (eat--t-face-bg face)
@@ -4549,9 +4558,10 @@ Each argument in ARGS can be either string or character."
 CATEGORIES is a list whose elements should be a one of the following
 keywords:
 
-  `:ascii'              All ASCII characters, plus `backspace',
-                        `insert', `delete' and `deletechar' keys, with
-                        all possible modifiers.
+  `:ascii'              All self-insertable characters, plus
+                        `backspace', `insert', `delete' and
+                        `deletechar' keys, with all possible
+                        modifiers.
   `:arrow'              Arrow keys with all possible modifiers.
   `:navigation'         Navigation keys: home, end, prior (or page up)
                         and next (or page down) with all possible
@@ -4561,136 +4571,129 @@ keywords:
   `:mouse-modifier'     All mouse events except mouse movement.
   `:mouse-movement'     Mouse movement.
 
-EXCEPTIONS is a list of event, which won't be bound."
-  (let ((map (make-sparse-keymap))
-        (esc-map (make-sparse-keymap)))
-    (when (and (memq :self-insert categories)
-               (not (member [remap self-insert-command] exceptions)))
-      (define-key map [remap self-insert-command] input-command))
-    (when (memq :ascii categories)
-      ;; Bind ASCII characters except ESC and DEL.
-      (cl-loop
-       for i from ?\C-@ to ?~
-       do (unless (or (= i meta-prefix-char)
-                      (memq i exceptions))
-            (define-key map `[,i] input-command)))
-      ;; Bind `backspace', `delete', `deletechar', and all modified
-      ;; variants.
-      (dolist (key '( backspace C-backspace
-                      insert C-insert M-insert S-insert C-M-insert
-                      C-S-insert M-S-insert C-M-S-insert
-                      delete C-delete M-delete S-delete C-M-delete
-                      C-S-delete M-S-delete C-M-S-delete
-                      deletechar C-deletechar M-deletechar
-                      S-deletechar C-M-deletechar C-S-deletechar
-                      M-S-deletechar C-M-S-deletechar))
-        (unless (memq key exceptions)
-          (define-key map `[,key] input-command)))
-      ;; Bind these non-encodable keys.  They are translated.
-      (dolist (key '(?\C-- ?\C-? ?\C-\ ))
-        (unless (memq key exceptions)
-          (define-key map `[,key] input-command)))
-      ;; Bind M-<ASCII> keys.
-      (unless (memq meta-prefix-char exceptions)
+EXCEPTIONS is a list of key sequences to not bind.  Don't use
+\"M-...\" key sequences in EXCEPTIONS, use \"ESC ...\" instead."
+  (let ((map (make-sparse-keymap)))
+    (cl-labels ((bind (key)
+                  (unless (member key exceptions)
+                    (define-key map key input-command))))
+      (when (memq :ascii categories)
+        ;; Bind ASCII and self-insertable characters except ESC and
+        ;; DEL.
+        (bind [remap self-insert-command])
         (cl-loop
          for i from ?\C-@ to ?~
-         do (unless (or (memq i '(?O ?\[))
-                        (member (event-convert-list `(meta ,i))
-                                exceptions))
-              (define-key esc-map `[,i] input-command)))
-        (define-key map `[,meta-prefix-char] esc-map)))
-    (when (memq :arrow categories)
-      (dolist (key '( up down right left
-                      C-up C-down C-right C-left
-                      M-up M-down M-right M-left
-                      S-up S-down S-right S-left
-                      C-M-up C-M-down C-M-right C-M-left
-                      C-S-up C-S-down C-S-right C-S-left
-                      M-S-up M-S-down M-S-right M-S-left
-                      C-M-S-up C-M-S-down C-M-S-right C-M-S-left))
-        (unless (memq key exceptions)
-          (define-key map `[,key] input-command))))
-    (when (memq :navigation categories)
-      (dolist (key '( home C-home M-home S-home C-M-home C-S-home
-                      M-S-home C-M-S-home
-                      end C-end M-end S-end C-M-end C-S-end
-                      M-S-end C-M-S-end
-                      prior C-prior M-prior S-prior C-M-prior
-                      C-S-prior M-S-prior C-M-S-prior
-                      next C-next M-next S-next C-M-next C-S-next
-                      M-S-next C-M-S-next))
-        (unless (memq key exceptions)
-          (define-key map `[,key] input-command))))
-    (when (memq :function categories)
-      (cl-loop
-       for i from 1 to 63
-       do (let ((key (intern (format "f%i" i))))
-            (unless (member key exceptions)
-              (define-key map `[,key] input-command)))))
-    (when (memq :mouse-click categories)
-      (dolist (key '(mouse-1 mouse-2 mouse-3))
-        (unless (memq key exceptions)
-          (define-key map `[,key] input-command))))
-    (when (memq :mouse-modifier categories)
-      (dolist (key '( down-mouse-1 drag-mouse-1 down-mouse-2
-                      drag-mouse-2 down-mouse-3 drag-mouse-3
-                      C-down-mouse-1 C-drag-mouse-1 C-down-mouse-2
-                      C-drag-mouse-2 C-down-mouse-3 C-drag-mouse-3
-                      M-down-mouse-1 M-drag-mouse-1 M-down-mouse-2
-                      M-drag-mouse-2 M-down-mouse-3 M-drag-mouse-3
-                      S-down-mouse-1 S-drag-mouse-1 S-down-mouse-2
-                      S-drag-mouse-2 S-down-mouse-3 S-drag-mouse-3
-                      C-M-down-mouse-1 C-M-drag-mouse-1
-                      C-M-down-mouse-2 C-M-drag-mouse-2
-                      C-M-down-mouse-3 C-M-drag-mouse-3
-                      C-S-down-mouse-1 C-S-drag-mouse-1
-                      C-S-down-mouse-2 C-S-drag-mouse-2
-                      C-S-down-mouse-3 C-S-drag-mouse-3
-                      M-S-down-mouse-1 M-S-drag-mouse-1
-                      M-S-down-mouse-2 M-S-drag-mouse-2
-                      M-S-down-mouse-3 M-S-drag-mouse-3
-                      C-M-S-down-mouse-1 C-M-S-drag-mouse-1
-                      C-M-S-down-mouse-2 C-M-S-drag-mouse-2
-                      C-M-S-down-mouse-3 C-M-S-drag-mouse-3 mouse-1
-                      mouse-2 mouse-3 mouse-4 mouse-5 mouse-6 mouse-7
-                      mouse-8 mouse-9 mouse-10 mouse-11 C-mouse-1
-                      C-mouse-2 C-mouse-3 C-mouse-4 C-mouse-5
-                      C-mouse-6 C-mouse-7 C-mouse-8 C-mouse-9
-                      C-mouse-10 C-mouse-11 M-mouse-1 M-mouse-2
-                      M-mouse-3 M-mouse-4 M-mouse-5 M-mouse-6
-                      M-mouse-7 M-mouse-8 M-mouse-9 M-mouse-10
-                      M-mouse-11 S-mouse-1 S-mouse-2 S-mouse-3
-                      S-mouse-4 S-mouse-5 S-mouse-6 S-mouse-7
-                      S-mouse-8 S-mouse-9 S-mouse-10 S-mouse-11
-                      C-M-mouse-1 C-M-mouse-2 C-M-mouse-3 C-M-mouse-4
-                      C-M-mouse-5 C-M-mouse-6 C-M-mouse-7 C-M-mouse-8
-                      C-M-mouse-9 C-M-mouse-10 C-M-mouse-11
-                      C-S-mouse-1 C-S-mouse-2 C-S-mouse-3 C-S-mouse-4
-                      C-S-mouse-5 C-S-mouse-6 C-S-mouse-7 C-S-mouse-8
-                      C-S-mouse-9 C-S-mouse-10 C-S-mouse-11
-                      M-S-mouse-1 M-S-mouse-2 M-S-mouse-3 M-S-mouse-4
-                      M-S-mouse-5 M-S-mouse-6 M-S-mouse-7 M-S-mouse-8
-                      M-S-mouse-9 M-S-mouse-10 M-S-mouse-11
-                      C-M-S-mouse-1 C-M-S-mouse-2 C-M-S-mouse-3
-                      C-M-S-mouse-4 C-M-S-mouse-5 C-M-S-mouse-6
-                      C-M-S-mouse-7 C-M-S-mouse-8 C-M-S-mouse-9
-                      C-M-S-mouse-10 C-M-S-mouse-11 wheel-up
-                      wheel-down wheel-right wheel-left C-wheel-up
-                      C-wheel-down C-wheel-right C-wheel-left
-                      M-wheel-up M-wheel-down M-wheel-right
-                      M-wheel-left S-wheel-up S-wheel-down
-                      S-wheel-right S-wheel-left C-M-wheel-up
-                      C-M-wheel-down C-M-wheel-right C-M-wheel-left
-                      C-S-wheel-up C-S-wheel-down C-S-wheel-right
-                      C-S-wheel-left M-S-wheel-up M-S-wheel-down
-                      M-S-wheel-right M-S-wheel-left C-M-S-wheel-up
-                      C-M-S-wheel-down C-M-S-wheel-right
-                      C-M-S-wheel-left))
-        (unless (memq key exceptions)
-          (define-key map `[,key] input-command))))
-    (when (and (memq :mouse-movement categories)
-               (not (memq 'mouse-movement exceptions)))
-      (define-key map [mouse-movement] input-command))
+         do (unless (= i meta-prefix-char)
+              (bind `[,i])))
+        ;; Bind `backspace', `delete', `deletechar', and all modified
+        ;; variants.
+        (dolist (key '( backspace C-backspace
+                        insert C-insert M-insert S-insert C-M-insert
+                        C-S-insert M-S-insert C-M-S-insert
+                        delete C-delete M-delete S-delete C-M-delete
+                        C-S-delete M-S-delete C-M-S-delete
+                        deletechar C-deletechar M-deletechar
+                        S-deletechar C-M-deletechar C-S-deletechar
+                        M-S-deletechar C-M-S-deletechar))
+          (bind `[,key]))
+        ;; Bind these non-encodable keys.  They are translated.
+        (dolist (key '(?\C-- ?\C-? ?\C-\ ))
+          (bind `[,key]))
+        ;; Bind M-<ASCII> keys.
+        (unless (member `[,meta-prefix-char] exceptions)
+          (define-key map `[,meta-prefix-char] (make-sparse-keymap))
+          (cl-loop
+           for i from ?\C-@ to ?~
+           do (unless (memq i '(?O ?\[))
+                (bind `[,meta-prefix-char ,i])))
+          (bind `[,meta-prefix-char ,meta-prefix-char])))
+      (when (memq :arrow categories)
+        (dolist (key '( up down right left
+                        C-up C-down C-right C-left
+                        M-up M-down M-right M-left
+                        S-up S-down S-right S-left
+                        C-M-up C-M-down C-M-right C-M-left
+                        C-S-up C-S-down C-S-right C-S-left
+                        M-S-up M-S-down M-S-right M-S-left
+                        C-M-S-up C-M-S-down C-M-S-right C-M-S-left))
+          (bind `[,key])))
+      (when (memq :navigation categories)
+        (dolist (key '( home C-home M-home S-home C-M-home C-S-home
+                        M-S-home C-M-S-home
+                        end C-end M-end S-end C-M-end C-S-end
+                        M-S-end C-M-S-end
+                        prior C-prior M-prior S-prior C-M-prior
+                        C-S-prior M-S-prior C-M-S-prior
+                        next C-next M-next S-next C-M-next C-S-next
+                        M-S-next C-M-S-next))
+          (bind `[,key])))
+      (when (memq :function categories)
+        (cl-loop
+         for i from 1 to 63
+         do (let ((key (intern (format "f%i" i))))
+              (bind `[,key]))))
+      (when (memq :mouse-click categories)
+        (dolist (key '(mouse-1 mouse-2 mouse-3))
+          (bind `[,key])))
+      (when (memq :mouse-modifier categories)
+        (dolist (key
+                 '( down-mouse-1 drag-mouse-1 down-mouse-2
+                    drag-mouse-2 down-mouse-3 drag-mouse-3
+                    C-down-mouse-1 C-drag-mouse-1 C-down-mouse-2
+                    C-drag-mouse-2 C-down-mouse-3 C-drag-mouse-3
+                    M-down-mouse-1 M-drag-mouse-1 M-down-mouse-2
+                    M-drag-mouse-2 M-down-mouse-3 M-drag-mouse-3
+                    S-down-mouse-1 S-drag-mouse-1 S-down-mouse-2
+                    S-drag-mouse-2 S-down-mouse-3 S-drag-mouse-3
+                    C-M-down-mouse-1 C-M-drag-mouse-1
+                    C-M-down-mouse-2 C-M-drag-mouse-2
+                    C-M-down-mouse-3 C-M-drag-mouse-3
+                    C-S-down-mouse-1 C-S-drag-mouse-1
+                    C-S-down-mouse-2 C-S-drag-mouse-2
+                    C-S-down-mouse-3 C-S-drag-mouse-3
+                    M-S-down-mouse-1 M-S-drag-mouse-1
+                    M-S-down-mouse-2 M-S-drag-mouse-2
+                    M-S-down-mouse-3 M-S-drag-mouse-3
+                    C-M-S-down-mouse-1 C-M-S-drag-mouse-1
+                    C-M-S-down-mouse-2 C-M-S-drag-mouse-2
+                    C-M-S-down-mouse-3 C-M-S-drag-mouse-3 mouse-1
+                    mouse-2 mouse-3 mouse-4 mouse-5 mouse-6 mouse-7
+                    mouse-8 mouse-9 mouse-10 mouse-11 C-mouse-1
+                    C-mouse-2 C-mouse-3 C-mouse-4 C-mouse-5
+                    C-mouse-6 C-mouse-7 C-mouse-8 C-mouse-9
+                    C-mouse-10 C-mouse-11 M-mouse-1 M-mouse-2
+                    M-mouse-3 M-mouse-4 M-mouse-5 M-mouse-6
+                    M-mouse-7 M-mouse-8 M-mouse-9 M-mouse-10
+                    M-mouse-11 S-mouse-1 S-mouse-2 S-mouse-3
+                    S-mouse-4 S-mouse-5 S-mouse-6 S-mouse-7
+                    S-mouse-8 S-mouse-9 S-mouse-10 S-mouse-11
+                    C-M-mouse-1 C-M-mouse-2 C-M-mouse-3 C-M-mouse-4
+                    C-M-mouse-5 C-M-mouse-6 C-M-mouse-7 C-M-mouse-8
+                    C-M-mouse-9 C-M-mouse-10 C-M-mouse-11
+                    C-S-mouse-1 C-S-mouse-2 C-S-mouse-3 C-S-mouse-4
+                    C-S-mouse-5 C-S-mouse-6 C-S-mouse-7 C-S-mouse-8
+                    C-S-mouse-9 C-S-mouse-10 C-S-mouse-11
+                    M-S-mouse-1 M-S-mouse-2 M-S-mouse-3 M-S-mouse-4
+                    M-S-mouse-5 M-S-mouse-6 M-S-mouse-7 M-S-mouse-8
+                    M-S-mouse-9 M-S-mouse-10 M-S-mouse-11
+                    C-M-S-mouse-1 C-M-S-mouse-2 C-M-S-mouse-3
+                    C-M-S-mouse-4 C-M-S-mouse-5 C-M-S-mouse-6
+                    C-M-S-mouse-7 C-M-S-mouse-8 C-M-S-mouse-9
+                    C-M-S-mouse-10 C-M-S-mouse-11 wheel-up
+                    wheel-down wheel-right wheel-left C-wheel-up
+                    C-wheel-down C-wheel-right C-wheel-left
+                    M-wheel-up M-wheel-down M-wheel-right
+                    M-wheel-left S-wheel-up S-wheel-down
+                    S-wheel-right S-wheel-left C-M-wheel-up
+                    C-M-wheel-down C-M-wheel-right C-M-wheel-left
+                    C-S-wheel-up C-S-wheel-down C-S-wheel-right
+                    C-S-wheel-left M-S-wheel-up M-S-wheel-down
+                    M-S-wheel-right M-S-wheel-left C-M-S-wheel-up
+                    C-M-S-wheel-down C-M-S-wheel-right
+                    C-M-S-wheel-left))
+          (bind `[,key])))
+      (when (memq :mouse-movement categories)
+        (bind [mouse-movement])))
     map))
 
 (defun eat-term-name ()
@@ -4826,14 +4829,14 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 
 ;;;; Buffer-local Cursor Blinking.
 
+(defvar eat--cursor-blink-type nil
+  "Type of blinking cursor.")
+
 (defvar eat--cursor-blink-state nil
-  "Current state of slowly blinking text, non-nil means invisible.")
+  "Current state of slowly blinking text, non-nil means on.")
 
 (defvar eat--cursor-blink-timer nil
   "Timer for blinking slowly blinking text.")
-
-(defvar eat--cursor-blink-frequency nil
-  "Frequency of cursor blinking.")
 
 (defvar eat--cursor-blink-mode)
 
@@ -4841,18 +4844,18 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   "Flip the state of slowly blinking text."
   (when (and eat--cursor-blink-mode
              (display-graphic-p))
-    (if eat--cursor-blink-state
-        (progn
-          (setq-local cursor-type eat--cursor-blink-state)
-          (setq eat--cursor-blink-state nil))
-      (setq eat--cursor-blink-state cursor-type)
-      (setq-local cursor-type nil))
+    (setq-local cursor-type (if eat--cursor-blink-state
+                                (caddr eat--cursor-blink-type)
+                              (car eat--cursor-blink-type)))
+    (setq eat--cursor-blink-state (not eat--cursor-blink-state))
+    ;; REVIEW: This is expensive, and some causes flickering.  Any
+    ;; better way?
     (when-let ((window (get-buffer-window nil 'visible)))
       (redraw-frame (window-frame window)))))
 
 (defun eat--cursor-blink-stop-timers ()
-  "Start blinking timers."
-  (when eat--cursor-blink-state
+  "Stop blinking timers."
+  (unless eat--cursor-blink-state
     (eat--flip-cursor-blink-state))
   (when eat--cursor-blink-timer
     (cancel-timer eat--cursor-blink-timer)
@@ -4862,7 +4865,7 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   "Start blinking timers."
   (eat--cursor-blink-stop-timers)
   (setq eat--cursor-blink-timer
-        (run-with-timer t (/ (float eat--cursor-blink-frequency))
+        (run-with-timer t (/ (float (cadr eat--cursor-blink-type)))
                         #'eat--flip-cursor-blink-state)))
 
 (define-minor-mode eat--cursor-blink-mode
@@ -4913,25 +4916,13 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   `:very-visible'       Very visible cursor.  Can also be implemented
                         as blinking cursor.
   Any other value     Default cursor."
-  (pcase state
-    (:invisible
-     (setq-local cursor-type (car eat-invisible-cursor-type))
-     (setq-local eat--cursor-blink-frequency
-                 (cdr eat-invisible-cursor-type))
-     (eat--cursor-blink-mode
-      (if (cdr eat-invisible-cursor-type) +1 -1)))
-    (:very-visible
-     (setq-local cursor-type (car eat-very-visible-cursor-type))
-     (setq-local eat--cursor-blink-frequency
-                 (cdr eat-very-visible-cursor-type))
-     (eat--cursor-blink-mode
-      (if (cdr eat-very-visible-cursor-type) +1 -1)))
-    (_ ; `:default'
-     (setq-local cursor-type (car eat-default-cursor-type))
-     (setq-local eat--cursor-blink-frequency
-                 (cdr eat-default-cursor-type))
-     (eat--cursor-blink-mode
-      (if (cdr eat-default-cursor-type) +1 -1)))))
+  (setq-local eat--cursor-blink-type
+              (pcase state
+                (:invisible eat-invisible-cursor-type)
+                (:very-visible eat-very-visible-cursor-type)
+                (_ eat-default-cursor-type))) ; `:default'
+  (setq-local cursor-type (car eat--cursor-blink-type))
+  (eat--cursor-blink-mode (if (cadr eat--cursor-blink-type) +1 -1)))
 
 
 ;;;;; Input.
@@ -5105,6 +5096,8 @@ ARG is passed to `yank-pop', which see."
                     (apply insert-for-yank args)))))
       (yank-pop arg))))
 
+;; When changing these keymaps, be sure to update the manual, README
+;; and commentary.
 (defvar eat-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?\C-c ?\C-j] #'eat-char-mode)
@@ -5117,8 +5110,9 @@ ARG is passed to `yank-pop', which see."
   (let ((map (eat-term-make-keymap
               #'eat-self-input
               '(:ascii :arrow :navigation)
-              '( ?\C-\\ ?\C-q ?\C-c ?\C-x ?\C-g ?\C-h ?\C-\M-c ?\C-u
-                 ?\M-x ?\M-: ?\M-! ?\M-& ?\C-y ?\M-y))))
+              '( [?\C-\\] [?\C-q] [?\C-c] [?\C-x] [?\C-g] [?\C-h]
+                 [?\e ?\C-c] [?\C-u] [?\C-q] [?\e ?x] [?\e ?:]
+                 [?\e ?!] [?\e ?&] [?\C-y] [?\e ?y]))))
     (define-key map [?\C-q] #'eat-quoted-input)
     (define-key map [?\C-y] #'eat-yank)
     (define-key map [?\M-y] #'eat-yank-pop)
@@ -5131,7 +5125,7 @@ ARG is passed to `yank-pop', which see."
   (let ((map (eat-term-make-keymap
               #'eat-self-input
               '(:ascii :arrow :navigation :function)
-              nil)))
+              '([?\e ?\C-m]))))
     (define-key map [?\C-\M-m] #'eat-semi-char-mode)
     map)
   "Keymap for Eat char mode.")
@@ -5648,7 +5642,7 @@ PROGRAM."
 
 ;;;###autoload
 (defun eat (&optional program arg)
-  "Start a new Eat terminal emulator in a new buffer.
+  "Start a new Eat terminal emulator in a buffer.
 
 Start a new Eat session, or switch to an already active session.
 Return the buffer selected (or created).
@@ -5690,6 +5684,8 @@ PROGRAM can be a shell command."
 
 ;;;;; Input.
 
+;; When changing these keymaps, be sure to update the manual, README
+;; and commentary.
 (defvar eat-eshell-emacs-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?\C-c ?\C-s] #'eat-eshell-semi-char-mode)
@@ -5701,8 +5697,9 @@ PROGRAM can be a shell command."
   (let ((map (eat-term-make-keymap
               #'eat-self-input
               '(:ascii :arrow :navigation)
-              '( ?\C-\\ ?\C-q ?\C-c ?\C-x ?\C-g ?\C-h ?\C-\M-c ?\C-u
-                 ?\M-x ?\M-: ?\M-! ?\M-& ?\C-y ?\M-y))))
+              '( [?\C-\\] [?\C-q] [?\C-c] [?\C-x] [?\C-g] [?\C-h]
+                 [?\e ?\C-c] [?\C-u] [?\C-q] [?\e ?x] [?\e ?:]
+                 [?\e ?!] [?\e ?&] [?\C-y] [?\e ?y]))))
     (define-key map [?\C-q] #'eat-quoted-input)
     (define-key map [?\C-y] #'eat-yank)
     (define-key map [?\M-y] #'eat-yank-pop)
@@ -5715,7 +5712,7 @@ PROGRAM can be a shell command."
   (let ((map (eat-term-make-keymap
               #'eat-self-input
               '(:ascii :arrow :navigation :function)
-              nil)))
+              '([?\e ?\C-m]))))
     (define-key map [?\C-\M-m] #'eat-eshell-semi-char-mode)
     map)
   "Keymap for Eat Eshell char mode.")
