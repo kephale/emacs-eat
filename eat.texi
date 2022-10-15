@@ -2,7 +2,7 @@
 
 @comment %**start of header
 @setfilename eat.info
-@set UPDATED 14 October 2022
+@set UPDATED 15 October 2022
 @set UPDATED-MONTH October 2022
 @set EDITION 0.1
 @set VERSION 0.1
@@ -188,7 +188,7 @@ keys and lets Emacs to handle them: @kbd{C-\}, @kbd{C-c}, @kbd{C-x},
 
 To input the above key sequences, prefix them with @kbd{C-q}.
 @kbd{C-q} reads the next event and sends to directly to the terminal.
-For example, to input @kbd{M-:}, use the key sequences @kbd{C-q M-:}.
+For example, to input @kbd{M-:}, use the key sequence @kbd{C-q M-:}.
 
 For an alternative way to input these exceptional characters,
 @pxref{Char Mode}.
