@@ -2811,12 +2811,12 @@ position."
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
-         ;; Make sure N is non-negative.  If N is more than the number
-         ;; of available columns available, set N to the maximum
-         ;; possible value.
+         ;; Make sure N is positive.  If N is more than the number of
+         ;; available columns available, set N to the maximum possible
+         ;; value.
          (n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
-                 (max (or n 1) 0))))
+                 (max (or n 1) 1))))
     ;; Return if N is zero.
     (unless (zerop n)
       (save-excursion
@@ -2834,12 +2834,12 @@ position."
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
-         ;; Make sure N is non-negative.  If N is more than the number
-         ;; of available columns available, set N to the maximum
-         ;; possible value.
+         ;; Make sure N is positive.  If N is more than the number of
+         ;; available columns available, set N to the maximum possible
+         ;; value.
          (n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
-                 (max (or n 1) 0))))
+                 (max (or n 1) 1))))
     ;; Return if N is zero.
     (unless (zerop n)
       (save-excursion
@@ -2868,12 +2868,12 @@ position."
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
-         ;; Make sure N is non-negative.  If N is more than the number
-         ;; of available columns available, set N to the maximum
-         ;; possible value.
+         ;; Make sure N is positive.  If N is more than the number of
+         ;; available columns available, set N to the maximum possible
+         ;; value.
          (n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
-                 (max (or n 1) 0))))
+                 (max (or n 1) 1))))
     ;; Return if N is zero.
     (unless (zerop n)
       (save-excursion
@@ -2894,12 +2894,12 @@ position."
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
-         ;; N should be non-negative and shouldn't exceed the number
-         ;; of lines below cursor position and inside current scroll
+         ;; N should be positive and shouldn't exceed the number of
+         ;; lines below cursor position and inside current scroll
          ;; region.
          (n (min (- (1+ (- scroll-end scroll-begin))
                     (1- (eat--t-cur-y cursor)))
-                 (max (or n 1) 0))))
+                 (max (or n 1) 1))))
     ;; Make sure we are in the scroll region and N is positive, return
     ;; on failure.
     (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
@@ -2950,12 +2950,12 @@ position."
          (x (eat--t-cur-x cursor))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
-         ;; N should be non-negative and shouldn't exceed the number
-         ;; of lines below cursor position and inside current scroll
+         ;; N should be positive and shouldn't exceed the number of
+         ;; lines below cursor position and inside current scroll
          ;; region.
          (n (min (- (1+ (- scroll-end scroll-begin))
                     (1- (eat--t-cur-y cursor)))
-                 (max (or n 1) 0))))
+                 (max (or n 1) 1))))
     ;; Make sure we are in the scroll region and N is positive, return
     ;; on failure.
     (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
@@ -2994,20 +2994,22 @@ position."
 
 (defun eat--t-repeat-last-char (&optional n)
   "Repeat last character N times."
-  (let ((disp (eat--t-term-display eat--t-term)))
-    (let ((char
-           ;; Get the character before cursor.
-           (when (< (eat--t-disp-begin disp) (point))
-             (if (get-text-property (1- (point)) 'eat--t-wrap-line)
-                 ;; The character before cursor is a newline to break
-                 ;; a long line, so use the character before that.
-                 (when (< (eat--t-disp-begin disp) (1- (point)))
-                   (char-before (1- (point))))
-               (char-before)))))
-      ;; Insert `char' N times.  Make sure `char' is a non-nil and not
-      ;; a newline.
-      (when (and char (/= char ?\n))
-        (eat--t-write (make-string n char))))))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         ;; N must be at least one.
+         (n (max (or n 1) 1))
+         (char
+          ;; Get the character before cursor.
+          (when (< (eat--t-disp-begin disp) (point))
+            (if (get-text-property (1- (point)) 'eat--t-wrap-line)
+                ;; The character before cursor is a newline to break
+                ;; a long line, so use the character before that.
+                (when (< (eat--t-disp-begin disp) (1- (point)))
+                  (char-before (1- (point))))
+              (char-before)))))
+    ;; Insert `char' N times.  Make sure `char' is a non-nil and not
+    ;; a newline.
+    (when (and char (/= char ?\n))
+      (eat--t-write (make-string n char)))))
 
 (defun eat--t-change-scroll-region (&optional top bottom)
   "Change the scroll region from lines TOP to BOTTOM (inclusive).
