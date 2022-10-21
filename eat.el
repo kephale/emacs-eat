@@ -5012,8 +5012,9 @@ event."
                           eat--mouse-pressed-buttons))
               (unless eat--mouse-pressed-buttons
                 (setq eat--mouse-last-position nil)
-                (funcall eat--mouse-drag-transient-map-exit)
-                (setq eat--mouse-drag-transient-map-exit nil)))
+                (when eat--mouse-drag-transient-map-exit
+                  (funcall eat--mouse-drag-transient-map-exit)
+                  (setq eat--mouse-drag-transient-map-exit nil))))
             (when (memq 'down (event-modifiers e))
               (push (event-basic-type e) eat--mouse-pressed-buttons)
               (setq eat--mouse-last-position (event-start e))
