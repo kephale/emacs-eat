@@ -5762,6 +5762,179 @@ automatic scrolling as a side effect."
       (output "\a")
       (should bell-rang))))
 
+(ert-deftest eat-test-character-sets ()
+  "Test character sets."
+  (eat--tests-with-term '()
+    (output "some text")
+    (should (match-term :display '("some text")
+                        :cursor '(1 . 10)))
+    (output "\n\e(0some text")
+    (should (match-term :display '("some text"
+                                   "⎽⎺└␊ ├␊│├")
+                        :cursor '(2 . 10)))
+    (output "\n\e(Bsome text")
+    (should (match-term :display '("some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text")
+                        :cursor '(3 . 10)))
+    (output "\n\C-nsome text")
+    (should (match-term :display '("some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text")
+                        :cursor '(4 . 10)))
+    (output "\n\e)0some text")
+    (should (match-term :display '("some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├")
+                        :cursor '(5 . 10)))
+    (output "\n\e)Bsome text")
+    (should (match-term :display '("some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text")
+                        :cursor '(6 . 10)))
+    (output "\n\ensome text")
+    (should (match-term :scrollback '("some text")
+                        :display '("⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text")
+                        :cursor '(6 . 10)))
+    (output "\n\e*0some text")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├")
+                        :display '("some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├")
+                        :cursor '(6 . 10)))
+    (output "\n\e*Bsome text")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text")
+                        :display '("some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text")
+                        :cursor '(6 . 10)))
+    (output "\n\eosome text")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text")
+                        :display '("⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text")
+                        :cursor '(6 . 10)))
+    (output "\n\e+0some text")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├")
+                        :display '("some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├")
+                        :cursor '(6 . 10)))
+    (output "\n\e+Bsome text")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text")
+                        :display '("some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text")
+                        :cursor '(6 . 10)))
+    (output "\n\C-osome text")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text")
+                        :display '("⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text")
+                        :cursor '(6 . 10)))
+    (output "\n\e(0some text")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├")
+                        :display '("some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├")
+                        :cursor '(6 . 10)))
+    (output "\n\e(Bsome text")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text")
+                        :display '("some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text")
+                        :cursor '(6 . 10)))
+    (output "\n\e(0+,-.0`abcdefghijklmnopqrstuvwxyz{|}~")
+    (should (match-term :scrollback '("some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├"
+                                      "some text"
+                                      "some text"
+                                      "⎽⎺└␊ ├␊│├")
+                        :display '("some text"
+                                   "some text"
+                                   "⎽⎺└␊ ├␊│├"
+                                   "some text"
+                                   "→←↑↓█�▒␉␌␍␊°±░#┘┐┌└┼"
+                                   "⎺⎻─⎼⎽├┤┴┬│≤≥π≠£•")
+                        :cursor '(6 . 17)))))
+
 (ert-deftest eat-test-save-and-restore-cursor ()
   "Test saving and restoring cursor position.
 
