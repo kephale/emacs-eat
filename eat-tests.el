@@ -5029,7 +5029,7 @@ automatic scrolling as a side effect."
                                    "cc")
                         :cursor '(3 . 3)))
     ;; With SGR attributes.
-    (output "\n\e[34;43md\e[b\e[0m")
+    (output "\n\e[34;43md\e[b")
     (should (match-term
              :display `("aa"
                         "bbb"
@@ -5042,7 +5042,7 @@ automatic scrolling as a side effect."
                             :background ,(face-foreground
                                           'eat-term-color-3 nil t))))
              :cursor '(4 . 3)))
-    (output "\n\e[1;11me\e[5b\e[0m")
+    (output "\n\e[;1;11me\e[5b")
     (should (match-term
              :display `("aa"
                         "bbb"
@@ -5060,7 +5060,7 @@ automatic scrolling as a side effect."
                             :intensity bold
                             :font 1)))
              :cursor '(5 . 7)))
-    (output "\n\e[2;5mf\e[0b\e[0m")
+    (output "\n\e[;2;5mf\e[0b")
     (should (match-term
              :display `("aa"
                         "bbb"

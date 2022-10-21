@@ -3037,12 +3037,11 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
 
 (defun eat--t-set-sgr-params (params)
   "Set SGR parameters PARAMS."
-  (let ((params (or params '((0))))
-        (face (eat--t-term-face eat--t-term)))
+  (let ((face (eat--t-term-face eat--t-term)))
     ;; Set attributes.
     (while params
       (pcase (pop params)
-        ('(0)
+        (`(,(or 0 'nil))
          (1value (setf (eat--t-face-fg face) nil))
          (1value (setf (eat--t-face-bg face) nil))
          (1value (setf (eat--t-face-intensity face) nil))
@@ -3674,7 +3673,7 @@ DATA is the selection data encoded in base64."
                             (match-string 0 output))
                     format
                     (cond
-                     ((string-empty-p str) nil)
+                     ((string-empty-p str) '((nil)))
                      ((<= #x30 (aref str 0) #x3b)
                       (mapcar (lambda (p)
                                 (mapcar (lambda (s)
