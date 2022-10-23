@@ -3328,19 +3328,17 @@ output."
   "Report the current default foreground color to the client."
   (funcall
    (eat--t-term-input-fn eat--t-term) eat--t-term
-   (format "\e]10;%s\e\\"
-           (mapconcat (lambda (n) (format "%04x" n))
-                      (color-values (face-foreground 'default))
-                      "/"))))
+   (let ((rgb (color-values (face-foreground 'default))))
+     (format "\e]10;%04x/%04x/%04x\e\\"
+             (pop rgb) (pop rgb) (pop rgb)))))
 
 (defun eat--t-report-background-color ()
   "Report the current default background color to the client."
   (funcall
    (eat--t-term-input-fn eat--t-term) eat--t-term
-   (format "\e]11;%s\e\\"
-           (mapconcat (lambda (n) (format "%04x" n))
-                      (color-values (face-background 'default))
-                      "/"))))
+   (let ((rgb (color-values (face-background 'default))))
+     (format "\e]11;%04x/%04x/%04x\e\\"
+             (pop rgb) (pop rgb) (pop rgb)))))
 
 (defun eat--t-manipulate-selection (targets data)
   "Set and send current selection.
@@ -5447,6 +5445,7 @@ OS's."
     (with-current-buffer buffer
       (let ((inhibit-quit t)            ; Don't disturb!
             (inhibit-read-only t)
+            (inhibit-modification-hooks t)
             (synchronize-scroll
              (or (= (eat-term-display-cursor eat--terminal) (point))
                  eat--char-mode)))
@@ -5864,8 +5863,11 @@ PROGRAM can be a shell command."
       (setq eat--output-queue-first-chunk-time nil)
       (let ((queue eat--pending-output-chunks))
         (setq eat--pending-output-chunks nil)
-        (eshell-output-filter
-         process (string-join (nreverse queue)))))))
+        (combine-change-calls
+            (eat-term-beginning eat--terminal)
+            (eat-term-end eat--terminal)
+          (eshell-output-filter
+           process (string-join (nreverse queue))))))))
 
 (defun eat--eshell-filter (process string)
   "Process output STRING from PROCESS."
