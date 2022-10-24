@@ -5896,16 +5896,16 @@ PROGRAM can be a shell command."
   "Process status message MESSAGE from PROCESS."
   (declare-function eshell-sentinel "esh-proc" (proc string))
   (when (buffer-live-p (process-buffer process))
-    (cl-letf* ((process-send-string
-                (symbol-function #'process-send-string))
-               ((symbol-function #'process-send-string)
-                (lambda (proc string)
-                  (when (or (not (eq proc process))
-                            (process-live-p proc))
-                    (funcall process-send-string proc string)))))
-      (eat--eshell-process-output-queue process (current-buffer)))
-    (when (memq (process-status process) '(signal exit))
-      (with-current-buffer (process-buffer process)
+    (with-current-buffer (process-buffer process)
+      (cl-letf* ((process-send-string
+                  (symbol-function #'process-send-string))
+                 ((symbol-function #'process-send-string)
+                  (lambda (proc string)
+                    (when (or (not (eq proc process))
+                              (process-live-p proc))
+                      (funcall process-send-string proc string)))))
+        (eat--eshell-process-output-queue process (current-buffer)))
+      (when (memq (process-status process) '(signal exit))
         (eat--eshell-cleanup))))
   (eshell-sentinel process message))
 
