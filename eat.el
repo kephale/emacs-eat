@@ -4465,10 +4465,11 @@ client process may get confused."
                         (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                                 (+ y 32)))))
                  (cond
+                  ;; `down-mouse-1' and friends.
                   ((memq 'down modifiers)
-                   ;; For mouse-1, mouse-2 and mouse-3, keep track the
-                   ;; button's state, we'll need it when button event
-                   ;; mouse mode is enabled.
+                   ;; For `mouse-1', `mouse-2' and `mouse-3', keep
+                   ;; track the button's state, we'll need it when
+                   ;; button event mouse mode is enabled.
                    (when (< (logand button 3) 3)
                      (setf (eat--t-term-mouse-pressed terminal)
                            ;; In XTerm and Kitty, mouse-1 is
@@ -4485,12 +4486,14 @@ client process may get confused."
                         (format "\e[<%i;%i;%iM" button x y)
                       (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                               (+ y 32)))))
+                  ;; `mouse-1', `mouse-2', `mouse-3', and their
+                  ;; `drag'ged variants.
                   ((and (or (memq 'click modifiers)
                             (memq 'drag modifiers))
                         (<= mouse-num 3))
-                   ;; For mouse-1, mouse-2 and mouse-3, keep track the
-                   ;; button's state, we'll need it when button event
-                   ;; mouse mode is enabled.
+                   ;; For `mouse-1', `mouse-2' and `mouse-3', keep
+                   ;; track the button's state, we'll need it when
+                   ;; button event mouse mode is enabled.
                    (setf (eat--t-term-mouse-pressed terminal)
                          (cl-delete-if
                           (lambda (b)
@@ -4502,11 +4505,12 @@ client process may get confused."
                         (format "\e[<%i;%i;%im" button x y)
                       (format "\e[M%c%c%c" (+ (logior button 3) 32)
                               (+ x 32) (+ y 32)))))
+                  ;; Mouse wheel, `mouse-4' and friends.
                   (t
                    (send
                     (if (eq (eat--t-term-mouse-encoding terminal)
                             'sgr)
-                        (format "\e[<%i;%i;%im" button x y)
+                        (format "\e[<%i;%i;%iM" button x y)
                       (format "\e[M%c%c%c" (+ button 32) (+ x 32)
                               (+ y 32))))))))))
           ;; Mouse movement tracking.
