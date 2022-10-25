@@ -343,16 +343,14 @@ If your process is choking on big inputs, try lowering the value."
 (defface eat-term-color-1
   '((t :inherit ansi-color-red))
   "Face used to render red color text."
-  :group 'eat-term
-  :version "28.1")
+  :group 'eat-term)
 
 (put 'eat-term-color-red 'face-alias 'eat-term-color-1)
 
 (defface eat-term-color-2
   '((t :inherit ansi-color-green))
   "Face used to render green color text."
-  :group 'eat-term
-  :version "28.1")
+  :group 'eat-term)
 
 (put 'eat-term-color-green 'face-alias 'eat-term-color-2)
 
