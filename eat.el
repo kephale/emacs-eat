@@ -1966,7 +1966,7 @@ Nil when not in alternative display mode.")
    :documentation "Saved SGR attributes.")
   (bracketed-yank nil :documentation "State of bracketed yank mode.")
   (keypad-mode nil :documentation "State of keypad mode.")
-  (mouse-mode t :documentation "Current mouse mode.")
+  (mouse-mode nil :documentation "Current mouse mode.")
   (mouse-pressed nil :documentation "Pressed mouse buttons.")
   (mouse-encoding nil :documentation "Current mouse event encoding.")
   (focus-event-mode nil :documentation "Whether to send focus event.")
@@ -4094,8 +4094,9 @@ point and buffer restriction.  MODE can be one of the following:
   nil                 Disable mouse.
   `:click'              Pass `mouse-1', `mouse-2', and `mouse-3'
                         clicks.
-  `:modifier-click'     Pass all mouse clicks, including `control',
-                        `meta' and `shift' modifiers.
+  `:modifier-click'     Pass all mouse click events on both press and
+                        release, including `control', `meta' and
+                        `shift' modifiers.
   `:drag'               All of `:modifier-click', plus dragging
                         (moving mouse while pressed) information.
   `:all'                Pass all mouse events, including movement.
@@ -4429,8 +4430,9 @@ client process may get confused."
                   (pos (if (memq 'drag modifiers)
                            (event-end mouse)
                          (event-start mouse)))
-                  (x (1+ (car (posn-col-row pos))))
-                  (y (1+ (cdr (posn-col-row pos))))
+                  (x-y (posn-col-row pos 'use-window))
+                  (x (1+ (car x-y)))
+                  (y (1+ (cdr x-y)))
                   (button
                    (let ((b (aref
                              [0 1 2 64 65 66 67 128 129 130 131]
@@ -4444,8 +4446,9 @@ client process may get confused."
                        (cl-incf b 16))
                      b)))
              (when ref-pos
-               (cl-decf x (car (posn-col-row ref-pos)))
-               (cl-decf y (cdr (posn-col-row ref-pos))))
+               (let ((ref-x-y (posn-col-row ref-pos 'use-window)))
+                 (cl-decf x (car ref-x-y))
+                 (cl-decf y (cdr ref-x-y))))
              (when (and (<= 1 x (eat--t-disp-width disp))
                         (<= 1 y (eat--t-disp-height disp))
                         (or (eat--t-term-mouse-encoding terminal)
