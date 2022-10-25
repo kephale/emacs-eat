@@ -5861,6 +5861,7 @@ PROGRAM can be a shell command."
       (set-marker eshell-last-output-start (point))
       (set-marker eshell-last-output-end (point))
       (eat--cursor-blink-mode -1)
+      (eat--grab-mouse nil nil)
       (eat-term-delete eat--terminal)
       (set-process-filter eat--process #'eshell-output-filter)
       (setq eat--terminal nil)
