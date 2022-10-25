@@ -5867,7 +5867,8 @@ PROGRAM can be a shell command."
       (setq eat--process nil)
       (kill-local-variable 'eshell-output-filter-functions)
       (eat--eshell-semi-char-mode -1)
-      (eat--eshell-char-mode -1))))
+      (eat--eshell-char-mode -1)
+      (setq buffer-read-only nil))))
 
 (defun eat--eshell-process-output-queue (process buffer)
   "Process the output queue on BUFFER from PROCESS."
