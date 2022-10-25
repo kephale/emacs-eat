@@ -4466,10 +4466,19 @@ client process may get confused."
                                 (+ y 32)))))
                  (cond
                   ((memq 'down modifiers)
+                   ;; For mouse-1, mouse-2 and mouse-3, keep track the
+                   ;; button's state, we'll need it when button event
+                   ;; mouse mode is enabled.
                    (when (< (logand button 3) 3)
                      (setf (eat--t-term-mouse-pressed terminal)
-                           (nconc (eat--t-term-mouse-pressed terminal)
-                                  (list button))))
+                           ;; In XTerm and Kitty, mouse-1 is
+                           ;; prioritized over mouse-2, and mouse-2
+                           ;; over mouse-3.  However St doesn't keep
+                           ;; track of multiple buttons.
+                           (sort
+                            (cons button (eat--t-term-mouse-pressed
+                                          terminal))
+                            #'<)))
                    (send
                     (if (eq (eat--t-term-mouse-encoding terminal)
                             'sgr)
@@ -4479,6 +4488,9 @@ client process may get confused."
                   ((and (or (memq 'click modifiers)
                             (memq 'drag modifiers))
                         (<= mouse-num 3))
+                   ;; For mouse-1, mouse-2 and mouse-3, keep track the
+                   ;; button's state, we'll need it when button event
+                   ;; mouse mode is enabled.
                    (setf (eat--t-term-mouse-pressed terminal)
                          (cl-delete-if
                           (lambda (b)
