@@ -4479,7 +4479,7 @@ client process may get confused."
                               (+ y 32)))))
                   ((and (or (memq 'click modifiers)
                             (memq 'drag modifiers))
-                        (< mouse-num 3))
+                        (<= mouse-num 3))
                    (setf (eat--t-term-mouse-pressed terminal)
                          (cl-delete-if
                           (lambda (b)
