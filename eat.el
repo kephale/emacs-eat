@@ -4438,8 +4438,7 @@ client process may get confused."
                              [0 1 2 64 65 66 67 128 129 130 131]
                              (1- mouse-num))))
                      (when (memq 'shift modifiers)
-                       (cl-incf b 4)
-                       (setq b (+ b 4)))
+                       (cl-incf b 4))
                      (when (memq 'meta modifiers)
                        (cl-incf b 8))
                      (when (memq 'control modifiers)
