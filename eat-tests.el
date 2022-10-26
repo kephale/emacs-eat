@@ -393,8 +393,8 @@ margin."
     (output "    \eE")
     (should-term :cursor '(5 . 1))))
 
-(ert-deftest eat-test-reverse-line-feed ()
-  "Test reverse line feed control function.
+(ert-deftest eat-test-reverse-index ()
+  "Test reverse index control function.
 
 Use newlines to move to an initial position from where the control
 function is to be invoked."
