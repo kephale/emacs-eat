@@ -393,6 +393,18 @@ margin."
     (output "    \eE")
     (should-term :cursor '(5 . 1))))
 
+(ert-deftest eat-test-index ()
+  "Test index control function."
+  (eat--tests-with-term '()
+    (output "\eD")
+    (should-term :cursor '(2 . 1))
+    (output "    \eD")
+    (should-term :cursor '(3 . 5))
+    (output "\eD")
+    (should-term :cursor '(4 . 5))
+    (output "    \eD")
+    (should-term :cursor '(5 . 9))))
+
 (ert-deftest eat-test-reverse-index ()
   "Test reverse index control function.
 
