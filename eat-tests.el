@@ -5394,7 +5394,7 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "foo b               "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-7 nil t))))
              :cursor '(5 . 6)))
     (output "\nbar baz foo\e[6G")
@@ -5406,7 +5406,7 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "foo b               "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-7 nil t)))
                         "bar baz foo")
              :cursor '(6 . 6)))
@@ -5419,12 +5419,12 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "foo b               "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-7 nil t)))
                         ,(add-props
                           "      z foo"
                           `((0 . 6)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-8 nil t))))
              :cursor '(6 . 6)))
     (output "\nbaz foo bar\e[6G")
@@ -5436,12 +5436,12 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "foo b               "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-7 nil t)))
                         ,(add-props
                           "      z foo"
                           `((0 . 6)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-8 nil t)))
                         "baz foo bar")
              :cursor '(6 . 6)))
@@ -5454,17 +5454,17 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "foo b               "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-7 nil t)))
                         ,(add-props
                           "      z foo"
                           `((0 . 6)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-8 nil t)))
                         ,(add-props
                           "baz f                 "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-55 nil t))))
              :cursor '(6 . 6)))
     (output "\nfoo bar baz\e[6G")
@@ -5476,17 +5476,17 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "foo b               "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-7 nil t)))
                         ,(add-props
                           "      z foo"
                           `((0 . 6)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-8 nil t)))
                         ,(add-props
                           "baz f                 "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-55 nil t)))
                         "foo bar baz")
              :cursor '(6 . 6)))
@@ -5499,17 +5499,17 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "foo b               "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-7 nil t)))
                         ,(add-props
                           "      z foo"
                           `((0 . 6)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-8 nil t)))
                         ,(add-props
                           "baz f                 "
                           `((5 . 20)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-55 nil t)))
                         ,(add-props
                           "                      "
@@ -5579,41 +5579,41 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "bar b               "
                           `((5 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-3 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-4 nil t)
                             :font 1))
                         ,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-3 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-4 nil t)
                             :font 1))
                         ,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-3 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-4 nil t)
                             :font 1))
                         ,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-3 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-4 nil t)
                             :font 1))
                         ,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-3 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-4 nil t)
                             :font 1)))
              :cursor '(2 . 6)))
@@ -5627,17 +5627,17 @@ automatic scrolling as a side effect."
              :display `(,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-15 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-11 nil t)
                             :intensity bold))
                         ,(add-props
                           "      z foo"
                           `((0 . 6)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-15 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-11 nil t)
                             :intensity bold))
                         "baz foo bar")
@@ -5653,41 +5653,41 @@ automatic scrolling as a side effect."
                         ,(add-props
                           "bar b               "
                           `((5 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-4 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-3 nil t)
                             :font 1))
                         ,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-4 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-3 nil t)
                             :font 1))
                         ,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-4 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-3 nil t)
                             :font 1))
                         ,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-4 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-3 nil t)
                             :font 1))
                         ,(add-props
                           "                    "
                           `((0 . 20)
-                            :foreground ,(face-background
+                            :foreground ,(face-foreground
                                           'eat-term-color-4 nil t)
-                            :background ,(face-background
+                            :background ,(face-foreground
                                           'eat-term-color-3 nil t)
                             :font 1)))
              :cursor '(2 . 6)))
