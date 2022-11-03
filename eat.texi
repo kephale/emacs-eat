@@ -77,8 +77,9 @@ Advanced Customizations
 * Performance Tuning::  Fine tuning to maximize performance.
 
 Appendices
-* GNU Free Documentation License::  Copying conditions.
-* Index::                           A list of various things.
+* GNU General Public License::  Copying condition for Eat.
+* GNU Free Documentation License::  Copying conditions of this manual.
+* Index::               A list of various things.
 @end menu
 
 @part Part I:@* Introduction
@@ -711,10 +712,12 @@ values, but they may change anytime.
 
 @part Part IV:@* Appendices
 
+@node GNU General Public License
+@appendix GNU General Public License
+
+@include gpl.texi
+
 @node GNU Free Documentation License
-@cindex GNU Free Documentation License
-@cindex FDL, GNU Free Documentation License
-@cindex GFDL, GNU Free Documentation License
 @appendix GNU Free Documentation License
 
 @include fdl.texi
