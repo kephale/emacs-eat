@@ -5065,7 +5065,11 @@ event."
   "Read a char and send it as INPUT."
   (declare (interactive-only "Use `eat-self-input' instead."))
   (interactive)
-  (eat-self-input 1 (read-event)))
+  ;; HACK: Quick hack to allow inputting `C-g'.  Any better way to do
+  ;; this?
+  (eat-self-input 1 (let ((inhibit-quit t)
+                          (quit-flag nil))
+                      (read-event))))
 
 (defun eat-yank (&optional arg)
   "Same as `yank', but for Eat.
