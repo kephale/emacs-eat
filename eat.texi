@@ -242,7 +242,8 @@ most inputs.  It forwards all keys, except @kbd{C-\}, @kbd{C-c},
 @kindex C-q @r{(``semi-char mode'')}
 To input these exceptions, there is a key @kbd{C-q}.  This reads the
 next input event and sends that as the input.  For example, the key
-sequences @kbd{C-q M-:} inputs @kbd{M-:}.
+sequences @kbd{C-q M-:} inputs @kbd{M-:}, @kbd{C-q C-g} inputs
+@kbd{C-g}.
 
 Input methods (@pxref{Input Methods,,, emacs, GNU Emacs Manual}) work
 in this mode, so, unlike Term (@pxref{Terminal emulator, Emacs
