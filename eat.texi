@@ -76,6 +76,12 @@ Advanced Customizations
 * Blinking Text::       Annoying blinking texts.
 * Performance Tuning::  Fine tuning to maximize performance.
 
+Recovering from Problems
+* Common Problems::     Common problem, and fixes.
+* Reporting Bugs::      How to report problems?
+* Tracing the Terminal::  Gathering some crucial information to
+                          reproduce a bug.
+
 Appendices
 * GNU General Public License::  Copying condition for Eat.
 * GNU Free Documentation License::  Copying conditions of this manual.
@@ -711,7 +717,270 @@ instantly, but this would likely cause a lot of flickering.
 The user option described in this chapter have reasonable default
 values, but they may change anytime.
 
-@part Part IV:@* Appendices
+@part Part IV:@* Recovering from Problems
+
+@node Common Problems
+@cindex common problems
+@cindex problem, common
+@chapter Common Problems
+
+This chapter describe how to recognize and handle situations in which
+Eat does something unexpected, such as hangs, garbled text, etc.
+
+@menu
+* Not Recognized::      The program can't recognize Eat.
+* Garbled Text::        When you get garbage on your terminal.
+* Not Responding::      What to do if Eat is unresponsive.
+* Signaled an Error::   The worst and the most unlikely bug.
+* Bugs in Manual::      What if there are problems in this manual?
+@end menu
+
+@node Not Recognized
+@cindex not recognized
+@cindex problem, not recognized
+@cindex terminal not recognized
+@cindex problem, terminal not recognized
+@section Terminal Not Recognized
+
+If your program says that it can't recognize the terminal, probably
+the @env{TERM} environment has a wrong value.
+
+Check the value of @env{TERM}, if it's not set to something like
+@samp{eat-...}, check the user option @code{eat-term-name}.  If that's
+correct that your shell might be changing the @env{TERM} environment
+variable.  If @code{eat-term-name} isn't correct, customize to a
+suitable value and try again, your problem should be fixed.
+
+If @env{TERM} has the correct value, then probably the Terminfo
+entries of Eat are missing.  This can happen if you manually install
+Eat.  Check that whether the values of the environment value
+@env{TERM} and the user option @code{eat-term-terminfo-directory}
+match.  If they match, customize @code{eat-term-terminfo-directory} to
+the directory that contains the Terminfo database, the program should
+now recognize Eat.  If they don't match, then your shell is probably
+responsible for the problem.
+
+@node Garbled Text
+@cindex garbled text
+@cindex problem, garbled text
+@cindex problem, text garbled
+@section Garbled Text on Terminal
+
+If the text on the terminal looks wrong, first check out the value of
+@env{TERM}.  Usually @env{TERM} has a wrong value set, making programs
+send invalid escape sequences.
+
+First, @pxref{Not Recognized}; the problem is most likely because the
+problem doesn't recognize Eat, and it stays silent instead of
+reporting that.
+
+If the problem isn't resolved after following the instructions in the
+previous section, may be your program is blindly assuming that the
+terminal is XTerm-compatible.  If so, what you are seeing is the
+current state of ``XTerm-compliance''.  Though it's not really a bug,
+we definite want to know what's problem so that we can fix it.
+@xref{Reporting Bugs} for instructions on sending bug reports or
+feature request.
+
+The other potential reason is that Eat is not working.  This is
+definitely a bug, so please report it.
+
+@node Not Responding
+@cindex not responding, eat
+@cindex not responding, emacs
+@cindex eat not responding
+@cindex emacs not responding
+@cindex problem, eat not responding
+@cindex problem, emacs not responding
+@cindex problem, not responding, eat
+@cindex problem, not responding, emacs
+@section Emacs or Eat Not Responding
+
+If you run something that outputs huge amount of data, your Emacs may
+not respond, and even quitting may not work.  Quitting doesn't work
+while doing something terminal related (output processing, for
+example), and that's intentional, because quitting would mess up the
+terminal.
+
+The best way to fix it is to stop the program, so that Eat is not
+overloaded.  To avoid the problem in future, it is recommended to run
+those programs in faster terminals like bare Eshell (i.e. without
+Eat-Eshell), Comint, or external terminal emulators.
+
+@node Signaled an Error
+@cindex signaled an error
+@cindex eat signaled an error
+@cindex problem, signaled an error
+@cindex problem, eat signaled an error
+@section Eat Signaled an Error
+
+The worst thing that happen is that Eat might signal an error.  It is
+the worst thing possible, because it messes up the terminal, and also
+a security hole.  Fortunately, this is very rare.  If you ever find
+any such bug, you should report the bug (@pxref{Reporting Bugs}) as
+soon as possible with as much information as possible.
+
+@findex eat-reset
+Once the error signaled, your best option is to delete the terminal
+and start a new one.  But if you don't want to delete the terminal,
+you can try invoking the command @command{reset} from your shell.  If
+for some reason you can't do that, invoke the Emacs command
+@command{eat-reset}.  This will reset most of the terminal state and
+give you a clean terminal to work with.  However, it mayn't work if
+you're really unlucky, in that case deleting the terminal and starting
+a new one is your only option.
+
+@node Bugs in Manual
+@cindex bugs in manual
+@cindex typos in manual
+@cindex bugs, manual
+@cindex typos, manual
+@cindex manual, bugs
+@cindex manual, typos
+@cindex problems, bugs in manual
+@cindex problems, typos in manual
+@cindex problems, bugs, manual
+@cindex problems, typos, manual
+@cindex problems, manual, bugs
+@cindex problems, manual, typos
+@section Bugs in Manual
+
+Human makes mistake, and we are no exceptions.  But we are trying hard
+to improve Eat and it's manual.
+
+If you don't understand something even after a careful rereading,
+that's a bug.
+
+If you find anything unclear in this manual, that's a bug.
+
+This manual's job is make everything clear, so failing to do that
+indicates a bug.
+
+If the built-in documentation and this manual don't agree, one of them
+must be wrong, and that's a bug.
+
+If you Eat doesn't behave as this manual describes, that's a bug.
+
+If you find any typing mistakes, that's a bug.
+
+If you find a bug, please report it.  @xref{Reporting Bugs} for
+instruction on how to report it.
+
+@node Reporting Bugs
+@cindex reporting bugs
+@cindex bug reporting
+@cindex problem, reporting
+@chapter Reporting Bugs
+
+We welcome bug reports and feature request.  If you think you have
+found a bug, please report it.  If you're doubt, please send it
+anyway.  We can't promise that we'll fix the bug or implement your
+feature idea, or always agree that it's a bug, but we always want to
+hear from you.  Please report bugs at
+@url{https://codeberg.org/akib/emacs-eat/issues/new}.  You may send
+the bug report by emailing to the maintain
+(@kbd{M-x describe-package RET eat RET} would show the email address),
+but we prefer the former method, since the report is visible to
+everyone immediately.
+
+The most important principle in reporting a bug is to report
+@emph{facts}.  Hypotheses and verbal descriptions are useful when they
+are more guesses, but in no way substitute for detailed raw data.  You
+are encouraged to send you finding about bug, but please make sure to
+send the raw data needed to reproduce the bug.
+
+For bug reports, please try to reproduce the bug with @samp{emacs -Q}.
+This will disable loading your Emacs configuration, ruling out the
+potential bugs in your customizations.  Please include enough
+information for us to reproduce the bug with @samp{emacs -Q}, so that
+we have (or can get) enough information about the bug to fix it.  Some
+bugs are hard to reproduce with @samp{emacs -Q}, and some are not
+easily reproducible at all, in that case please give us the as much
+information as possible about Emacs configuration.  Generally
+speaking, enough information includes (but not limited to):
+
+@itemize @bullet
+@item
+A description of the bug.
+
+@item
+The version of Eat you're running.
+(@kbd{M-x describe-package RET eat RET} would show the version.)
+
+@item
+The version of Emacs you're running.
+
+@item
+Your Eat configuration, precisely.
+
+@item
+If you didn't or can't reproduce the bug with @code{emacs -Q}, as much
+information as possible about Emacs configuration.
+
+@item
+Precisely what you did.
+
+@item
+Trace output, if you can generate it.  (@xref{Tracing the Terminal}
+for instruction to generate it.)
+
+@item
+Hardware and operating system names and versions.
+
+@item
+Anything else that you think would be helpful.
+@end itemize
+
+When in doubt whether to include something or not, please include it.
+It is better to include many useless information than to leave out
+something useful.
+
+It is critical to send enough information to reproduce the bug.  What
+is not critical to ``narrow down'' the example to the smallest
+possible -- anything that reproduces the bug will suffice.  (Of
+course, if you like doing experiments, the smaller the example, the
+better.)
+
+@node Tracing the Terminal
+@cindex tracing the terminal
+@cindex terminal tracing
+@cindex terminal recording
+@chapter Tracing the Terminal
+
+When you run into a bug and want to report it, you'll want to trace
+the terminal.  Tracing means recording all the terminal activity,
+including creation, output, resizing and deleting.
+
+@findex eat-trace-mode
+@findex eat-eshell-trace-mode
+To enable tracing, enable the global minor mode
+@command{eat-trace-mode}.  This will trace all new Eat terminals.
+This won't work with Eshell, however.  Enable the global minor mode
+@command{eat-eshell-trace-mode} for that.
+
+Trace output for each command will be output in a buffer named
+@samp{*eat-trace @var{buffer-name}*: @var{command}}, where
+@var{buffer-name} is the buffer showing the terminal, and
+@var{command} is the command run in the terminal.
+
+Only the terminals created after the trace mode is enabled are traced.
+So if you don't have the mode enabled when you have found a bug,
+tracing can't give you any information (as tracing is disabled,
+nothing has been recorded).
+
+While submitting bug reports, please include the whole output in the
+trace output buffer.  This contains many crucial information required
+to reproduce your bug.
+
+@findex eat-trace-replay
+You can replay the terminal by executing the command
+@command{eat-trace-replay} is the trace output buffer.  You can use
+the key @kbd{n} or the key @kbd{@key{down}} to show the next frame.
+This is not intended for ordinary users, it's documented here only to
+help you debug Eat.  You mustn't rely on the behavior of this
+functionality to do anything else.
+
+@part Part V:@* Appendices
 
 @node GNU General Public License
 @appendix GNU General Public License
