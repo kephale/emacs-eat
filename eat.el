@@ -5738,7 +5738,8 @@ to the end of (accessible portion of) buffer."
   "Trace `eat-exec'.
 
 BUFFER is the buffer and COMMAND and SWITCHES are the invocation
-command."
+command.  BUFFER, NAME, COMMAND, STARTFILE and SWITCHES are passed to
+FN, `eat-exec', which see."
   (let ((time (current-time)))
     (prog1
         (funcall fn buffer name command startfile switches)
@@ -5776,15 +5777,17 @@ BUFFER is passed to FN, `eat--process-output-queue', which see."
           (symbol-function #'eat-term-process-output))
          ((symbol-function #'eat-term-process-output)
           (lambda (terminal output)
-            (with-current-buffer eat--trace-output-buffer
-              (eat--trace-log nil 'output output))
+            (when (buffer-live-p eat--trace-output-buffer)
+              (with-current-buffer eat--trace-output-buffer
+                (eat--trace-log nil 'output output)))
             (funcall eat-term-process-output terminal output)))
          (eat-term-redisplay
           (symbol-function #'eat-term-redisplay))
          ((symbol-function #'eat-term-redisplay)
           (lambda (terminal)
-            (with-current-buffer eat--trace-output-buffer
-              (eat--trace-log nil 'redisplay))
+            (when (buffer-live-p eat--trace-output-buffer)
+              (with-current-buffer eat--trace-output-buffer
+                (eat--trace-log nil 'redisplay)))
             (funcall eat-term-redisplay terminal))))
       (funcall fn buffer))))
 
@@ -5797,8 +5800,9 @@ PROCESS and WINDOWS are passed to FN,
       ((eat-term-resize (symbol-function #'eat-term-resize))
        ((symbol-function #'eat-term-resize)
         (lambda (terminal width height)
-          (with-current-buffer eat--trace-output-buffer
-            (eat--trace-log nil 'resize width height))
+          (when (buffer-live-p eat--trace-output-buffer)
+            (with-current-buffer eat--trace-output-buffer
+              (eat--trace-log nil 'resize width height)))
           (funcall eat-term-resize terminal width height))))
     (funcall fn process windows)))
 
@@ -5810,7 +5814,8 @@ Elements of ARGS are passed to FN, `eat--sentinel', which see."
       ((eat-term-delete (symbol-function #'eat-term-delete))
        ((symbol-function #'eat-term-delete)
         (lambda (terminal)
-          (eat--trace-stop)
+          (when (buffer-live-p eat--trace-output-buffer)
+            (eat--trace-stop))
           (funcall eat-term-delete terminal))))
     (apply fn args)))
 
@@ -6342,7 +6347,7 @@ see."
 
 FN is the original definition of `eat--eshell-output-filter', which
 see."
-  (if (not eat--trace-output-buffer)
+  (if (not (buffer-live-p eat--trace-output-buffer))
       (funcall fn)
     (cl-letf*
         ((eat-term-process-output
@@ -6365,13 +6370,15 @@ see."
   "Trace `eat--eshell-cleanup'.
 
 FN is the original definition of `eat--eshell-cleanup', which see."
-  (cl-letf*
-      ((eat-term-delete (symbol-function #'eat-term-delete))
-       ((symbol-function #'eat-term-delete)
-        (lambda (terminal)
-          (eat--trace-stop)
-          (funcall eat-term-delete nil terminal))))
-    (funcall fn)))
+  (if (not (buffer-live-p eat--trace-output-buffer))
+      (funcall fn)
+    (cl-letf*
+        ((eat-term-delete (symbol-function #'eat-term-delete))
+         ((symbol-function #'eat-term-delete)
+          (lambda (terminal)
+            (eat--trace-stop)
+            (funcall eat-term-delete terminal))))
+      (funcall fn))))
 
 (define-minor-mode eat-eshell-trace-mode
   "Toggle tracing Eat terminal."
@@ -6589,7 +6596,7 @@ already exist."
     (let ((ov (make-overlay (point-min) (point-min))))
       (overlay-put ov 'before-string
                    (propertize " " 'display
-                               '(left-fringe right-triangle warning)))
+                               '(left-fringe right-triangle)))
       (setq-local eat--trace-replay-current-sexp-overlay ov))
     (goto-char (point-min))
     (let ((source (current-buffer))
