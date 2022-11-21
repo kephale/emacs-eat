@@ -6331,23 +6331,22 @@ BUFFER is passed to FN, `eat--process-output-queue', which see."
   (if (or (not (buffer-live-p buffer))
           (not (buffer-local-value 'eat--trace-output-buffer buffer)))
       (funcall fn buffer)
-    (cl-letf*
-        ((eat-term-process-output
-          (symbol-function #'eat-term-process-output))
-         ((symbol-function #'eat-term-process-output)
-          (lambda (terminal output)
-            (when (buffer-live-p eat--trace-output-buffer)
-              (with-current-buffer eat--trace-output-buffer
-                (eat--trace-log nil 'output output)))
-            (funcall eat-term-process-output terminal output)))
-         (eat-term-redisplay
-          (symbol-function #'eat-term-redisplay))
-         ((symbol-function #'eat-term-redisplay)
-          (lambda (terminal)
-            (when (buffer-live-p eat--trace-output-buffer)
-              (with-current-buffer eat--trace-output-buffer
-                (eat--trace-log nil 'redisplay)))
-            (funcall eat-term-redisplay terminal))))
+    (cl-letf* ((eat-term-process-output
+                (symbol-function #'eat-term-process-output))
+               ((symbol-function #'eat-term-process-output)
+                (lambda (terminal output)
+                  (when (buffer-live-p eat--trace-output-buffer)
+                    (with-current-buffer eat--trace-output-buffer
+                      (eat--trace-log nil 'output output)))
+                  (funcall eat-term-process-output terminal output)))
+               (eat-term-redisplay
+                (symbol-function #'eat-term-redisplay))
+               ((symbol-function #'eat-term-redisplay)
+                (lambda (terminal)
+                  (when (buffer-live-p eat--trace-output-buffer)
+                    (with-current-buffer eat--trace-output-buffer
+                      (eat--trace-log nil 'redisplay)))
+                  (funcall eat-term-redisplay terminal))))
       (funcall fn buffer))))
 
 (defun eat--trace-adjust-process-window-size (fn process windows)
@@ -6362,21 +6361,48 @@ PROCESS and WINDOWS are passed to FN,
           (when (buffer-live-p eat--trace-output-buffer)
             (with-current-buffer eat--trace-output-buffer
               (eat--trace-log nil 'resize width height)))
-          (funcall eat-term-resize terminal width height))))
+          (funcall eat-term-resize terminal width height)))
+       (eat-term-redisplay (symbol-function #'eat-term-redisplay))
+       ((symbol-function #'eat-term-redisplay)
+        (lambda (terminal)
+          (when (buffer-live-p eat--trace-output-buffer)
+            (with-current-buffer eat--trace-output-buffer
+              (eat--trace-log nil 'redisplay)))
+          (funcall eat-term-redisplay terminal))))
     (funcall fn process windows)))
 
 (defun eat--trace-sentinel (fn &rest args)
   "Trace `eat--sentinel'.
 
 Elements of ARGS are passed to FN, `eat--sentinel', which see."
+  (cl-letf* ((eat-term-delete (symbol-function #'eat-term-delete))
+             ((symbol-function #'eat-term-delete)
+              (lambda (terminal)
+                (when (buffer-live-p eat--trace-output-buffer)
+                  (eat--trace-stop))
+                (funcall eat-term-delete terminal))))
+    (apply fn args)))
+
+(defun eat--trace-reset (fn)
+  "Trace `eat-reset'.
+
+FN is original definition of `eat-reset'."
   (cl-letf*
-      ((eat-term-delete (symbol-function #'eat-term-delete))
-       ((symbol-function #'eat-term-delete)
+      ((eat-term-reset (symbol-function #'eat-term-reset))
+       ((symbol-function #'eat-term-reset)
         (lambda (terminal)
           (when (buffer-live-p eat--trace-output-buffer)
-            (eat--trace-stop))
-          (funcall eat-term-delete terminal))))
-    (apply fn args)))
+            (with-current-buffer eat--trace-output-buffer
+              (eat--trace-log nil 'reset)))
+          (funcall eat-term-reset terminal)))
+       (eat-term-redisplay (symbol-function #'eat-term-redisplay))
+       ((symbol-function #'eat-term-redisplay)
+        (lambda (terminal)
+          (when (buffer-live-p eat--trace-output-buffer)
+            (with-current-buffer eat--trace-output-buffer
+              (eat--trace-log nil 'redisplay)))
+          (funcall eat-term-redisplay terminal))))
+    (funcall fn)))
 
 (defun eat--eshell-trace-adjust-make-process-args (fn &rest args)
   "Trace `eat--eshell-adjust-make-process-args'.
@@ -6429,21 +6455,20 @@ FN is the original definition of `eat--eshell-output-filter', which
 see."
   (if (not (buffer-live-p eat--trace-output-buffer))
       (funcall fn)
-    (cl-letf*
-        ((eat-term-process-output
-          (symbol-function #'eat-term-process-output))
-         ((symbol-function #'eat-term-process-output)
-          (lambda (terminal output)
-            (with-current-buffer eat--trace-output-buffer
-              (eat--trace-log nil 'output output))
-            (funcall eat-term-process-output terminal output)))
-         (eat-term-redisplay
-          (symbol-function #'eat-term-redisplay))
-         ((symbol-function #'eat-term-redisplay)
-          (lambda (terminal)
-            (with-current-buffer eat--trace-output-buffer
-              (eat--trace-log nil 'redisplay))
-            (funcall eat-term-redisplay terminal))))
+    (cl-letf* ((eat-term-process-output
+                (symbol-function #'eat-term-process-output))
+               ((symbol-function #'eat-term-process-output)
+                (lambda (terminal output)
+                  (with-current-buffer eat--trace-output-buffer
+                    (eat--trace-log nil 'output output))
+                  (funcall eat-term-process-output terminal output)))
+               (eat-term-redisplay
+                (symbol-function #'eat-term-redisplay))
+               ((symbol-function #'eat-term-redisplay)
+                (lambda (terminal)
+                  (with-current-buffer eat--trace-output-buffer
+                    (eat--trace-log nil 'redisplay))
+                  (funcall eat-term-redisplay terminal))))
       (funcall fn))))
 
 (defun eat--eshell-trace-cleanup (fn)
@@ -6452,12 +6477,11 @@ see."
 FN is the original definition of `eat--eshell-cleanup', which see."
   (if (not (buffer-live-p eat--trace-output-buffer))
       (funcall fn)
-    (cl-letf*
-        ((eat-term-delete (symbol-function #'eat-term-delete))
-         ((symbol-function #'eat-term-delete)
-          (lambda (terminal)
-            (eat--trace-stop)
-            (funcall eat-term-delete terminal))))
+    (cl-letf* ((eat-term-delete (symbol-function #'eat-term-delete))
+               ((symbol-function #'eat-term-delete)
+                (lambda (terminal)
+                  (eat--trace-stop)
+                  (funcall eat-term-delete terminal))))
       (funcall fn))))
 
 (define-minor-mode eat-trace-mode
@@ -6473,6 +6497,7 @@ FN is the original definition of `eat--eshell-cleanup', which see."
         (advice-add #'eat--adjust-process-window-size :around
                     #'eat--trace-adjust-process-window-size)
         (advice-add #'eat--sentinel :around #'eat--trace-sentinel)
+        (advice-add #'eat-reset :around #'eat--trace-reset)
         (advice-add #'eat--eshell-adjust-make-process-args :around
                     #'eat--eshell-trace-adjust-make-process-args)
         (advice-add #'eat--eshell-output-filter :around
@@ -6485,6 +6510,7 @@ FN is the original definition of `eat--eshell-cleanup', which see."
     (advice-remove #'eat--adjust-process-window-size
                    #'eat--trace-adjust-process-window-size)
     (advice-remove #'eat--sentinel #'eat--trace-sentinel)
+    (advice-remove #'eat-reset #'eat--trace-reset)
     (advice-remove #'eat--eshell-adjust-make-process-args
                    #'eat--eshell-trace-adjust-make-process-args)
     (advice-remove #'eat--eshell-output-filter
@@ -6538,13 +6564,16 @@ FN is the original definition of `eat--eshell-cleanup', which see."
        (setf (eat-term-set-cursor-function eat--terminal)
              #'eat--set-cursor)
        (setf (eat-term-ring-bell-function eat--terminal) #'eat--bell)
-       (eat-term-resize eat--terminal width height))
+       (eat-term-resize eat--terminal width height)
+       (eat-term-redisplay eat--terminal))
       (`(,_time output ,string)
        (eat-term-process-output eat--terminal string))
       (`(,_time redisplay)
        (eat-term-redisplay eat--terminal))
       (`(,_time resize ,width ,height)
        (eat-term-resize eat--terminal width height))
+      (`(,_time reset)
+       (eat-term-reset eat--terminal))
       (`(,_time finish)
        (eat-term-delete eat--terminal)))
     (eat--synchronize-scroll)))
