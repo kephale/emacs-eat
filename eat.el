@@ -4920,7 +4920,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   (interactive)
   (when eat--terminal
     (let ((inhibit-read-only t))
-      (eat-term-reset eat--terminal))))
+      (eat-term-reset eat--terminal)
+      (eat-term-redisplay eat--terminal))))
 
 (defun eat--set-cursor (_ state)
   "Set cursor type according to STATE.
@@ -5554,6 +5555,7 @@ of window displaying PROCESS's buffer."
                       (= (point) (eat-term-end eat--terminal)
                          (point-max))))))
         (eat-term-resize eat--terminal width height)
+        (eat-term-redisplay eat--terminal)
         (when synchronize-scroll
           (funcall eat--synchronize-scroll-function))))
     size))
@@ -5636,6 +5638,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
           (insert-file-contents startfile)
           (process-send-string
            process (delete-and-extract-region (point) (point-max)))))
+      (eat-term-redisplay eat--terminal)
       (run-hooks 'eat-exec-hook)
       buffer)))
 
@@ -5992,6 +5995,7 @@ Elements of ARGS are passed to FN, `eat--sentinel', which see."
       (with-selected-window window
         (eat-term-resize eat--terminal (window-max-chars-per-line)
                          (window-text-height))))
+    (eat-term-redisplay eat--terminal)
     (make-local-variable 'eshell-output-filter-functions)
     (setq eshell-output-filter-functions '(eat--eshell-output-filter))
     (eat-eshell-semi-char-mode)))
