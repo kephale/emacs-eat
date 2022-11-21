@@ -115,7 +115,7 @@ This is the default name used when running Eat."
   :group 'eat-ui)
 
 (defcustom eat-term-scrollback-size 131072 ; 128 K
-  "Size of scrollback area in characters.  Nil means unlimited."
+  "Size of scrollback area in characters.  nil means unlimited."
   :type '(choice integer (const nil))
   :group 'eat-term
   :group 'eat-ui)
