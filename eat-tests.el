@@ -5469,6 +5469,34 @@ automatic scrolling as a side effect."
 
 ;;;;; Resizing Tests.
 
+(ert-deftest eat-test-resize-when-at-beginning-of-first-line ()
+  "Test resize when the beginning of the first line on display."
+  (eat--tests-with-term '()
+    (output "1\n2\n3\n4\n5\n6\e[H")
+    (should-term :display '("1"
+                            "2"
+                            "3"
+                            "4"
+                            "5"
+                            "6")
+                 :cursor '(1 . 1))
+    (eat-term-resize (terminal) 20 5)
+    (should-term :scrollback '("1")
+                 :display '("2"
+                            "3"
+                            "4"
+                            "5"
+                            "6")
+                 :cursor '(1 . 1))
+    (output "7\n")
+    (should-term :scrollback '("1")
+                 :display '("7"
+                            "3"
+                            "4"
+                            "5"
+                            "6")
+                 :cursor '(2 . 1))))
+
 (ert-deftest eat-test-resize-when-at-beginning-of-last-line ()
   "Test resize when the beginning of the last line on display."
   (eat--tests-with-term '()

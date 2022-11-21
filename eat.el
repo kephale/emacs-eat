@@ -3893,76 +3893,80 @@ DATA is the selection data encoded in base64."
                          (eq old-height height)))
                (>= width 1)
                (>= height 1))
-      (save-excursion
-        ;; Update state.
-        (setf (eat--t-disp-width disp) width)
-        (setf (eat--t-disp-height disp) height)
-        (setf (eat--t-term-scroll-begin eat--t-term) 1)
-        (setf (eat--t-term-scroll-end eat--t-term)
-              (eat--t-disp-height disp))
-        (set-marker (eat--t-cur-position cursor) (point))
-        (if (eat--t-term-main-display eat--t-term)
-            ;; For alternative display, just delete the part of the
-            ;; display that went out of the edges.  So if the terminal
-            ;; was enlarged, we don't have anything to do.
-            (when (or (< old-width width)
-                      (< old-height height))
-              ;; Go to the beginning of display.
-              (goto-char (eat--t-disp-begin disp))
-              (dotimes (l height)
-                (eat--t-col-motion width)
-                (delete-region (point) (car (eat--t-eol)))
-                (if (< (1+ l) height)
-                    (eat--t-goto-bol 1)
-                  (delete-region (point) (point-max))
-                  (let ((y (eat--t-cur-y cursor))
-                        (x (eat--t-cur-x cursor)))
-                    (eat--t-goto 1 1)
-                    (eat--t-goto y x)))))
-          ;; REVIEW: This works, but it is very simple.  Most
-          ;; terminals have more sophisticated mechanisms to do this.
-          ;; It would be nice thing have them here.
-          ;; Go to the beginning of display.
-          (goto-char (eat--t-disp-begin disp))
-          ;; Try to move to the end of previous line, maybe that's a
-          ;; part of a too long line.
-          (unless (bobp)
-            (backward-char))
-          ;; Join all long lines.
-          (while (not (eobp))
-            (eat--t-join-long-line))
-          ;; Go to display beginning again and break long lines.
-          (goto-char (eat--t-disp-begin disp))
-          (while (not (eobp))
-            (eat--t-break-long-line (eat--t-disp-width disp)))
-          ;; Calculate the beginning position of display.
-          (goto-char (eat--t-cur-position cursor))
-          ;; TODO: This part needs explanation.
-          (let* ((disp-begin (car (eat--t-bol (- (1- height))))))
-            (when (< (eat--t-disp-begin disp) disp-begin)
-              (goto-char (max (- (eat--t-disp-begin disp) 1)
-                              (point-min)))
-              (set-marker (eat--t-disp-begin disp) disp-begin)
-              (while (< (point) (1- (eat--t-disp-begin disp)))
-                (eat--t-join-long-line
-                 (1- (eat--t-disp-begin disp))))))
-          ;; Update the coordinates of cursor.
-          (goto-char (eat--t-cur-position cursor))
-          (setf (eat--t-cur-x cursor) (1+ (eat--t-current-col)))
-          (goto-char (eat--t-disp-begin disp))
-          (setf (eat--t-cur-y cursor)
-                (let ((y 0))
-                  (while (< (point) (eat--t-cur-position cursor))
-                    (condition-case nil
-                        (search-forward
-                         "\n" (eat--t-cur-position cursor))
-                      (search-failed
-                       (goto-char (eat--t-cur-position cursor))))
-                    (cl-incf y))
-                  (when (and (> (point) (point-min))
-                             (= (char-before) ?\n))
-                    (cl-incf y))
-                  (max y 1))))))))
+      ;; Update state.
+      (setf (eat--t-disp-width disp) width)
+      (setf (eat--t-disp-height disp) height)
+      (setf (eat--t-term-scroll-begin eat--t-term) 1)
+      (setf (eat--t-term-scroll-end eat--t-term)
+            (eat--t-disp-height disp))
+      (set-marker (eat--t-cur-position cursor) (point))
+      (if (eat--t-term-main-display eat--t-term)
+          ;; For alternative display, just delete the part of the
+          ;; display that went out of the edges.  So if the terminal
+          ;; was enlarged, we don't have anything to do.
+          (when (or (< old-width width)
+                    (< old-height height))
+            ;; Go to the beginning of display.
+            (goto-char (eat--t-disp-begin disp))
+            (dotimes (l height)
+              (eat--t-col-motion width)
+              (delete-region (point) (car (eat--t-eol)))
+              (if (< (1+ l) height)
+                  (eat--t-goto-bol 1)
+                (delete-region (point) (point-max))
+                (let ((y (eat--t-cur-y cursor))
+                      (x (eat--t-cur-x cursor)))
+                  (eat--t-goto 1 1)
+                  (eat--t-goto y x)))))
+        ;; REVIEW: This works, but it is very simple.  Most
+        ;; terminals have more sophisticated mechanisms to do this.
+        ;; It would be nice thing have them here.
+        ;; Go to the beginning of display.
+        (goto-char (eat--t-disp-begin disp))
+        ;; Try to move to the end of previous line, maybe that's a
+        ;; part of a too long line.
+        (unless (bobp)
+          (backward-char))
+        ;; Join all long lines.
+        (while (not (eobp))
+          (eat--t-join-long-line))
+        ;; Go to display beginning again and break long lines.
+        (goto-char (eat--t-disp-begin disp))
+        (while (not (eobp))
+          (eat--t-break-long-line (eat--t-disp-width disp)))
+        ;; Calculate the beginning position of display.
+        (goto-char (point-max))
+        ;; TODO: This part needs explanation.
+        (let* ((disp-begin (car (eat--t-bol (- (1- height))))))
+          (when (< (eat--t-disp-begin disp) disp-begin)
+            (goto-char (max (- (eat--t-disp-begin disp) 1)
+                            (point-min)))
+            (set-marker (eat--t-disp-begin disp) disp-begin)
+            (while (< (point) (1- (eat--t-disp-begin disp)))
+              (eat--t-join-long-line
+               (1- (eat--t-disp-begin disp))))))
+        ;; Update the cursor if needed.
+        (when (< (eat--t-cur-position cursor)
+                 (eat--t-disp-begin disp))
+          (set-marker (eat--t-cur-position cursor)
+                      (eat--t-disp-begin disp)))
+        ;; Update the coordinates of cursor.
+        (goto-char (eat--t-cur-position cursor))
+        (setf (eat--t-cur-x cursor) (1+ (eat--t-current-col)))
+        (goto-char (eat--t-disp-begin disp))
+        (setf (eat--t-cur-y cursor)
+              (let ((y 0))
+                (while (< (point) (eat--t-cur-position cursor))
+                  (condition-case nil
+                      (search-forward
+                       "\n" (eat--t-cur-position cursor))
+                    (search-failed
+                     (goto-char (eat--t-cur-position cursor))))
+                  (cl-incf y))
+                (when (and (> (point) (point-min))
+                           (= (char-before) ?\n))
+                  (cl-incf y))
+                (max y 1)))))))
 
 ;;;###autoload
 (defun eat-term-make (buffer position)
