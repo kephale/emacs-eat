@@ -3904,15 +3904,15 @@ DATA is the selection data encoded in base64."
           ;; For alternative display, just delete the part of the
           ;; display that went out of the edges.  So if the terminal
           ;; was enlarged, we don't have anything to do.
-          (when (or (< old-width width)
-                    (< old-height height))
+          (when (or (< width old-width)
+                    (< height old-height))
             ;; Go to the beginning of display.
             (goto-char (eat--t-disp-begin disp))
             (dotimes (l height)
               (eat--t-col-motion width)
               (delete-region (point) (car (eat--t-eol)))
               (if (< (1+ l) height)
-                  (eat--t-goto-bol 1)
+                  (forward-char)
                 (delete-region (point) (point-max))
                 (let ((y (eat--t-cur-y cursor))
                       (x (eat--t-cur-x cursor)))
