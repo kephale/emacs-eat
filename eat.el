@@ -3954,9 +3954,13 @@ DATA is the selection data encoded in base64."
                 (let ((y 0))
                   (while (< (point) (eat--t-cur-position cursor))
                     (condition-case nil
-                        (search-forward "\n")
+                        (search-forward
+                         "\n" (eat--t-cur-position cursor))
                       (search-failed
-                       (goto-char (point-max))))
+                       (goto-char (eat--t-cur-position cursor))))
+                    (cl-incf y))
+                  (when (and (> (point) (point-min))
+                             (= (char-before) ?\n))
                     (cl-incf y))
                   (max y 1))))))))
 

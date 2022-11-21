@@ -227,7 +227,42 @@ SPEC is a form that should evaluate to a plist.  The plist can have
 any of the following properties:
 
   `:width'        Width of terminal.  Defaults to 20.
-  `:height'       Height of terminal.  Defaults to 6."
+  `:height'       Height of terminal.  Defaults to 6.
+
+The following functions are available within BODY:
+
+(terminal)
+  Return the terminal.
+
+(output &rest ARGS)
+  Output ARGS to the terminal, where ARGS is a list of string.
+
+(input-event EVENT &optional REF-POS N)
+  Input EVENT to the terminal.  REF-POS is the starting position of
+  the terminal, a mouse position list.  N is how times to input EVENT.
+
+(input)
+  Return all unread input.
+
+(should-term SCROLLBACK DISPLAY CURSOR)
+  Match the terminal with SCROLLBACK, DISPLAY and CURSOR.  SCROLLBACK
+  is expected content of scrollback region.  DISPLAY is the expected
+  display.  CURSOR is the expected cursor position, as a cons (X . Y),
+  where X and Y are one-based.
+
+  Both SCROLLBACK and DISPLAY are list of strings.  They matched with
+  the terminal for visual equivalence, not literal equivaence (i.e,
+  properties are also compared, and \"foo\" and \"foo   \" are assumed
+  to be equivalent).
+
+(add-props STRING &rest INTERVALS)
+  Add text properties to STRING as specified in INTERVALS.  Each
+  argument in INTERVALS is of form ((BEGIN . END) PROPERTY VALUE
+  PROPERTY VALUE...).  Here is all PROPERTY is applied on STRING from
+  BEGIN to END.  PROPERTY should one of `:foreground', `:background'
+  `:underline-type', `:underline-color', `:crossed', `:intensity',
+  `:italic', `:blink' and `:font'.  Any other properties are also
+  applied but ignored by `should-term'."
   (declare (indent 1))
   (let ((term (make-symbol "term"))
         (input (make-symbol "input")))
@@ -5430,6 +5465,35 @@ automatic scrolling as a side effect."
                   "                    "
                   '((0 . 20) :background "#1405c8")))
      :cursor '(1 . 1))))
+
+
+;;;;; Resizing Tests.
+
+(ert-deftest eat-test-resize-when-at-beginning-of-last-line ()
+  "Test resize when the beginning of the last line on display."
+  (eat--tests-with-term '()
+    (output "1\n2\n3\n4\n5\n")
+    (should-term :display '("1"
+                            "2"
+                            "3"
+                            "4"
+                            "5")
+                 :cursor '(6 . 1))
+    (eat-term-resize (terminal) 20 5)
+    (should-term :scrollback '("1")
+                 :display '("2"
+                            "3"
+                            "4"
+                            "5")
+                 :cursor '(5 . 1))
+    (output "6\n")
+    (should-term :scrollback '("1"
+                               "2")
+                 :display '("3"
+                            "4"
+                            "5"
+                            "6")
+                 :cursor '(5 . 1))))
 
 
 ;;;;; Miscellaneous Tests.
