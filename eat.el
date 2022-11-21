@@ -5705,151 +5705,6 @@ PROGRAM can be a shell command."
       buffer)))
 
 
-;;;;; Tracing.
-
-(defconst eat--trace-recorded-variables
-  '(eat-term-scrollback-size
-    eat-enable-alternative-display)
-  "The variable to record in trace output.")
-
-(defvar eat--trace-output-buffer nil
-  "Buffer where the trace data is written to.")
-
-(defun eat--trace-log (time operation &rest args)
-  "Log TIME, OPERATION and ARGS into trace output.
-
-TIME defaults to the current time.
-
-The current buffer should be the trace output buffer.  Move the point
-to the end of (accessible portion of) buffer."
-  (goto-char (point-max))
-  ;; Hope that `float-time' won't roll over while tracing.  ;-)
-  (insert (replace-regexp-in-string
-           "\n" "\\\\n"
-           (format "%S" `(,(float-time time) ,operation ,@args)))
-          ?\n))
-
-(defun eat--trace-stop ()
-  "Stop tracing the terminal in current buffer."
-  (when eat--trace-output-buffer
-    (with-current-buffer eat--trace-output-buffer
-      (eat--trace-log nil 'finish)))
-  (remove-hook 'kill-buffer-hook #'eat--trace-stop t)
-  (kill-local-variable 'eat--trace-output-buffer))
-
-(defun eat--trace-exec (fn buffer name command startfile switches)
-  "Trace `eat-exec'.
-
-BUFFER is the buffer and COMMAND and SWITCHES are the invocation
-command.  BUFFER, NAME, COMMAND, STARTFILE and SWITCHES are passed to
-FN, `eat-exec', which see."
-  (let ((time (current-time)))
-    (prog1
-        (funcall fn buffer name command startfile switches)
-      (let ((buf (generate-new-buffer
-                  (format "*eat-trace %s*: %s"
-                          (buffer-name buffer)
-                          (mapconcat #'shell-quote-argument
-                                     (cons command switches) " "))))
-            (width nil)
-            (height nil)
-            (variables nil))
-        (with-current-buffer buffer
-          (setq-local eat--trace-output-buffer buf)
-          (add-hook 'kill-buffer-hook #'eat--trace-stop nil t)
-          (let ((size (eat-term-size eat--terminal)))
-            (setq width (car size))
-            (setq height (cdr size)))
-          (dolist (var eat--trace-recorded-variables)
-            (push (cons var (symbol-value var)) variables)))
-        (with-current-buffer buf
-          (lisp-data-mode)
-          (insert ";; -*- lisp-data -*-\n")
-          (eat--trace-log time 'create 'eat width height
-                          variables))))))
-
-(defun eat--trace-process-output-queue (fn buffer)
-  "Trace `eat--process-output-queue'.
-
-BUFFER is passed to FN, `eat--process-output-queue', which see."
-  (if (or (not (buffer-live-p buffer))
-          (not (buffer-local-value 'eat--trace-output-buffer buffer)))
-      (funcall fn buffer)
-    (cl-letf*
-        ((eat-term-process-output
-          (symbol-function #'eat-term-process-output))
-         ((symbol-function #'eat-term-process-output)
-          (lambda (terminal output)
-            (when (buffer-live-p eat--trace-output-buffer)
-              (with-current-buffer eat--trace-output-buffer
-                (eat--trace-log nil 'output output)))
-            (funcall eat-term-process-output terminal output)))
-         (eat-term-redisplay
-          (symbol-function #'eat-term-redisplay))
-         ((symbol-function #'eat-term-redisplay)
-          (lambda (terminal)
-            (when (buffer-live-p eat--trace-output-buffer)
-              (with-current-buffer eat--trace-output-buffer
-                (eat--trace-log nil 'redisplay)))
-            (funcall eat-term-redisplay terminal))))
-      (funcall fn buffer))))
-
-(defun eat--trace-adjust-process-window-size (fn process windows)
-  "Trace `eat--adjust-process-window-size'.
-
-PROCESS and WINDOWS are passed to FN,
-`eat--adjust-process-window-size', which see."
-  (cl-letf*
-      ((eat-term-resize (symbol-function #'eat-term-resize))
-       ((symbol-function #'eat-term-resize)
-        (lambda (terminal width height)
-          (when (buffer-live-p eat--trace-output-buffer)
-            (with-current-buffer eat--trace-output-buffer
-              (eat--trace-log nil 'resize width height)))
-          (funcall eat-term-resize terminal width height))))
-    (funcall fn process windows)))
-
-(defun eat--trace-sentinel (fn &rest args)
-  "Trace `eat--sentinel'.
-
-Elements of ARGS are passed to FN, `eat--sentinel', which see."
-  (cl-letf*
-      ((eat-term-delete (symbol-function #'eat-term-delete))
-       ((symbol-function #'eat-term-delete)
-        (lambda (terminal)
-          (when (buffer-live-p eat--trace-output-buffer)
-            (eat--trace-stop))
-          (funcall eat-term-delete terminal))))
-    (apply fn args)))
-
-(define-minor-mode eat-trace-mode
-  "Toggle tracing Eat terminal."
-  :global t
-  :require 'eat
-  :lighter " Eat-Trace"
-  (if eat-trace-mode
-      (progn
-        (advice-add #'eat-exec :around #'eat--trace-exec)
-        (advice-add #'eat--process-output-queue :around
-                    #'eat--trace-process-output-queue)
-        (advice-add #'eat--adjust-process-window-size :around
-                    #'eat--trace-adjust-process-window-size)
-        (advice-add #'eat--sentinel :around #'eat--trace-sentinel))
-    (advice-remove #'eat-exec #'eat--trace-exec)
-    (advice-remove #'eat--process-output-queue
-                   #'eat--trace-process-output-queue)
-    (advice-remove #'eat--adjust-process-window-size
-                   #'eat--trace-adjust-process-window-size)
-    (advice-remove #'eat--sentinel #'eat--trace-sentinel)
-    (dolist (buffer (buffer-list))
-      (when (and (buffer-local-value 'eat--trace-output-buffer buffer)
-                 (provided-mode-derived-p
-                  (buffer-local-value 'major-mode buffer)
-                  'eat-mode))
-        (setf (buffer-local-value 'eat--trace-output-buffer buffer)
-              nil)))))
-
-
 ;;;; Eshell integration.
 
 ;;;;; Input.
@@ -6298,123 +6153,6 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
     (advice-remove #'eshell-gather-process-output
                    #'eat--eshell-adjust-make-process-args))))
 
-
-
-;;;;; Tracing.
-
-(defun eat--eshell-trace-adjust-make-process-args (fn &rest args)
-  "Trace `eat--eshell-adjust-make-process-args'.
-
-ARGS is passed to FN, `eat--eshell-adjust-make-process-args', which
-see."
-  (cl-letf*
-      ((command nil)
-       (make-process (symbol-function #'make-process))
-       ((symbol-function #'make-process)
-        (lambda (&rest plist)
-          (prog1
-              (apply make-process plist)
-            (setq command (nthcdr 5 (plist-get plist :command))))))
-       (eat--eshell-setup-proc-and-term
-        (symbol-function #'eat--eshell-setup-proc-and-term))
-       ((symbol-function #'eat--eshell-setup-proc-and-term)
-        (lambda (proc)
-          (let ((time (current-time)))
-            (prog1
-                (funcall eat--eshell-setup-proc-and-term proc)
-              (when (eq eat--process proc)
-                (let ((buf (generate-new-buffer
-                            (format "*eat-trace %s*: %s"
-                                    (buffer-name)
-                                    (mapconcat
-                                     #'shell-quote-argument
-                                     command " "))))
-                      (width nil)
-                      (height nil)
-                      (variables nil))
-                  (setq-local eat--trace-output-buffer buf)
-                  (add-hook 'kill-buffer-hook #'eat--trace-stop nil t)
-                  (let ((size (eat-term-size eat--terminal)))
-                    (setq width (car size))
-                    (setq height (cdr size)))
-                  (dolist (var eat--trace-recorded-variables)
-                    (push (cons var (symbol-value var)) variables))
-                  (with-current-buffer buf
-                    (lisp-data-mode)
-                    (insert ";; -*- lisp-data -*-\n")
-                    (eat--trace-log time 'create 'eshell width height
-                                    variables)))))))))
-    (apply fn args)))
-
-(defun eat--eshell-trace-output-filter (fn)
-  "Trace `eat--eshell-output-filter'.
-
-FN is the original definition of `eat--eshell-output-filter', which
-see."
-  (if (not (buffer-live-p eat--trace-output-buffer))
-      (funcall fn)
-    (cl-letf*
-        ((eat-term-process-output
-          (symbol-function #'eat-term-process-output))
-         ((symbol-function #'eat-term-process-output)
-          (lambda (terminal output)
-            (with-current-buffer eat--trace-output-buffer
-              (eat--trace-log nil 'output output))
-            (funcall eat-term-process-output terminal output)))
-         (eat-term-redisplay
-          (symbol-function #'eat-term-redisplay))
-         ((symbol-function #'eat-term-redisplay)
-          (lambda (terminal)
-            (with-current-buffer eat--trace-output-buffer
-              (eat--trace-log nil 'redisplay))
-            (funcall eat-term-redisplay terminal))))
-      (funcall fn))))
-
-(defun eat--eshell-trace-cleanup (fn)
-  "Trace `eat--eshell-cleanup'.
-
-FN is the original definition of `eat--eshell-cleanup', which see."
-  (if (not (buffer-live-p eat--trace-output-buffer))
-      (funcall fn)
-    (cl-letf*
-        ((eat-term-delete (symbol-function #'eat-term-delete))
-         ((symbol-function #'eat-term-delete)
-          (lambda (terminal)
-            (eat--trace-stop)
-            (funcall eat-term-delete terminal))))
-      (funcall fn))))
-
-(define-minor-mode eat-eshell-trace-mode
-  "Toggle tracing Eat terminal."
-  :global t
-  :require 'eat
-  :lighter " Eat-Eshell-Trace"
-  (if eat-eshell-trace-mode
-      (progn
-        (advice-add #'eat--eshell-adjust-make-process-args :around
-                    #'eat--eshell-trace-adjust-make-process-args)
-        (advice-add #'eat--eshell-output-filter :around
-                    #'eat--eshell-trace-output-filter)
-        (advice-add #'eat--adjust-process-window-size :around
-                    #'eat--trace-adjust-process-window-size)
-        (advice-add #'eat--eshell-cleanup :around
-                    #'eat--eshell-trace-cleanup))
-    (advice-remove #'eat--eshell-adjust-make-process-args
-                   #'eat--eshell-trace-adjust-make-process-args)
-    (advice-remove #'eat--eshell-output-filter
-                   #'eat--eshell-trace-output-filter)
-    (advice-remove #'eat--adjust-process-window-size
-                   #'eat--trace-adjust-process-window-size)
-    (advice-remove #'eat--eshell-cleanup
-                   #'eat--eshell-trace-cleanup)
-    (dolist (buffer (buffer-list))
-      (when (and (buffer-local-value 'eat--trace-output-buffer buffer)
-                 (provided-mode-derived-p
-                  (buffer-local-value 'major-mode buffer)
-                  'eat-eshell-mode))
-        (setf (buffer-local-value 'eat--trace-output-buffer buffer)
-              nil)))))
-
 
 ;;;; Eshell Visual Command Handling.
 
@@ -6521,7 +6259,245 @@ already exist."
     (define-key project-prefix-map "E" #'eat-project)))
 
 
-;;;; Trace Data Replay
+;;;; Tracing.
+
+;;;;; Recording Trace Data.
+
+(defconst eat--trace-recorded-variables
+  '(eat-term-scrollback-size
+    eat-enable-alternative-display)
+  "The variable to record in trace output.")
+
+(defvar eat--trace-output-buffer nil
+  "Buffer where the trace data is written to.")
+
+(defun eat--trace-log (time operation &rest args)
+  "Log TIME, OPERATION and ARGS into trace output.
+
+TIME defaults to the current time.
+
+The current buffer should be the trace output buffer.  Move the point
+to the end of (accessible portion of) buffer."
+  (goto-char (point-max))
+  ;; Hope that `float-time' won't roll over while tracing.  ;-)
+  (insert (replace-regexp-in-string
+           "\n" "\\\\n"
+           (format "%S" `(,(float-time time) ,operation ,@args)))
+          ?\n))
+
+(defun eat--trace-stop ()
+  "Stop tracing the terminal in current buffer."
+  (when eat--trace-output-buffer
+    (with-current-buffer eat--trace-output-buffer
+      (eat--trace-log nil 'finish)))
+  (remove-hook 'kill-buffer-hook #'eat--trace-stop t)
+  (kill-local-variable 'eat--trace-output-buffer))
+
+(defun eat--trace-exec (fn buffer name command startfile switches)
+  "Trace `eat-exec'.
+
+BUFFER is the buffer and COMMAND and SWITCHES are the invocation
+command.  BUFFER, NAME, COMMAND, STARTFILE and SWITCHES are passed to
+FN, `eat-exec', which see."
+  (let ((time (current-time)))
+    (prog1
+        (funcall fn buffer name command startfile switches)
+      (let ((buf (generate-new-buffer
+                  (format "*eat-trace %s*: %s"
+                          (buffer-name buffer)
+                          (mapconcat #'shell-quote-argument
+                                     (cons command switches) " "))))
+            (width nil)
+            (height nil)
+            (variables nil))
+        (with-current-buffer buffer
+          (setq-local eat--trace-output-buffer buf)
+          (add-hook 'kill-buffer-hook #'eat--trace-stop nil t)
+          (let ((size (eat-term-size eat--terminal)))
+            (setq width (car size))
+            (setq height (cdr size)))
+          (dolist (var eat--trace-recorded-variables)
+            (push (cons var (symbol-value var)) variables)))
+        (with-current-buffer buf
+          (lisp-data-mode)
+          (insert ";; -*- lisp-data -*-\n")
+          (eat--trace-log time 'create 'eat width height
+                          variables))))))
+
+(defun eat--trace-process-output-queue (fn buffer)
+  "Trace `eat--process-output-queue'.
+
+BUFFER is passed to FN, `eat--process-output-queue', which see."
+  (if (or (not (buffer-live-p buffer))
+          (not (buffer-local-value 'eat--trace-output-buffer buffer)))
+      (funcall fn buffer)
+    (cl-letf*
+        ((eat-term-process-output
+          (symbol-function #'eat-term-process-output))
+         ((symbol-function #'eat-term-process-output)
+          (lambda (terminal output)
+            (when (buffer-live-p eat--trace-output-buffer)
+              (with-current-buffer eat--trace-output-buffer
+                (eat--trace-log nil 'output output)))
+            (funcall eat-term-process-output terminal output)))
+         (eat-term-redisplay
+          (symbol-function #'eat-term-redisplay))
+         ((symbol-function #'eat-term-redisplay)
+          (lambda (terminal)
+            (when (buffer-live-p eat--trace-output-buffer)
+              (with-current-buffer eat--trace-output-buffer
+                (eat--trace-log nil 'redisplay)))
+            (funcall eat-term-redisplay terminal))))
+      (funcall fn buffer))))
+
+(defun eat--trace-adjust-process-window-size (fn process windows)
+  "Trace `eat--adjust-process-window-size'.
+
+PROCESS and WINDOWS are passed to FN,
+`eat--adjust-process-window-size', which see."
+  (cl-letf*
+      ((eat-term-resize (symbol-function #'eat-term-resize))
+       ((symbol-function #'eat-term-resize)
+        (lambda (terminal width height)
+          (when (buffer-live-p eat--trace-output-buffer)
+            (with-current-buffer eat--trace-output-buffer
+              (eat--trace-log nil 'resize width height)))
+          (funcall eat-term-resize terminal width height))))
+    (funcall fn process windows)))
+
+(defun eat--trace-sentinel (fn &rest args)
+  "Trace `eat--sentinel'.
+
+Elements of ARGS are passed to FN, `eat--sentinel', which see."
+  (cl-letf*
+      ((eat-term-delete (symbol-function #'eat-term-delete))
+       ((symbol-function #'eat-term-delete)
+        (lambda (terminal)
+          (when (buffer-live-p eat--trace-output-buffer)
+            (eat--trace-stop))
+          (funcall eat-term-delete terminal))))
+    (apply fn args)))
+
+(defun eat--eshell-trace-adjust-make-process-args (fn &rest args)
+  "Trace `eat--eshell-adjust-make-process-args'.
+
+ARGS is passed to FN, `eat--eshell-adjust-make-process-args', which
+see."
+  (cl-letf*
+      ((command nil)
+       (make-process (symbol-function #'make-process))
+       ((symbol-function #'make-process)
+        (lambda (&rest plist)
+          (prog1
+              (apply make-process plist)
+            (setq command (nthcdr 5 (plist-get plist :command))))))
+       (eat--eshell-setup-proc-and-term
+        (symbol-function #'eat--eshell-setup-proc-and-term))
+       ((symbol-function #'eat--eshell-setup-proc-and-term)
+        (lambda (proc)
+          (let ((time (current-time)))
+            (prog1
+                (funcall eat--eshell-setup-proc-and-term proc)
+              (when (eq eat--process proc)
+                (let ((buf (generate-new-buffer
+                            (format "*eat-trace %s*: %s"
+                                    (buffer-name)
+                                    (mapconcat
+                                     #'shell-quote-argument
+                                     command " "))))
+                      (width nil)
+                      (height nil)
+                      (variables nil))
+                  (setq-local eat--trace-output-buffer buf)
+                  (add-hook 'kill-buffer-hook #'eat--trace-stop nil t)
+                  (let ((size (eat-term-size eat--terminal)))
+                    (setq width (car size))
+                    (setq height (cdr size)))
+                  (dolist (var eat--trace-recorded-variables)
+                    (push (cons var (symbol-value var)) variables))
+                  (with-current-buffer buf
+                    (lisp-data-mode)
+                    (insert ";; -*- lisp-data -*-\n")
+                    (eat--trace-log time 'create 'eshell width height
+                                    variables)))))))))
+    (apply fn args)))
+
+(defun eat--eshell-trace-output-filter (fn)
+  "Trace `eat--eshell-output-filter'.
+
+FN is the original definition of `eat--eshell-output-filter', which
+see."
+  (if (not (buffer-live-p eat--trace-output-buffer))
+      (funcall fn)
+    (cl-letf*
+        ((eat-term-process-output
+          (symbol-function #'eat-term-process-output))
+         ((symbol-function #'eat-term-process-output)
+          (lambda (terminal output)
+            (with-current-buffer eat--trace-output-buffer
+              (eat--trace-log nil 'output output))
+            (funcall eat-term-process-output terminal output)))
+         (eat-term-redisplay
+          (symbol-function #'eat-term-redisplay))
+         ((symbol-function #'eat-term-redisplay)
+          (lambda (terminal)
+            (with-current-buffer eat--trace-output-buffer
+              (eat--trace-log nil 'redisplay))
+            (funcall eat-term-redisplay terminal))))
+      (funcall fn))))
+
+(defun eat--eshell-trace-cleanup (fn)
+  "Trace `eat--eshell-cleanup'.
+
+FN is the original definition of `eat--eshell-cleanup', which see."
+  (if (not (buffer-live-p eat--trace-output-buffer))
+      (funcall fn)
+    (cl-letf*
+        ((eat-term-delete (symbol-function #'eat-term-delete))
+         ((symbol-function #'eat-term-delete)
+          (lambda (terminal)
+            (eat--trace-stop)
+            (funcall eat-term-delete terminal))))
+      (funcall fn))))
+
+(define-minor-mode eat-trace-mode
+  "Toggle tracing Eat terminal."
+  :global t
+  :require 'eat
+  :lighter " Eat-Trace"
+  (if eat-trace-mode
+      (progn
+        (advice-add #'eat-exec :around #'eat--trace-exec)
+        (advice-add #'eat--process-output-queue :around
+                    #'eat--trace-process-output-queue)
+        (advice-add #'eat--adjust-process-window-size :around
+                    #'eat--trace-adjust-process-window-size)
+        (advice-add #'eat--sentinel :around #'eat--trace-sentinel)
+        (advice-add #'eat--eshell-adjust-make-process-args :around
+                    #'eat--eshell-trace-adjust-make-process-args)
+        (advice-add #'eat--eshell-output-filter :around
+                    #'eat--eshell-trace-output-filter)
+        (advice-add #'eat--eshell-cleanup :around
+                    #'eat--eshell-trace-cleanup))
+    (advice-remove #'eat-exec #'eat--trace-exec)
+    (advice-remove #'eat--process-output-queue
+                   #'eat--trace-process-output-queue)
+    (advice-remove #'eat--adjust-process-window-size
+                   #'eat--trace-adjust-process-window-size)
+    (advice-remove #'eat--sentinel #'eat--trace-sentinel)
+    (advice-remove #'eat--eshell-adjust-make-process-args
+                   #'eat--eshell-trace-adjust-make-process-args)
+    (advice-remove #'eat--eshell-output-filter
+                   #'eat--eshell-trace-output-filter)
+    (advice-remove #'eat--eshell-cleanup
+                   #'eat--eshell-trace-cleanup)
+    (dolist (buffer (buffer-list))
+      (when (buffer-local-value 'eat--trace-output-buffer buffer)
+        (setf (buffer-local-value 'eat--trace-output-buffer buffer)
+              nil)))))
+
+
+;;;;; Trace Data Replay.
 
 (defvar eat--trace-replay-buffer nil
   "The buffer replaying the trace data in current buffer.")

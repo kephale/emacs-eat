@@ -951,11 +951,9 @@ the terminal.  Tracing means recording all the terminal activity,
 including creation, output, resizing and deleting.
 
 @findex eat-trace-mode
-@findex eat-eshell-trace-mode
 To enable tracing, enable the global minor mode
-@command{eat-trace-mode}.  This will trace all new Eat terminals.
-This won't work with Eshell, however.  Enable the global minor mode
-@command{eat-eshell-trace-mode} for that.
+@command{eat-trace-mode}.  This will trace all new terminals,
+including the terminal created inside Eshell.
 
 Trace output for each command will be output in a buffer named
 @samp{*eat-trace @var{buffer-name}*: @var{command}}, where
