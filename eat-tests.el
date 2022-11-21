@@ -5470,7 +5470,7 @@ automatic scrolling as a side effect."
 ;;;;; Resizing Tests.
 
 (ert-deftest eat-test-resize-when-at-beginning-of-first-line ()
-  "Test resize when the beginning of the first line on display."
+  "Test resize when on the beginning of the first line of display."
   (eat--tests-with-term '()
     (output "1\n2\n3\n4\n5\n6\e[H")
     (should-term :display '("1"
@@ -5498,7 +5498,7 @@ automatic scrolling as a side effect."
                  :cursor '(2 . 1))))
 
 (ert-deftest eat-test-resize-when-at-beginning-of-last-line ()
-  "Test resize when the beginning of the last line on display."
+  "Test resize when on the beginning of the last line of display."
   (eat--tests-with-term '()
     (output "1\n2\n3\n4\n5\n")
     (should-term :display '("1"
@@ -5522,6 +5522,24 @@ automatic scrolling as a side effect."
                             "5"
                             "6")
                  :cursor '(5 . 1))))
+
+(ert-deftest eat-test-resize-alternative-display ()
+  "Test resize when the beginning of the first line on display."
+  (eat--tests-with-term '()
+    (output "\e[?1049htoo looooooooooooong\nl\no\no\nn\ng")
+    (should-term :display '("too looooooooooooong"
+                            "l"
+                            "o"
+                            "o"
+                            "n"
+                            "g")
+                 :cursor '(6 . 2))
+    (eat-term-resize (terminal) 18 4)
+    (should-term :display '("too looooooooooooo"
+                            "l"
+                            "o"
+                            "o")
+                 :cursor '(4 . 2))))
 
 
 ;;;;; Miscellaneous Tests.
