@@ -6620,10 +6620,13 @@ FN is the original definition of `eat--eshell-cleanup', which see."
         (setq eat--trace-replay-frame-count frame-count))))
   (display-buffer eat--trace-replay-buffer))
 
-(defun eat-trace-replay-next-frame ()
-  "Show the next frame."
-  (interactive)
-  (eat--trace-replay-eval-next))
+(defun eat-trace-replay-next-frame (&optional n)
+  "Show the Nth next frame.
+
+N defaults to 1.  Interactively, N is the prefix argument."
+  (interactive "p")
+  (dotimes (_ n)
+    (eat--trace-replay-eval-next)))
 
 (defun eat-trace--cleanup ()
   "Clean up the source buffer before the terminal being killed."
