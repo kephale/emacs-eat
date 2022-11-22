@@ -6517,8 +6517,8 @@ FN is the original definition of `eat--eshell-cleanup', which see."
                    #'eat--eshell-trace-cleanup)
     (dolist (buffer (buffer-list))
       (when (buffer-local-value 'eat--trace-output-buffer buffer)
-        (setf (buffer-local-value 'eat--trace-output-buffer buffer)
-              nil)))))
+        (with-current-buffer buffer
+          (setq-local eat--trace-output-buffer nil))))))
 
 
 ;;;;; Trace Data Replay.
