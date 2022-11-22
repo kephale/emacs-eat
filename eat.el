@@ -3963,8 +3963,8 @@ DATA is the selection data encoded in base64."
                     (search-failed
                      (goto-char (eat--t-cur-position cursor))))
                   (cl-incf y))
-                (when (and (> (point) (point-min))
-                           (= (char-before) ?\n))
+                (when (or (= (point) (point-min))
+                          (= (char-before) ?\n))
                   (cl-incf y))
                 (max y 1)))))))
 
