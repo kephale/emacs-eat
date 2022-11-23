@@ -5130,8 +5130,8 @@ ARG is passed to `yank-pop', which see."
 ;; and commentary.
 (defvar eat-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?\C-c ?\C-j] #'eat-char-mode)
-    (define-key map [?\C-c ?\C-s] #'eat-semi-char-mode)
+    (define-key map [?\C-c ?\M-d] #'eat-char-mode)
+    (define-key map [?\C-c ?\C-j] #'eat-semi-char-mode)
     (define-key map [?\C-c ?\C-k] #'eat-kill-process)
     map)
   "Keymap for Eat mode.")
@@ -5721,8 +5721,9 @@ PROGRAM can be a shell command."
 ;; and commentary.
 (defvar eat-eshell-emacs-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?\C-c ?\C-s] #'eat-eshell-semi-char-mode)
-    (define-key map [?\C-c ?\C-j] #'eat-eshell-char-mode)
+    (define-key map [?\C-c ?\C-j] #'eat-eshell-semi-char-mode)
+    (define-key map [remap eshell-toggle-direct-send] ; C-c M-d
+                #'eat-eshell-char-mode)
     map)
   "Keymap for Eat Eshell when no process is running.")
 
@@ -5737,7 +5738,6 @@ PROGRAM can be a shell command."
     (define-key map [?\C-y] #'eat-yank)
     (define-key map [?\M-y] #'eat-yank-pop)
     (define-key map [?\C-c ?\C-e] #'eat-eshell-emacs-mode)
-    (define-key map [?\C-c ?\C-j] #'eat-eshell-char-mode)
     map)
   "Keymap for Eat Eshell semi-char mode.")
 

@@ -273,10 +273,12 @@ forwards all supported keys to terminals, except some exceptions,
 @pxref{Semi-char Mode}.  It is possible to input them with @kbd{C-q},
 but it is not very convenient.
 
-@kindex C-c C-j @r{(``semi-char mode'')}
+@kindex C-c M-d @r{(``semi-char mode'')}
 To overcome this problem, Eat implements another input mode called
-``char mode''.  To switch to ``char mode'', press @kbd{C-c C-j} in
-``semi-char mode''.
+``char mode''.  To switch to ``char mode'', press @kbd{C-c M-d} in
+``semi-char mode''.  In Eshell, the command
+@command{eshell-toggle-direct-send} is remapped to enable
+``char-mode'', which is usually bound to @kbd{C-c M-d}.
 
 In this input mode, Eat forwards all supported keys.  However, input
 methods still work in this mode, so you can still input keys that are
@@ -307,10 +309,12 @@ mode''.
 In this mode, @kbd{C-c C-k} kills the terminal program like in
 ``semi-char mode''.
 
-@kindex C-c C-s @r{(``emacs mode'')}
 @kindex C-c C-j @r{(``emacs mode'')}
+@kindex C-c M-d @r{(``emacs mode'')}
 From ``emacs mode'', you can switch to ``semi-char mode'' with
-@kbd{C-c C-s} and to ``char mode'' with @kbd{C-c C-j}.
+@kbd{C-c C-j} and to ``char mode'' with @kbd{C-c M-d}.  In Eshell, the
+command @command{eshell-toggle-direct-send} is remapped to enable
+``char-mode'', which is usually bound to @kbd{C-c M-d}.
 
 @part Part III:@* Advanced Customizations
 
