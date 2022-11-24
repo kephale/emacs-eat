@@ -25,7 +25,7 @@ TEXI2HTML ?= texi2any --no-split --html
 TEXI2PDF ?= texi2pdf
 TEXI2PS ?= texi2any --ps
 
-all: eat.elc terminfo info check changelog
+all: eat.elc terminfo info
 
 info: eat.info
 
