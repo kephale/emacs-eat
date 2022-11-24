@@ -33,7 +33,7 @@ changelog:
 .PHONY: all terminfo check changelog
 
 eat.elc:
-	$(EMACS) -batch -f '(byte-compile-file "eat.el")'
+	$(EMACS) -batch --eval '(byte-compile-file "eat.el")'
 
 e/eat-mono e/eat-color eat-256color e/eat-truecolor:
 	env TERMINFO=. tic -x eat.ti
