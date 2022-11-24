@@ -21,8 +21,8 @@ To start Eat, run =M-x eat=.  Eat has three keybinding modes:
 
 - "emacs" mode: No special keybinding, except the following:
 
-  - =C-c C-s=: Switch to semi-char mode.
-  - =C-c C-j=: Switch to char mode.
+  - =C-c C-j=: Switch to semi-char mode.
+  - =C-c M-d=: Switch to char mode.
   - =C-c C-k=: Kill process.
 
 - "semi-char" mode: Most keys are bound to send the key to the
