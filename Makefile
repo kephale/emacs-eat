@@ -18,6 +18,7 @@
 # see <https://www.gnu.org/licenses/>.
 
 EMACS ?= emacs
+TIC ?= tic
 
 all: eat.elc terminfo check changelog
 
@@ -32,8 +33,8 @@ changelog:
 
 .PHONY: all terminfo check changelog
 
-eat.elc:
+eat.elc: eat.el
 	$(EMACS) -batch --eval '(byte-compile-file "eat.el")'
 
-e/eat-mono e/eat-color eat-256color e/eat-truecolor:
-	env TERMINFO=. tic -x eat.ti
+e/eat-mono e/eat-color eat-256color e/eat-truecolor: eat.ti
+	env TERMINFO=. $(TIC) -x eat.ti
