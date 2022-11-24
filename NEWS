@@ -1,0 +1,32 @@
+Eat NEWS -- History of user-visible changes
+
+Copyright (C) 2022 Akib Azmain Turja.
+See the end of the file for license conditions.
+
+This file is about changes in Eat.
+
+Note:
++++ indicates that Eat manual have been updated.
+--- means no change in the manuals is needed.
+When you add a new item, use the appropriate mark if you are sure it
+applies, and please also update docstrings as needed.
+
+
+----------------------------------------------------------------------
+Adapted from etc/NEWS in Emacs source tree.
+
+This file is part of Eat and is not part of GNU Emacs.
+
+Eat is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Eat is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
+

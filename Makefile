@@ -19,7 +19,7 @@
 
 EMACS ?= emacs
 
-all: eat.elc terminfo
+all: eat.elc terminfo check changelog
 
 terminfo: e/eat-mono e/eat-color eat-256color e/eat-truecolor
 
@@ -27,7 +27,10 @@ check: eat.el
 	$(EMACS) -batch -l eat.el -l eat-tests.el \
 		-f ert-run-tests-batch-and-exit
 
-.PHONY: all terminfo check
+changelog:
+	./make-changelog
+
+.PHONY: all terminfo check changelog
 
 eat.elc:
 	$(EMACS) -batch -f '(byte-compile-file "eat.el")'
