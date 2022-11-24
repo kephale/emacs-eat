@@ -19,8 +19,21 @@
 
 EMACS ?= emacs
 TIC ?= tic
+TEXI2INFO ?= texi2any
+TEXI2DVI ?= texi2dvi
+TEXI2HTML ?= texi2any --no-split --html
+TEXI2PDF ?= texi2pdf
+TEXI2PS ?= texi2any --ps
 
-all: eat.elc terminfo check changelog
+all: eat.elc terminfo info check changelog
+
+info: eat.info
+
+dvi: eat.dvi
+
+html: eat.html
+
+pdf: eat.pdf
 
 terminfo: e/eat-mono e/eat-color eat-256color e/eat-truecolor
 
@@ -31,10 +44,22 @@ check: eat.el
 changelog:
 	./make-changelog
 
-.PHONY: all terminfo check changelog
+.PHONY: all terminfo info dvi html pdf check changelog
 
 eat.elc: eat.el
 	$(EMACS) -batch --eval '(byte-compile-file "eat.el")'
 
 e/eat-mono e/eat-color eat-256color e/eat-truecolor: eat.ti
 	env TERMINFO=. $(TIC) -x eat.ti
+
+eat.info: eat.texi gpl.texi fdl.texi
+	$(TEXI2INFO) eat.texi
+
+eat.dvi: eat.texi gpl.texi fdl.texi texinfo.tex
+	$(TEXI2DVI) eat.texi
+
+eat.html: eat.texi gpl.texi fdl.texi
+	$(TEXI2HTML) eat.texi
+
+eat.pdf: eat.texi gpl.texi fdl.texi texinfo.tex
+	$(TEXI2PDF) eat.texi
