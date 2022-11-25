@@ -71,7 +71,7 @@ right now.  So, you have to follow one of the following methods:
 
 #+begin_src emacs-lisp
 (quelpa '(eat :fetcher git
-              :url "https://codeberg.org/akib/emacs-iwindow.git"
+              :url "https://codeberg.org/akib/emacs-eat.git"
               :files ("*.el" "dir"
                       "*.info" "*.texi"
                       "*.ti" ("e" "e/*")))
