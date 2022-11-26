@@ -2036,7 +2036,7 @@ display."
     (unless (zerop n)
       ;; Move to the Nth next column, use spaces to reach that column
       ;; if needed.
-      (eat--t-repeated-insert ?\  (- n (eat--t-col-motion n)))
+      (eat--t-repeated-insert ?\s (- n (eat--t-col-motion n)))
       (cl-incf (eat--t-cur-x cursor) n))))
 
 (defun eat--t-cur-left (&optional n)
@@ -2570,7 +2570,7 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
        (when (eat--t-face-bg face)
          (save-excursion
            (eat--t-repeated-insert
-            ?\  (1+ (- (eat--t-disp-width disp)
+            ?\s (1+ (- (eat--t-disp-width disp)
                        (eat--t-cur-x cursor)))
             (and (eat--t-face-bg face)
                  (eat--t-face-face face))))))
@@ -2583,7 +2583,7 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
                         (1+ (point))))
        ;; Fill the region with spaces, use SGR background attribute
        ;; if set.
-       (eat--t-repeated-insert ?\  (eat--t-cur-x cursor)
+       (eat--t-repeated-insert ?\s (eat--t-cur-x cursor)
                                (and (eat--t-face-bg face)
                                     (eat--t-face-face face)))
        ;; We erased the character at the cursor position, so after
@@ -2595,7 +2595,7 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
        (delete-region (car (eat--t-bol)) (car (eat--t-eol)))
        ;; Fill the region before cursor position with spaces, use SGR
        ;; background attribute if set.
-       (eat--t-repeated-insert ?\  (1- (eat--t-cur-x cursor))
+       (eat--t-repeated-insert ?\s (1- (eat--t-cur-x cursor))
                                (and (eat--t-face-bg face)
                                     (eat--t-face-face face)))
        ;; If the SGR background attribute is set, we need to fill the
@@ -2604,7 +2604,7 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
        (when (eat--t-face-bg face)
          (save-excursion
            (eat--t-repeated-insert
-            ?\  (1+ (- (eat--t-disp-width disp)
+            ?\s (1+ (- (eat--t-disp-width disp)
                        (eat--t-cur-x cursor)))
             (and (eat--t-face-bg face)
                  (eat--t-face-face face)))))))))
@@ -2631,14 +2631,14 @@ to (1, 1).  When N is 3, also erase the scrollback."
          ;; integer.
          (let ((pos (point)))
            ;; Fill current line.
-           (eat--t-repeated-insert ?\  (1+ (- (eat--t-disp-width disp)
+           (eat--t-repeated-insert ?\s (1+ (- (eat--t-disp-width disp)
                                               (eat--t-cur-x cursor)))
                                    (eat--t-face-face face))
            ;; Fill the following lines.
            (dotimes (_ (- (eat--t-disp-height disp)
                           (eat--t-cur-y cursor)))
              (insert ?\n)
-             (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
+             (eat--t-repeated-insert ?\s (eat--t-disp-width disp)
                                      (eat--t-face-face face)))
            ;; Restore position.
            (goto-char pos))))
@@ -2656,12 +2656,12 @@ to (1, 1).  When N is 3, also erase the scrollback."
          (if (not (eat--t-face-bg face))
              (eat--t-repeated-insert ?\n (1- y))
            (dotimes (_ (1- y))
-             (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
+             (eat--t-repeated-insert ?\s (eat--t-disp-width disp)
                                      (eat--t-face-face face))
              (insert ?\n)))
          ;; Fill the current line to keep the cursor unmoved.  Use
          ;; background if the corresponding SGR attribute is set.
-         (eat--t-repeated-insert ?\  x (and (eat--t-face-bg face)
+         (eat--t-repeated-insert ?\s x (and (eat--t-face-bg face)
                                             (eat--t-face-face face)))
          ;; We are off by one column; so move a column backward.
          (when incl-point
@@ -2683,7 +2683,7 @@ to (1, 1).  When N is 3, also erase the scrollback."
            (dotimes (i (eat--t-disp-height disp))
              (unless (zerop i)
                (insert ?\n))
-             (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
+             (eat--t-repeated-insert ?\s (eat--t-disp-width disp)
                                      (eat--t-face-face face)))
            ;; Restore point.
            (goto-char pos)))))))
@@ -2824,7 +2824,7 @@ position."
       (save-excursion
         ;; Insert N spaces, with SGR background if that attribute is
         ;; set.
-        (eat--t-repeated-insert ?\  n (and (eat--t-face-bg face)
+        (eat--t-repeated-insert ?\s n (and (eat--t-face-bg face)
                                            (eat--t-face-face face)))
         ;; Remove the characters that went beyond the edge of display.
         (eat--t-col-motion (- (eat--t-disp-width disp)
@@ -2860,10 +2860,10 @@ position."
                 ;; Reach the position from where to start filling.
                 ;; Use spaces if needed.
                 (when (> empty n)
-                  (eat--t-repeated-insert ?\  (- empty n)))
+                  (eat--t-repeated-insert ?\s (- empty n)))
                 ;; Fill with background.
                 (eat--t-repeated-insert
-                 ?\  (min empty n) (eat--t-face-face face))))))))))
+                 ?\s (min empty n) (eat--t-face-face face))))))))))
 
 (defun eat--t-erase-char (n)
   "Make next N character cells empty, preserving cursor."
@@ -2886,7 +2886,7 @@ position."
           ;; Insert N spaces, with background if SGR background
           ;; attribute is set.
           (eat--t-repeated-insert
-           ?\  n (and (eat--t-face-bg face)
+           ?\s n (and (eat--t-face-bg face)
                       (eat--t-face-face face))))))))
 
 (defun eat--t-insert-line (n)
@@ -2914,7 +2914,7 @@ position."
              ;; the cursor unmoved, go to the beginning of line and
              ;; insert enough spaces to not move the cursor.
              (eat--t-goto-bol)
-             (eat--t-repeated-insert ?\  (1- (eat--t-cur-x cursor))
+             (eat--t-repeated-insert ?\s (1- (eat--t-cur-x cursor))
                                      (and (eat--t-face-bg face)
                                           (eat--t-face-face face)))
              (point))
@@ -2926,7 +2926,7 @@ position."
            (dotimes (i n)
              ;; Fill a line.
              (eat--t-repeated-insert
-              ?\  (if (not (zerop i))
+              ?\s (if (not (zerop i))
                       (eat--t-disp-width disp)
                     ;; The first inserted line is already filled
                     ;; partially, so calculate the number columns left
@@ -2986,13 +2986,13 @@ position."
                 (eat--t-repeated-insert ?\n n)
               (dotimes (_ n)
                 (insert ?\n)
-                (eat--t-repeated-insert ?\  (eat--t-disp-width disp)
+                (eat--t-repeated-insert ?\s (eat--t-disp-width disp)
                                         (eat--t-face-face face)))))
           (goto-char pos)))
       ;; Go to column where cursor is to preserve cursor position, use
       ;; spaces if needed to reach the position.
       (eat--t-repeated-insert
-       ?\  (- (1- x) (eat--t-col-motion (1- x)))))))
+       ?\s (- (1- x) (eat--t-col-motion (1- x)))))))
 
 (defun eat--t-repeat-last-char (&optional n)
   "Repeat last character N times."
@@ -3648,7 +3648,7 @@ DATA is the selection data encoded in base64."
                        (intermediate-bytes ""))
                    (save-match-data
                      (when (string-match
-                            (rx (zero-or-more (any (?  . ?/)))
+                            (rx (zero-or-more (any (?\s . ?/)))
                                 string-end)
                             str)
                        (setq str (substring
