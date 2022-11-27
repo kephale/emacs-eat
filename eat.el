@@ -2299,6 +2299,68 @@ of range, place cursor at the edge of display."
 CHARSET should be one of `g0', `g1', `g2' and `g3'."
   (setf (car (eat--t-term-charset eat--t-term)) charset))
 
+(defun eat--t-move-before-to-safe ()
+  "Move to a safe position before point.  Return how much moved.
+
+If the current position is safe, do nothing and return 0.
+
+Safe position is the position that's not on a multi-column wide
+character or its the internal invisible spaces."
+  (if (and (not (bobp))
+           ;; Is the current position unsafe?
+           (get-text-property (1- (point)) 'eat--t-invisible-space))
+      (let ((start-pos (point)))
+        ;; Move to the safe position.
+        (goto-char (previous-single-char-property-change
+                    (point) 'eat--t-invisible-space))
+        (cl-assert
+         (1value (or (bobp)
+                     (null (get-text-property
+                            (1- (point)) 'eat--t-invisible-space)))))
+        (- start-pos (point)))
+    0))
+
+(defun eat--t-make-pos-safe ()
+  "If the position isn't safe, make it safe by replacing with spaces."
+  (let ((moved (eat--t-move-before-to-safe)))
+    (unless (zerop moved)
+      (let ((width (get-text-property
+                    (point) 'eat--t-char-width)))
+        (cl-assert width)
+        (delete-region (point) (+ (point) width))
+        (eat--t-repeated-insert
+         ?\s width (eat--t-face-face
+                    (eat--t-term-face eat--t-term)))
+        (backward-char (- width moved))))))
+
+(defun eat--t-fix-partial-multi-col-char ()
+  "Replace any partial multi-column character with spaces."
+  (let ((face (eat--t-face-face
+               (eat--t-term-face eat--t-term))))
+    (if (get-text-property (point) 'eat--t-invisible-space)
+        (let ((start-pos (point))
+              (count nil))
+          (goto-char (next-single-char-property-change
+                      (point) 'eat--t-invisible-space))
+          (setq count (- (1+ (point)) start-pos))
+          ;; Make sure we really overwrote the character
+          ;; partially.
+          (when (< count (get-text-property
+                          (point) 'eat--t-char-width))
+            (delete-region start-pos (1+ (point)))
+            (eat--t-repeated-insert ?\s count face))
+          (goto-char start-pos))
+      ;; Detect the case where we have deleted all the invisible
+      ;; spaces before, but not the multi-column character itself.
+      (when-let* (((not (eobp)))
+                  (w (get-text-property (point) 'eat--t-char-width))
+                  ((> w 1)))
+        ;; `delete-char' also works, but it does more checks, so
+        ;; hopefully this will be faster.
+        (delete-region (point) (1+ (point)))
+        (insert (propertize " " 'face face))
+        (backward-char)))))
+
 (defun eat--t-write (str)
   "Write STR on display."
   (let* ((str
@@ -2361,35 +2423,113 @@ CHARSET should be one of `g0', `g1', `g2' and `g3'."
                s))
             (_
              str)))
+         (face (eat--t-face-face
+                (eat--t-term-face eat--t-term)))
          ;; Add `face' property.
-         (str (propertize str 'face
-                          (eat--t-face-face
-                           (eat--t-term-face eat--t-term)))))
+         (str (propertize str 'face face))
+         ;; Alist of indices and width of multi-column characters.
+         (multi-col-char-indices nil)
+         (inserted-till 0))
+    ;; Find all the multi-column wide characters in STR, using a
+    ;; binary search like algorithm; hopefully it won't slow down
+    ;; showing ASCII.
+    (named-let find ((string str)
+                     (beg 0)
+                     (end (length str)))
+      ;; NOTE: `string-width' doesn't work correctly given a range of
+      ;; characters in a string.  This workarounds the bug partially.
+      ;; FIXME: This sometimes doesn't work.  To reproduce, do C-h h
+      ;; in emacs -nw in Eat.
+      (unless (= (- end beg) (string-width string))
+        (if (= (- end beg) 1)
+            ;; Record the character width here.  We only use
+            ;; `string-width', (= `string-width' `char-width') isn't
+            ;; always t.
+            (push (cons beg (string-width string))
+                  multi-col-char-indices)
+          (let ((mid (/ (+ beg end) 2)))
+            ;; Processing the latter half first in important,
+            ;; otherwise the order of indices will be reversed.
+            (find (substring str mid end) mid end)
+            (find (substring str beg mid) beg mid)))))
     ;; TODO: Comment.
     ;; REVIEW: This probably needs to be updated.
     (let* ((disp (eat--t-term-display eat--t-term))
            (cursor (eat--t-disp-cursor disp))
            (scroll-end (eat--t-term-scroll-end eat--t-term)))
-      (while (not (string-empty-p str))
-        (let ((ins-count (min (- (eat--t-disp-width disp)
+      ;; If the position isn't safe, replace the multi-column
+      ;; character with spaces to make it safe.
+      (eat--t-make-pos-safe)
+      (while (< inserted-till (length str))
+        ;; Insert STR, and record the width of STR inserted
+        ;; successfully.
+        (let ((ins-count
+               (named-let write
+                   ((max (min (- (eat--t-disp-width disp)
                                  (1- (eat--t-cur-x cursor)))
-                              (length str))))
-          (insert (substring str 0 ins-count))
-          (setq str (substring str ins-count))
+                              (string-width str inserted-till)))
+                    (written 0))
+                 (let* ((next-multi-col (car multi-col-char-indices))
+                        (end (+ inserted-till max))
+                        (e (if next-multi-col
+                               ;; Exclude the multi-column character.
+                               (min (car next-multi-col) end)
+                             end))
+                        (wrote (- e inserted-till)))
+                   (cl-assert
+                    (= (string-width str inserted-till e)
+                       (- e inserted-till)))
+                   (insert (substring str inserted-till e))
+                   (setq inserted-till e)
+                   (if (or (null next-multi-col)
+                           (< (- end e) (cdr next-multi-col)))
+                       ;; Either everything is done, or we reached
+                       ;; the limit.
+                       (+ written wrote)
+                     ;; There are many characters which are too narrow
+                     ;; for `string-width' to return 1.  XTerm, Kitty
+                     ;; and St seems to ignore them, so we too.
+                     (if (zerop (cdr next-multi-col))
+                         (cl-incf inserted-till)
+                       (insert
+                        ;; Make sure the multi-column character
+                        ;; occupies the same number of characters as
+                        ;; its width.
+                        (propertize
+                         (make-string (1- (cdr next-multi-col)) ?\s)
+                         'invisible t 'face face
+                         'eat--t-invisible-space t
+                         'eat--t-char-width (cdr next-multi-col))
+                        ;; Now insert the multi-column character.
+                        (propertize
+                         (substring str inserted-till
+                                    (cl-incf inserted-till))
+                         'face face
+                         'eat--t-char-width (cdr next-multi-col))))
+                     (setf multi-col-char-indices
+                           (cdr multi-col-char-indices))
+                     (write (- max wrote (cdr next-multi-col))
+                            (+ written wrote
+                               (cdr next-multi-col))))))))
           (cl-incf (eat--t-cur-x cursor) ins-count)
           (if (eat--t-term-ins-mode eat--t-term)
               (delete-region
                (save-excursion
                  (eat--t-col-motion (- (eat--t-disp-width disp)
                                        (1- (eat--t-cur-x cursor))))
+                 ;; Make sure the point is safe.
+                 (eat--t-move-before-to-safe)
                  (point))
                (car (eat--t-eol)))
             (delete-region (point) (min (+ ins-count (point))
-                                        (car (eat--t-eol)))))
+                                        (car (eat--t-eol))))
+            ;; Replace any partially-overwritten character with
+            ;; spaces.
+            (eat--t-fix-partial-multi-col-char))
           (when (> (eat--t-cur-x cursor) (eat--t-disp-width disp))
             (if (not (eat--t-term-auto-margin eat--t-term))
                 (eat--t-cur-left 1)
-              (unless (string-empty-p str)
+              (when (< inserted-till (length str))
                 (when (= (eat--t-cur-y cursor) scroll-end)
                   (eat--t-scroll-up 1 'as-side-effect))
                 (if (= (eat--t-cur-y cursor) scroll-end)
@@ -2821,6 +2961,9 @@ position."
                  (max (or n 1) 1))))
     ;; Return if N is zero.
     (unless (zerop n)
+      ;; If the position isn't safe, replace the multi-column
+      ;; character with spaces to make it safe.
+      (eat--t-make-pos-safe)
       (save-excursion
         ;; Insert N spaces, with SGR background if that attribute is
         ;; set.
@@ -2829,6 +2972,8 @@ position."
         ;; Remove the characters that went beyond the edge of display.
         (eat--t-col-motion (- (eat--t-disp-width disp)
                               (+ (1- (eat--t-cur-x cursor)) n)))
+        ;; Make sure we delete any multi-column character completely.
+        (eat--t-move-before-to-safe)
         (delete-region (point) (car (eat--t-eol)))))))
 
 (defun eat--t-delete-char (n)
@@ -2844,11 +2989,16 @@ position."
                  (max (or n 1) 1))))
     ;; Return if N is zero.
     (unless (zerop n)
+      ;; If the position isn't safe, replace the multi-column
+      ;; character with spaces to make it safe.
+      (eat--t-make-pos-safe)
       (save-excursion
         (let ((m (point)))
           ;; Delete N character on current line.
           (eat--t-col-motion n)
           (delete-region m (point))
+          ;; Replace any partially-overwritten character with spaces.
+          (eat--t-fix-partial-multi-col-char)
           ;; If SGR background attribute is set, fill N characters at
           ;; the right edge of display with that background.
           (when (eat--t-face-bg face)
@@ -2878,11 +3028,16 @@ position."
                  (max (or n 1) 1))))
     ;; Return if N is zero.
     (unless (zerop n)
+      ;; If the position isn't safe, replace the multi-column
+      ;; character with spaces to make it safe.
+      (eat--t-make-pos-safe)
       (save-excursion
         (let ((m (point)))
           ;; Delete N character on current line.
           (eat--t-col-motion n)
           (delete-region m (point))
+          ;; Replace any partially-overwritten character with spaces.
+          (eat--t-fix-partial-multi-col-char)
           ;; Insert N spaces, with background if SGR background
           ;; attribute is set.
           (eat--t-repeated-insert
