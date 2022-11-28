@@ -5524,12 +5524,11 @@ END if it's safe to do so."
            (when eat--process
              (cond
               (eat--semi-char-mode
-               `("["
+               '("["
                  (:propertize
                   "semi-char"
-                  help-echo
-                  ,(concat "mouse-1: Switch to char mode, "
-                           "mouse-3: Switch to emacs mode")
+                  help-echo "mouse-1: Switch to char mode, \
+mouse-3: Switch to emacs mode"
                   mouse-face mode-line-highlight
                   local-map
                   (keymap
@@ -5542,9 +5541,8 @@ END if it's safe to do so."
                '("["
                  (:propertize
                   "char"
-                  help-echo
-                  ,(concat "mouse-1: Switch to semi-char mode, "
-                           "mouse-3: Switch to emacs mode")
+                  help-echo "mouse-1: Switch to semi-char mode, \
+mouse-3: Switch to emacs mode"
                   mouse-face mode-line-highlight
                   local-map
                   (keymap
@@ -5554,12 +5552,11 @@ END if it's safe to do so."
                        (down-mouse-3 . eat-emacs-mode)))))
                  "]"))
               (t
-               `("["
+               '("["
                  (:propertize
                   "emacs"
-                  help-echo
-                  ,(concat "mouse-1: Switch to semi char mode, "
-                           "mouse-3: Switch to char mode")
+                  help-echo "mouse-1: Switch to semi char mode, \
+mouse-3: Switch to char mode"
                   mouse-face mode-line-highlight
                   local-map
                   (keymap
