@@ -64,8 +64,18 @@ following:
 
 * Installation
 
-Eat requires at Emacs 28.1 or above.  Eat isn't available on any ELPA
-right now.  So, you have to follow one of the following methods:
+Eat requires at least Emacs 28.1 or above.
+
+** NonGNU ELPA Devel
+
+Eat is available on NonGNU ELPA Devel.  If you don't have the archive
+setup put something like the following in your init file:
+
+#+begin_src emacs-lisp
+(add-to-list 'package-archives
+             '("nongnu-dev"
+               . "https://elpa.nongnu.org/nongnu-devel/"))
+#+end_src
 
 ** Quelpa
 
