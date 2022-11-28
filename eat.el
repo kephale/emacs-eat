@@ -4939,11 +4939,12 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (defvar eat--fast-blink-timer nil
   "Timer for blinking rapidly blinking text.")
 
+(declare-function face-remap-add-relative "face-remap"
+                  (face &rest specs))
+(declare-function face-remap-remove-relative "face-remap" (cookie))
+
 (defun eat--flip-slow-blink-state ()
   "Flip the state of slowly blinking text."
-  (declare-function face-remap-add-relative "face-remap"
-                    (face &rest specs))
-  (declare-function face-remap-remove-relative "face-remap" (cookie))
   (face-remap-remove-relative eat--slow-blink-remap)
   (setq eat--slow-blink-remap
         (face-remap-add-relative
@@ -4953,9 +4954,6 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 
 (defun eat--flip-fast-blink-state ()
   "Flip the state of rapidly blinking text."
-  (declare-function face-remap-add-relative "face-remap"
-                    (face &rest specs))
-  (declare-function face-remap-remove-relative "face-remap" (cookie))
   (face-remap-remove-relative eat--fast-blink-remap)
   (setq eat--fast-blink-remap
         (face-remap-add-relative
@@ -4985,8 +4983,6 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (define-minor-mode eat-blink-mode
   "Toggle blinking of text with blink attribute."
   :lighter " Eat-Blink"
-  (declare-function face-remap-add-relative "face-remap"
-                    (face &rest specs))
   (cond
    (eat-blink-mode
     (setq eat-blink-mode nil)
@@ -5979,10 +5975,11 @@ PROGRAM can be a shell command."
 
 ;;;;; Process Handling.
 
+(defvar eshell-last-output-start) ; In `esh-mode'.
+(defvar eshell-last-output-end) ; In `esh-mode'.
+
 (defun eat--eshell-output-filter ()
   "Handle output from subprocess."
-  (defvar eshell-last-output-start) ; In `esh-mode'.
-  (defvar eshell-last-output-end) ; In `esh-mode'.
   (let ((inhibit-quit t)            ; Don't disturb!
         (inhibit-read-only t)
         (str (buffer-substring-no-properties
@@ -6029,8 +6026,6 @@ PROGRAM can be a shell command."
 
 (defun eat--eshell-cleanup ()
   "Cleanup everything."
-  (defvar eshell-last-output-start) ; In `esh-mode'.
-  (defvar eshell-last-output-end) ; In `esh-mode'.
   (when eat--terminal
     (let ((inhibit-read-only t))
       (goto-char (eat-term-end eat--terminal))
@@ -6049,9 +6044,10 @@ PROGRAM can be a shell command."
       (eat--eshell-char-mode -1)
       (setq buffer-read-only nil))))
 
+(declare-function eshell-output-filter "esh-mode" (process string))
+
 (defun eat--eshell-process-output-queue (process buffer)
   "Process the output queue on BUFFER from PROCESS."
-  (declare-function eshell-output-filter "esh-mode" (process string))
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (when eat--process-output-queue-timer
@@ -6089,9 +6085,10 @@ PROGRAM can be a shell command."
                  #'eat--eshell-process-output-queue process
                  (current-buffer))))))))
 
+(declare-function eshell-sentinel "esh-proc" (proc string))
+
 (defun eat--eshell-sentinel (process message)
   "Process status message MESSAGE from PROCESS."
-  (declare-function eshell-sentinel "esh-proc" (proc string))
   (when (buffer-live-p (process-buffer process))
     (with-current-buffer (process-buffer process)
       (cl-letf* ((process-send-string
@@ -6208,6 +6205,11 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
     (kill-local-variable 'eat--output-queue-first-chunk-time)
     (kill-local-variable 'eat--process-output-queue-timer))))
 
+(declare-function eshell-gather-process-output "esh-proc"
+                  (command args))
+(defvar eshell-variable-aliases-list) ; In `esh-var'.
+(defvar eshell-last-async-procs) ; In `esh-cmd'.
+
 ;;;###autoload
 (define-minor-mode eat-eshell-mode
   "Toggle Eat terminal emulation is Eshell."
@@ -6263,10 +6265,6 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                           (down-mouse-3 . eat-eshell-char-mode)))))
                     "]")))))))
   :group 'eat-ehell
-  (defvar eshell-variable-aliases-list) ; In `esh-var'.
-  (defvar eshell-last-async-procs) ; In `esh-cmd'.
-  (declare-function eshell-gather-process-output "esh-proc"
-                    (command args))
   (cond
    (eat-eshell-mode
     (let ((buffers nil))
@@ -6326,6 +6324,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
 
 ;;;; Eshell Visual Command Handling.
 
+(defvar eshell-destroy-buffer-when-process-dies) ; In `em-term'.
+
 ;; Adapted from `em-term'.
 (defun eat--eshell-visual-sentinel (proc _msg)
   "Clean up the buffer visiting PROC.
@@ -6334,7 +6334,6 @@ If `eshell-destroy-buffer-when-process-dies' is non-nil, destroy
 the buffer.
 
 MSG describes PROC's status."
-  (defvar eshell-destroy-buffer-when-process-dies) ; In `em-term'.
   (when eshell-destroy-buffer-when-process-dies
     (let ((proc-buf (process-buffer proc)))
       (when (and proc-buf (buffer-live-p proc-buf)
@@ -6347,15 +6346,16 @@ MSG describes PROC's status."
               (switch-to-buffer buf)))
         (kill-buffer proc-buf)))))
 
+(defvar eshell-interpreter-alist) ; In `esh-ext'.
+(declare-function eshell-find-interpreter "esh-ext"
+                  (file args &optional no-examine-p))
+(declare-function eshell-stringify-list "esh-util" (args))
+
 (defun eat--eshell-exec-visual (&rest args)
   "Run the specified PROGRAM in a terminal emulation buffer.
 
 ARGS are passed to the program.  At the moment, no piping of input is
 allowed."
-  (declare-function eshell-find-interpreter "esh-ext"
-                    (file args &optional no-examine-p))
-  (declare-function eshell-stringify-list "esh-util" (args))
-  (defvar eshell-interpreter-alist) ; In `esh-ext'.
   (require 'esh-ext)
   (require 'esh-util)
   (let* ((eshell-interpreter-alist nil)
@@ -6384,12 +6384,13 @@ allowed."
       (eat-semi-char-mode)))
   nil)
 
+(declare-function eshell-exec-visual "em-term" (&rest args))
+
 ;;;###autoload
 (define-minor-mode eat-eshell-visual-command-mode
   "Toggle running Eshell visual commands with Eat."
   :group 'eat-eshell
   :global t
-  (declare-function eshell-exec-visual "em-term" (&rest args))
   (if eat-eshell-visual-command-mode
       (advice-add #'eshell-exec-visual :override
                   #'eat--eshell-exec-visual)
@@ -6397,6 +6398,9 @@ allowed."
 
 
 ;;;; Project Integration.
+
+(declare-function project-root "project" (project))
+(declare-function project-prefixed-buffer-name "project" (mode))
 
 ;;;###autoload
 (defun eat-project (&optional arg)
@@ -6411,8 +6415,6 @@ With a numeric prefix ARG (like \\[universal-argument] 42 \\[eshell]),
 switch to the session with that number, or create it if it doesn't
 already exist."
   (interactive "P")
-  (declare-function project-root "project" (project))
-  (declare-function project-prefixed-buffer-name "project" (mode))
   (require 'project)
   (let* ((default-directory (project-root (project-current t)))
          (eat-buffer-name (project-prefixed-buffer-name "eat")))
