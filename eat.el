@@ -2699,7 +2699,7 @@ N default to 1."
 N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
 1, erase beginning of line to cursor.  When N is 2, erase whole line."
   (let ((face (eat--t-term-face eat--t-term)))
-    (pcase n
+    (pcase-exhaustive n
       ((or 0 'nil (pred (< 2)))
        ;; Delete cursor position (inclusive) to end of line.
        (delete-region (point) (car (eat--t-eol)))
@@ -2761,7 +2761,7 @@ is 1, erase beginning of display to cursor.  In both on the previous
 cases, don't move cursor.  When N is 2, erase display and reset cursor
 to (1, 1).  When N is 3, also erase the scrollback."
   (let ((face (eat--t-term-face eat--t-term)))
-    (pcase n
+    (pcase-exhaustive n
       ((or 0 'nil (pred (< 3)))
        ;; Delete from cursor position (inclusive) to end of terminal.
        (delete-region (point) (point-max))
@@ -3421,11 +3421,12 @@ MODE should be one of nil and `x10', `normal', `button-event',
     (setf (eat--t-term-mouse-pressed eat--t-term) nil))
   ;; Inform the UI.
   (funcall (eat--t-term-grab-mouse-fn eat--t-term) eat--t-term
-           (pcase mode
+           (pcase-exhaustive mode
              ('x10 :click)
              ('normal :modifier-click)
              ('button-event :drag)
-             ('any-event :all))))
+             ('any-event :all)
+             ('nil nil))))
 
 (defun eat--t-enable-x10-mouse ()
   "Enable X10 mouse tracking."
@@ -3472,7 +3473,7 @@ MODE should be one of nil and `x10', `normal', `button-event',
 PARAMS is the parameter list and FORMAT is the format of parameters in
 output."
   (setq params (or params '((0))))
-  (pcase format
+  (pcase-exhaustive format
     ('nil
      (when (= (caar params) 0)
        (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
@@ -3659,7 +3660,7 @@ DATA is the selection data encoded in base64."
   "Parse and evaluate OUTPUT."
   (let ((index 0))
     (while (< index (length output))
-      (pcase (eat--t-term-parser-state eat--t-term)
+      (pcase-exhaustive (eat--t-term-parser-state eat--t-term)
         ('nil
          ;; Regular expression to find the end of plain text.
          (let ((match (string-match
@@ -3681,7 +3682,7 @@ DATA is the selection data encoded in base64."
                (setq index match))
              ;; Dispatch control sequence.
              (cl-incf index)
-             (pcase (aref output (1- index))
+             (pcase-exhaustive (aref output (1- index))
                (?\a
                 (eat--t-bell))
                (?\b
@@ -4472,7 +4473,7 @@ client process may get confused."
                   ('prior ?5)
                   ('next ?6)
                   (_ ?1))
-                (pcase (event-modifiers ev)
+                (pcase-exhaustive (event-modifiers ev)
                   ((and (pred (memq 'control))
                         (pred (memq 'meta))
                         (pred (memq 'shift)))
@@ -5447,13 +5448,12 @@ selection, or nil if none."
   (let ((inhibit-eol-conversion t)
         (select-enable-clipboard (eq selection :clipboard))
         (select-enable-primary (eq selection :primary)))
-    (pcase data
+    (pcase-exhaustive data
       ('t
        (when eat-enable-yank-to-terminal
          (ignore-error error
            (current-kill 0 'do-not-move))))
-      ((and (pred stringp)
-            str)
+      ((and (pred stringp) str)
        (when eat-enable-kill-from-terminal
          (kill-new str))))))
 
@@ -6715,7 +6715,7 @@ FN is the original definition of `eat--eshell-cleanup', which see."
   (let ((inhibit-read-only t))
     (setq eat--trace-replay-progress
           (- (car data) eat--trace-replay-recording-start-time))
-    (pcase data
+    (pcase-exhaustive data
       (`(,time create ,_ui ,width ,height ,variables)
        (setq eat--trace-replay-recording-start-time time
              eat--trace-replay-progress 0)
