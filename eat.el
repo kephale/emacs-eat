@@ -3349,7 +3349,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                 nil t)))))
     ;; Update face according to the attributes.
     (setf (eat--t-face-face face)
-          `(,@(when-let ((fg (or (if (eat--t-face-conceal face)
+          `(,@(and-let* ((fg (or (if (eat--t-face-conceal face)
                                      (eat--t-face-bg face)
                                    (eat--t-face-fg face))
                                  (cond
@@ -3361,31 +3361,31 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                           :background
                         :foreground)
                       fg))
-            ,@(when-let ((bg (or (eat--t-face-bg face)
+            ,@(and-let* ((bg (or (eat--t-face-bg face)
                                  (and (eat--t-face-inverse face)
                                       (face-background 'default)))))
                 (list (if (eat--t-face-inverse face)
                           :foreground
                         :background)
                       bg))
-            ,@(when-let ((underline (eat--t-face-underline face)))
+            ,@(and-let* ((underline (eat--t-face-underline face)))
                 (list
                  :underline
                  (list :color (eat--t-face-underline-color face)
                        :style underline)))
-            ,@(when-let ((crossed (eat--t-face-crossed face)))
+            ,@(and-let* ((crossed (eat--t-face-crossed face)))
                 ;; REVIEW: How about colors?  No terminal supports
                 ;; crossed attribute with colors, so we'll need to be
                 ;; creative to add the feature.
                 `(:strike-through t))
             :inherit
-            (,@(when-let ((intensity (eat--t-face-intensity face)))
+            (,@(and-let* ((intensity (eat--t-face-intensity face)))
                  (list intensity))
-             ,@(when-let ((italic (eat--t-face-italic face)))
+             ,@(and-let* ((italic (eat--t-face-italic face)))
                  (cl-assert (1value (eq (1value italic)
                                         'eat-term-italic)))
                  (list (1value italic)))
-             ,@(when-let ((blink (eat--t-face-blink face)))
+             ,@(and-let* ((blink (eat--t-face-blink face)))
                  (list blink))
              ,(eat--t-face-font face))))))
 
@@ -5041,7 +5041,7 @@ return \"eat-color\", otherwise return \"eat-mono\"."
     (setq eat--cursor-blink-state (not eat--cursor-blink-state))
     ;; REVIEW: This is expensive, and some causes flickering.  Any
     ;; better way?
-    (when-let ((window (get-buffer-window nil 'visible)))
+    (when-let* ((window (get-buffer-window nil 'visible)))
       (redraw-frame (window-frame window)))))
 
 (defun eat--cursor-blink-stop-timers ()
@@ -5466,7 +5466,7 @@ selection, or nil if none."
 
 (defun eat--synchronize-scroll ()
   "Synchronize scrolling and point between terminal and window."
-  (when-let ((window (get-buffer-window (current-buffer))))
+  (when-let* ((window (get-buffer-window (current-buffer))))
     (set-window-start
      window (eat-term-display-beginning eat--terminal)))
   (goto-char (eat-term-display-cursor eat--terminal)))
@@ -5756,7 +5756,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
         (insert "\n\n"))
       (setq eat--terminal (eat-term-make buffer (point)))
       (eat-semi-char-mode)
-      (when-let ((window (get-buffer-window nil t)))
+      (when-let* ((window (get-buffer-window nil t)))
         (with-selected-window window
           (eat-term-resize eat--terminal (window-max-chars-per-line)
                            (window-text-height))))
@@ -6020,7 +6020,7 @@ PROGRAM can be a shell command."
           (eat-term-manipulate-selection-function eat--terminal)
           #'eat--manipulate-kill-ring
           (eat-term-ring-bell-function eat--terminal) #'eat--bell)
-    (when-let ((window (get-buffer-window nil t)))
+    (when-let* ((window (get-buffer-window nil t)))
       (with-selected-window window
         (eat-term-resize eat--terminal (window-max-chars-per-line)
                          (window-text-height))))
@@ -6150,7 +6150,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
 
 (defun eat--eshell-synchronize-scroll ()
   "Synchronize scrolling and point between terminal and window."
-  (when-let ((window (get-buffer-window (current-buffer))))
+  (when-let* ((window (get-buffer-window (current-buffer))))
     (set-window-start
      window
      (if (or (eat-term-in-alternative-display-p eat--terminal)
@@ -6344,9 +6344,9 @@ MSG describes PROC's status."
                  (not (eq 'run (process-status proc)))
                  (= (process-exit-status proc) 0))
         (if (eq (current-buffer) proc-buf)
-            (when-let ((buf (and (boundp 'eshell-parent-buffer)
-                                 (buffer-live-p eshell-parent-buffer)
-                                 eshell-parent-buffer)))
+            (when-let* ((buf (and (boundp 'eshell-parent-buffer)
+                                  (buffer-live-p eshell-parent-buffer)
+                                  eshell-parent-buffer)))
               (switch-to-buffer buf)))
         (kill-buffer proc-buf)))))
 
@@ -6749,7 +6749,7 @@ FN is the original definition of `eat--eshell-cleanup', which see."
         (backward-list)
         (move-overlay eat--trace-replay-current-sexp-overlay
                       (point) (point))
-        (when-let ((window (get-buffer-window)))
+        (when-let* ((window (get-buffer-window)))
           (set-window-point window (point)))
         (with-current-buffer eat--trace-replay-buffer
           (cl-incf eat--trace-replay-progress-frame)
