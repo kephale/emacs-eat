@@ -1775,7 +1775,7 @@ Treat LINE FEED (?\\n) as the line delimiter."
   ;; Move to the beginning of line, record the point, and return that
   ;; point and the distance of that point from current line in lines.
   (save-excursion
-    (let* ((moved (eat--t-goto-eol n)))
+    (let ((moved (eat--t-goto-eol n)))
       (cons (point) moved))))
 
 (defun eat--t-col-motion (n)
@@ -1981,7 +1981,7 @@ Don't `set' it, bind it to a value with `let'.")
 
 (defun eat--t-reset ()
   "Reset terminal."
-  (let* ((disp (eat--t-term-display eat--t-term)))
+  (let ((disp (eat--t-term-display eat--t-term)))
     ;; Reset most of the things to their respective default values.
     (setf (eat--t-term-parser-state eat--t-term) nil)
     (setf (eat--t-disp-begin disp) (point-min-marker))
@@ -2783,10 +2783,10 @@ to (1, 1).  When N is 3, also erase the scrollback."
            ;; Restore position.
            (goto-char pos))))
       (1
-       (let* ((y (eat--t-cur-y cursor))
-              (x (eat--t-cur-x cursor))
-              ;; Should we erase including the cursor position?
-              (incl-point (/= (point) (point-max))))
+       (let ((y (eat--t-cur-y cursor))
+             (x (eat--t-cur-x cursor))
+             ;; Should we erase including the cursor position?
+             (incl-point (/= (point) (point-max))))
          ;; Delete the region to be erased.
          (delete-region (eat--t-disp-begin disp)
                         (if incl-point (1+ (point)) (point)))
@@ -2911,17 +2911,17 @@ If DONT-MOVE-CURSOR is non-nil, don't move cursor from current
 position."
   ;; Make sure we in the alternative display.
   (when (eat--t-term-main-display eat--t-term)
-    (let* ((main-disp (eat--t-term-main-display eat--t-term))
-           (old-y (eat--t-cur-y
-                   (eat--t-disp-cursor
-                    (eat--t-term-display eat--t-term))))
-           (old-x (eat--t-cur-x
-                   (eat--t-disp-cursor
-                    (eat--t-term-display eat--t-term))))
-           (width (eat--t-disp-width
-                   (eat--t-term-display eat--t-term)))
-           (height (eat--t-disp-height
-                    (eat--t-term-display eat--t-term))))
+    (let ((main-disp (eat--t-term-main-display eat--t-term))
+          (old-y (eat--t-cur-y
+                  (eat--t-disp-cursor
+                   (eat--t-term-display eat--t-term))))
+          (old-x (eat--t-cur-x
+                  (eat--t-disp-cursor
+                   (eat--t-term-display eat--t-term))))
+          (width (eat--t-disp-width
+                  (eat--t-term-display eat--t-term)))
+          (height (eat--t-disp-height
+                   (eat--t-term-display eat--t-term))))
       ;; Delete everything.
       (delete-region (point-min) (point-max))
       ;; Restore the main display.
@@ -4092,7 +4092,7 @@ DATA is the selection data encoded in base64."
         ;; Calculate the beginning position of display.
         (goto-char (point-max))
         ;; TODO: This part needs explanation.
-        (let* ((disp-begin (car (eat--t-bol (- (1- height))))))
+        (let ((disp-begin (car (eat--t-bol (- (1- height))))))
           (when (< (eat--t-disp-begin disp) disp-begin)
             (goto-char (max (- (eat--t-disp-begin disp) 1)
                             (point-min)))
@@ -4369,7 +4369,7 @@ you need the position."
   "Prepare TERMINAL for displaying."
   (let ((inhibit-quit t))
     (eat--t-with-env terminal
-      (let* ((disp (eat--t-term-display eat--t-term)))
+      (let ((disp (eat--t-term-display eat--t-term)))
         (when (< (eat--t-disp-old-begin disp)
                  (eat--t-disp-begin disp))
           ;; Join long lines.
@@ -4541,8 +4541,8 @@ client process may get confused."
                     (setq tmp (get char 'ascii-character))
                     (setq char tmp))))
            (when (numberp char)
-             (let* ((base (event-basic-type char))
-                    (mods (event-modifiers char)))
+             (let ((base (event-basic-type char))
+                   (mods (event-modifiers char)))
                ;; Try to avoid event-convert-list if possible.
                (if (and (characterp char)
                         (not (memq 'meta mods))
@@ -5715,8 +5715,8 @@ to it."
 
 PROCESS is the process whose window to resize, and WINDOWS is the list
 of window displaying PROCESS's buffer."
-  (let* ((size (funcall window-adjust-process-window-size-function
-                        process windows)))
+  (let ((size (funcall window-adjust-process-window-size-function
+                       process windows)))
     (when size
       (let ((width (max (car size) 1))
             (height (max (cdr size) 1))
@@ -6361,7 +6361,7 @@ allowed."
   (defvar eshell-interpreter-alist) ; In `esh-ext'.
   (require 'esh-ext)
   (require 'esh-util)
-  (let* (eshell-interpreter-alist
+  (let* ((eshell-interpreter-alist nil)
          (interp (eshell-find-interpreter (car args) (cdr args)))
          (program (car interp))
          (args (flatten-tree
