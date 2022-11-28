@@ -5459,7 +5459,7 @@ selection, or nil if none."
 
 (defun eat--bell (_)
   "Ring the bell."
-  (beep t))
+  (ding t))
 
 
 ;;;;; Major Mode.
