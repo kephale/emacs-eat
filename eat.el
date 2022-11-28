@@ -1692,25 +1692,24 @@ Return the number of lines moved.
 
 Treat LINE FEED (?\\n) as the line delimiter."
   ;; TODO: Comment.
-  (let ((n (or n 0)))
-    (cond
-     ((> n 0)
-      (let ((moved 0))
-        (while (and (< (point) (point-max))
-                    (< moved n))
-          (and (search-forward "\n" nil 'move)
-               (cl-incf moved)))
-        moved))
-     ((<= n 0)
-      (let ((moved 1))
-        (while (and (or (= moved 1)
-                        (< (point-min) (point)))
-                    (< n moved))
-          (cl-decf moved)
-          (and (search-backward "\n" nil 'move)
-               (= moved n)
-               (goto-char (match-end 0))))
-        moved)))))
+  (setq n (or n 0))
+  (cond ((> n 0)
+         (let ((moved 0))
+           (while (and (< (point) (point-max))
+                       (< moved n))
+             (and (search-forward "\n" nil 'move)
+                  (cl-incf moved)))
+           moved))
+        ((<= n 0)
+         (let ((moved 1))
+           (while (and (or (= moved 1)
+                           (< (point-min) (point)))
+                       (< n moved))
+             (cl-decf moved)
+             (and (search-backward "\n" nil 'move)
+                  (= moved n)
+                  (goto-char (match-end 0))))
+           moved))))
 
 (defun eat--t-goto-eol (&optional n)
   "Go to the end of current line.
@@ -1724,25 +1723,24 @@ Return the number of lines moved.
 
 Treat LINE FEED (?\\n) as the line delimiter."
   ;; TODO: Comment.
-  (let ((n (or n 0)))
-    (cond
-     ((>= n 0)
-      (let ((moved -1))
-        (while (and (or (= moved -1)
-                        (< (point) (point-max)))
-                    (< moved n))
-          (cl-incf moved)
-          (and (search-forward "\n" nil 'move)
-               (= moved n)
-               (goto-char (match-beginning 0))))
-        moved))
-     ((< n 0)
-      (let ((moved 0))
-        (while (and (< (point-min) (point))
-                    (< n moved))
-          (and (search-backward "\n" nil 'move)
-               (cl-decf moved)))
-        moved)))))
+  (setq n (or n 0))
+  (cond ((>= n 0)
+         (let ((moved -1))
+           (while (and (or (= moved -1)
+                           (< (point) (point-max)))
+                       (< moved n))
+             (cl-incf moved)
+             (and (search-forward "\n" nil 'move)
+                  (= moved n)
+                  (goto-char (match-beginning 0))))
+           moved))
+        ((< n 0)
+         (let ((moved 0))
+           (while (and (< (point-min) (point))
+                       (< n moved))
+             (and (search-backward "\n" nil 'move)
+                  (cl-decf moved)))
+           moved))))
 
 (defun eat--t-bol (&optional n)
   "Return the beginning of current line.
@@ -1758,6 +1756,8 @@ Treat LINE FEED (?\\n) as the line delimiter."
   ;; Move to the beginning of line, record the point, and return that
   ;; point and the distance of that point from current line in lines.
   (save-excursion
+    ;; `let' is neccessary, we need to evaluate (point) after going to
+    ;; `(eat--t-goto-bol N)'.
     (let ((moved (eat--t-goto-bol n)))
       (cons (point) moved))))
 
@@ -1775,6 +1775,8 @@ Treat LINE FEED (?\\n) as the line delimiter."
   ;; Move to the beginning of line, record the point, and return that
   ;; point and the distance of that point from current line in lines.
   (save-excursion
+    ;; `let' is neccessary, we need to evaluate (point) after going to
+    ;; (eat--t-goto-eol N).
     (let ((moved (eat--t-goto-eol n)))
       (cons (point) moved))))
 
@@ -1789,26 +1791,27 @@ Return the number of columns moved.
 
 Assume all characters occupy a single column."
   ;; Record the current position.
-  (let ((point (point)))
+  (let ((start-pos (point)))
     ;; Move to the new position.
-    (cond
-     ((> n 0)
-      (let ((eol (car (eat--t-eol)))
-            (pos (+ (point) n)))
-        (goto-char (min pos eol))))
-     ((< n 0)
-      (let ((bol (car (eat--t-bol)))
-            (pos (+ (point) n)))
-        (goto-char (max pos bol)))))
+    (cond ((> n 0)
+           (let ((eol (car (eat--t-eol)))
+                 (pos (+ (point) n)))
+             (goto-char (min pos eol))))
+          ((< n 0)
+           (let ((bol (car (eat--t-bol)))
+                 (pos (+ (point) n)))
+             (goto-char (max pos bol)))))
     ;; Return the distance from the previous position.
-    (- (point) point)))
+    (- (point) start-pos)))
 
 (defun eat--t-current-col ()
   "Return the current column.
 
 Assume all characters occupy a single column."
   ;; We assume that that all characters occupy a single column, so a
-  ;; subtraction should work.
+  ;; subtraction should work.  For multi-column characters, we add
+  ;; extra invisible spaces before the character to make it occupy as
+  ;; many character is its width.
   (- (point) (car (eat--t-bol))))
 
 (defun eat--t-goto-col (n)
@@ -1823,11 +1826,13 @@ Assume all characters occupy a single column."
   (eat--t-col-motion n))
 
 (defun eat--t-repeated-insert (c n &optional face)
-  "Insert C, N times.
-
-C is a character.  FACE is the face to use, or nil."
-  (let ((str (make-string n c)))
-    (insert (if face (propertize str 'face face) str))))
+  "Insert character C, N times, using face FACE, if given."
+  (insert (if face
+              (let ((str (make-string n c)))
+                (put-text-property 0 n 'face face str)
+                str)
+            ;; Avoid the `let'.
+            (make-string n c))))
 
 (defun eat--t-join-long-line (&optional limit)
   "Join long line once, but don't try to go beyond LIMIT.
@@ -1860,13 +1865,13 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
           ;; line and start from the beginning.
           (forward-char)
         ;; The next character is not a newline, so we must be at a
-        ;; long, or we are the end of the accessible part of the
+        ;; long line, or we are the end of the accessible part of the
         ;; buffer.  Whatever the case, we break the loop, and if it is
         ;; a long line, we break the line.
         (setq loop nil)
         (unless (= (point) (point-max))
           (insert-before-markers
-           (propertize "\n" 'eat--t-wrap-line t)))))))
+           #("\n" 0 1 (eat--t-wrap-line t))))))))
 
 
 ;;;; Emulator.
@@ -2026,12 +2031,12 @@ Don't `set' it, bind it to a value with `let'.")
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; If N is less than 1, set N to 1.  If N is more than the
-         ;; number of available columns on the right side, set N to
-         ;; the maximum possible value.
-         (n (min (- (eat--t-disp-width disp) (eat--t-cur-x cursor))
-                 (max (or n 1) 1))))
+         (cursor (eat--t-disp-cursor disp)))
+    ;; If N is less than 1, set N to 1.  If N is more than the number
+    ;; of available columns on the right side, set N to the maximum
+    ;; possible value.
+    (setq n (min (- (eat--t-disp-width disp) (eat--t-cur-x cursor))
+                 (max (or n 1) 1)))
     ;; N is non-zero in most cases, except at the edge of display.
     (unless (zerop n)
       ;; Move to the Nth next column, use spaces to reach that column
@@ -2045,11 +2050,11 @@ display."
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; If N is less than 1, set N to 1.  If N is more than the
-         ;; number of available columns on the left side, set N to the
-         ;; maximum possible value.
-         (n (min (1- (eat--t-cur-x cursor)) (max (or n 1) 1))))
+         (cursor (eat--t-disp-cursor disp)))
+    ;; If N is less than 1, set N to 1.  If N is more than the number
+    ;; of available columns on the left side, set N to the maximum
+    ;; possible value.
+    (setq n (min (1- (eat--t-cur-x cursor)) (max (or n 1) 1)))
     ;; N is non-zero in most cases, except at the edge of display.
     (unless (zerop n)
       ;; Move to the Nth previous column.
@@ -2063,9 +2068,9 @@ display."
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; If N is out of range, bring it within the bounds of range.
-         (n (min (max (or n 1) 1) (eat--t-disp-width disp))))
+         (cursor (eat--t-disp-cursor disp)))
+    ;; If N is out of range, bring it within the bounds of range.
+    (setq n (min (max (or n 1) 1) (eat--t-disp-width disp)))
     ;; Depending on the current position of cursor, move right or
     ;; left.
     (cond ((< (eat--t-cur-x cursor) n)
@@ -2076,12 +2081,11 @@ display."
 (defun eat--t-beg-of-next-line (n)
   "Move to beginning of Nth next line."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; If N is less than 1, set N to 1.  If N is more than the
-         ;; number of available lines below, set N to the maximum
-         ;; possible value.
-         (n (min (- (eat--t-disp-height disp) (eat--t-cur-y cursor))
-                 (max (or n 1) 1))))
+         (cursor (eat--t-disp-cursor disp)))
+    ;; If N is less than 1, set N to 1.  If N is more than the number
+    ;; of available lines below, set N to the maximum possible value.
+    (setq n (min (- (eat--t-disp-height disp) (eat--t-cur-y cursor))
+                 (max (or n 1) 1)))
     ;; N is non-zero in most cases, except at the edge of display.
     ;; Whatever the case, we move to the beginning of line.
     (if (zerop n)
@@ -2095,11 +2099,10 @@ display."
 (defun eat--t-beg-of-prev-line (n)
   "Move to beginning of Nth previous line."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; If N is less than 1, set N to 1.  If N is more than the
-         ;; number of available lines above, set N to the maximum
-         ;; possible value.
-         (n (min (1- (eat--t-cur-y cursor)) (max (or n 1) 1))))
+         (cursor (eat--t-disp-cursor disp)))
+    ;; If N is less than 1, set N to 1.  If N is more than the number
+    ;; of available lines above, set N to the maximum possible value.
+    (setq n (min (1- (eat--t-cur-y cursor)) (max (or n 1) 1)))
     ;; Move to the beginning Nth previous line.  Even if there are no
     ;; line above, move to the beginning of the line.
     (eat--t-goto-bol (- n))
@@ -2111,9 +2114,8 @@ display."
 
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
-  (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         (x (eat--t-cur-x cursor)))
+  (let ((x (eat--t-cur-x (eat--t-disp-cursor
+                          (eat--t-term-display eat--t-term)))))
     ;; Move to the beginning of target line.
     (eat--t-beg-of-next-line n)
     ;; If the cursor wasn't at column one, move the cursor to the
@@ -2126,9 +2128,8 @@ display."
 
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
-  (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         (x (eat--t-cur-x cursor)))
+  (let ((x (eat--t-cur-x (eat--t-disp-cursor
+                          (eat--t-term-display eat--t-term)))))
     ;; Move to the beginning of target line.
     (eat--t-beg-of-prev-line n)
     ;; If the cursor wasn't at column one, move the cursor to the
@@ -2142,9 +2143,9 @@ display."
 N default to 1.  If N is out of range, place cursor at the edge of
 display."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; If N is out of range, bring it within the bounds of range.
-         (n (min (max (or n 1) 1) (eat--t-disp-height disp))))
+         (cursor (eat--t-disp-cursor disp)))
+    ;; If N is out of range, bring it within the bounds of range.
+    (setq n (min (max (or n 1) 1) (eat--t-disp-height disp)))
     ;; Depending on the current position of cursor, move downward or
     ;; upward.
     (cond ((< (eat--t-cur-y cursor) n)
@@ -2160,13 +2161,12 @@ column, but if AS-SIDE-EFFECT is given and non-nil, assume that
 scrolling is triggered as a side effect of some other control function
 and don't move the point relative to the text and change current line
 accordingly."
-  (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
-         (scroll-end (eat--t-term-scroll-end eat--t-term))
-         ;; N shouldn't be more more than the number of lines in
-         ;; scroll region.
-         (n (min (max (or n 1) 0) (1+ (- scroll-end scroll-begin)))))
+  (let ((disp (eat--t-term-display eat--t-term))
+        (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+        (scroll-end (eat--t-term-scroll-end eat--t-term)))
+    ;; N shouldn't be more more than the number of lines in scroll
+    ;; region.
+    (setq n (min (max (or n 1) 0) (1+ (- scroll-end scroll-begin))))
     ;; Make sure that N is positive.
     (unless (zerop n)
       ;; Try to not point relative to the text.
@@ -2198,8 +2198,9 @@ accordingly."
           (when (< (point) (point-max))
             (eat--t-repeated-insert ?\n n))))
       ;; Recalculate point if needed.
-      (let ((recalc-point
-             (<= scroll-begin (eat--t-cur-y cursor) scroll-end)))
+      (let* ((cursor (eat--t-disp-cursor disp))
+             (recalc-point
+              (<= scroll-begin (eat--t-cur-y cursor) scroll-end)))
         ;; If recalc-point is non-nil, and AS-SIDE-EFFECT is non-nil,
         ;; update cursor position so that it is unmoved relative to
         ;; surrounding text and reconsider point recalculation.
@@ -2218,14 +2219,13 @@ accordingly."
 (defun eat--t-scroll-down (&optional n)
   "Scroll down N lines, preserving cursor position.
 
-N default to 1."
-  (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         (scroll-begin (eat--t-term-scroll-begin eat--t-term))
-         (scroll-end (eat--t-term-scroll-end eat--t-term))
-         ;; N shouldn't be more more than the number of lines in
-         ;; scroll region.
-         (n (min (max (or n 1) 0) (1+ (- scroll-end scroll-begin)))))
+N defaults to 1."
+  (let ((disp (eat--t-term-display eat--t-term))
+        (scroll-begin (eat--t-term-scroll-begin eat--t-term))
+        (scroll-end (eat--t-term-scroll-end eat--t-term)))
+    ;; N shouldn't be more more than the number of lines in scroll
+    ;; region.
+    (setq n (min (max (or n 1) 0) (1+ (- scroll-end scroll-begin))))
     ;; Make sure that N is positive.
     (unless (zerop n)
       ;; Move to the beginning of scroll region.
@@ -2239,8 +2239,9 @@ N default to 1."
       (when (< (point) (point-max))
         (delete-region (point) (car (eat--t-eol n))))
       ;; The cursor mustn't move, so we have to recalculate point.
-      (let ((y (eat--t-cur-y cursor))
-            (x (eat--t-cur-x cursor)))
+      (let* ((cursor (eat--t-disp-cursor disp))
+             (y (eat--t-cur-y cursor))
+             (x (eat--t-cur-x cursor)))
         (eat--t-goto 1 1)
         (eat--t-goto y x)))))
 
@@ -2268,7 +2269,7 @@ of range, place cursor at the edge of display."
     ;; from current position than from the display beginning (the only
     ;; exception is when the cursor is at the display beginning).  So
     ;; first moving to the display beginning and then moving to those
-    ;; point will be faster than moving from cursor (except a small
+    ;; point will be faster than moving from cursor (except a tiny
     ;; (perhaps negligible) overhead of `goto-char').  What we don't
     ;; have is a formula the calculate the distance between two
     ;; positions.
@@ -2363,73 +2364,68 @@ character or its the internal invisible spaces."
 
 (defun eat--t-write (str)
   "Write STR on display."
-  (let* ((str
-          ;; Convert STR to Unicode according to the current character
-          ;; set.
-          (pcase (alist-get (car (eat--t-term-charset eat--t-term))
-                            (cdr (eat--t-term-charset eat--t-term)))
-            ;; For `us-ascii', the default, no conversion is
-            ;; necessary.
-            ('us-ascii
-             str)
-            ;; `dec-line-drawing' contains various characters useful
-            ;; for drawing line diagram, so it is a must.  This is
-            ;; also possible with `us-ascii', thanks to Unicode, but
-            ;; the character set `dec-line-drawing' is usually less
-            ;; expensive in terms of bytes needed to transfer than
-            ;; `us-ascii'.
-            ('dec-line-drawing
-             (let ((s (copy-sequence str)))
-               (dotimes (i (length s))
-                 (let ((replacement (alist-get (aref s i)
-                                               '((?+ . ?→)
-                                                 (?, . ?←)
-                                                 (?- . ?↑)
-                                                 (?. . ?↓)
-                                                 (?0 . ?█)
-                                                 (?\` . ?�)
-                                                 (?a . ?▒)
-                                                 (?b . ?␉)
-                                                 (?c . ?␌)
-                                                 (?d . ?␍)
-                                                 (?e . ?␊)
-                                                 (?f . ?°)
-                                                 (?g . ?±)
-                                                 (?h . ?░)
-                                                 (?i . ?#)
-                                                 (?j . ?┘)
-                                                 (?k . ?┐)
-                                                 (?l . ?┌)
-                                                 (?m . ?└)
-                                                 (?n . ?┼)
-                                                 (?o . ?⎺)
-                                                 (?p . ?⎻)
-                                                 (?q . ?─)
-                                                 (?r . ?⎼)
-                                                 (?s . ?⎽)
-                                                 (?t . ?├)
-                                                 (?u . ?┤)
-                                                 (?v . ?┴)
-                                                 (?w . ?┬)
-                                                 (?x . ?│)
-                                                 (?y . ?≤)
-                                                 (?z . ?≥)
-                                                 (?{ . ?π)
-                                                 (?| . ?≠)
-                                                 (?} . ?£)
-                                                 (?~ . ?•)))))
-                   (when replacement
-                     (aset s i replacement))))
-               s))
-            (_
-             str)))
-         (face (eat--t-face-face
-                (eat--t-term-face eat--t-term)))
-         ;; Add `face' property.
-         (str (propertize str 'face face))
-         ;; Alist of indices and width of multi-column characters.
-         (multi-col-char-indices nil)
-         (inserted-till 0))
+  (let ((face (eat--t-face-face (eat--t-term-face eat--t-term)))
+        ;; Alist of indices and width of multi-column characters.
+        (multi-col-char-indices nil)
+        (inserted-till 0))
+    ;; Copy STR and add face to it.
+    (setq str (propertize str 'face face))
+    ;; Convert STR to Unicode according to the current character
+    ;; set.
+    (pcase-exhaustive
+        (alist-get (car (eat--t-term-charset eat--t-term))
+                   (cdr (eat--t-term-charset eat--t-term)))
+      ;; For `us-ascii', the default, no conversion is
+      ;; necessary.
+      ('us-ascii
+       str)
+      ;; `dec-line-drawing' contains various characters useful
+      ;; for drawing line diagram, so it is a must.  This is
+      ;; also possible with `us-ascii', thanks to Unicode, but
+      ;; the character set `dec-line-drawing' is usually less
+      ;; expensive in terms of bytes needed to transfer than
+      ;; `us-ascii'.
+      ('dec-line-drawing
+       (dotimes (i (length str))
+         (let ((replacement (alist-get (aref str i)
+                                       '((?+ . ?→)
+                                         (?, . ?←)
+                                         (?- . ?↑)
+                                         (?. . ?↓)
+                                         (?0 . ?█)
+                                         (?\` . ?�)
+                                         (?a . ?▒)
+                                         (?b . ?␉)
+                                         (?c . ?␌)
+                                         (?d . ?␍)
+                                         (?e . ?␊)
+                                         (?f . ?°)
+                                         (?g . ?±)
+                                         (?h . ?░)
+                                         (?i . ?#)
+                                         (?j . ?┘)
+                                         (?k . ?┐)
+                                         (?l . ?┌)
+                                         (?m . ?└)
+                                         (?n . ?┼)
+                                         (?o . ?⎺)
+                                         (?p . ?⎻)
+                                         (?q . ?─)
+                                         (?r . ?⎼)
+                                         (?s . ?⎽)
+                                         (?t . ?├)
+                                         (?u . ?┤)
+                                         (?v . ?┴)
+                                         (?w . ?┬)
+                                         (?x . ?│)
+                                         (?y . ?≤)
+                                         (?z . ?≥)
+                                         (?{ . ?π)
+                                         (?| . ?≠)
+                                         (?} . ?£)
+                                         (?~ . ?•)))))
+           (when replacement
+             (aset str i replacement))))))
     ;; Find all the multi-column wide characters in STR, using a
     ;; binary search like algorithm; hopefully it won't slow down
     ;; showing ASCII.
@@ -2535,7 +2531,7 @@ character or its the internal invisible spaces."
                 (if (= (eat--t-cur-y cursor) scroll-end)
                     (eat--t-carriage-return)
                   (if (= (point) (point-max))
-                      (insert (propertize "\n" 'eat--t-wrap-line t))
+                      (insert #("\n" 0 1 (eat--t-wrap-line t)))
                     (put-text-property (point) (1+ (point))
                                        'eat--t-wrap-line t)
                     (forward-char))
@@ -2546,8 +2542,9 @@ character or its the internal invisible spaces."
   "Go to the Nth next tabulation stop.
 
 N default to 1."
-  (let* ((n (max (or n 1) 1))           ; N must be positive.
-         (disp (eat--t-term-display eat--t-term))
+  ;; N must be positive.
+  (setq n (max (or n 1) 1))
+  (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp)))
     ;; Do some math calculate the distance of the Nth next tabulation
     ;; stop from cursor, and go there.
@@ -2558,8 +2555,9 @@ N default to 1."
   "Go to the Nth previous tabulation stop.
 
 N default to 1."
-  (let* ((n (max (or n 1) 1))           ; N must be positive.
-         (disp (eat--t-term-display eat--t-term))
+  ;; N must be positive.
+  (setq n (max (or n 1) 1))
+  (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp)))
     ;; Do some math calculate the distance of the Nth next tabulation
     ;; stop from cursor, and go there.
@@ -2641,8 +2639,8 @@ N default to 1."
 
 (defun eat--t-reverse-index ()
   "Go to the previous line preserving column, scrolling if needed."
-  (let* ((disp (eat--t-term-display eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
+  (let* ((cursor (eat--t-disp-cursor
+                  (eat--t-term-display eat--t-term)))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
          ;; Are we in the scroll region?
          (in-scroll-region (<= scroll-begin (eat--t-cur-y cursor))))
@@ -2698,9 +2696,7 @@ N default to 1."
 
 N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
 1, erase beginning of line to cursor.  When N is 2, erase whole line."
-  (let* ((disp (eat--t-term-display eat--t-term))
-         (face (eat--t-term-face eat--t-term))
-         (cursor (eat--t-disp-cursor disp)))
+  (let ((face (eat--t-term-face eat--t-term)))
     (pcase n
       ((or 0 'nil (pred (< 2)))
        ;; Delete cursor position (inclusive) to end of line.
@@ -2709,11 +2705,13 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
        ;; erased area with that background.
        (when (eat--t-face-bg face)
          (save-excursion
-           (eat--t-repeated-insert
-            ?\s (1+ (- (eat--t-disp-width disp)
-                       (eat--t-cur-x cursor)))
-            (and (eat--t-face-bg face)
-                 (eat--t-face-face face))))))
+           (let* ((disp (eat--t-term-display eat--t-term))
+                  (cursor (eat--t-disp-cursor disp)))
+             (eat--t-repeated-insert
+              ?\s (1+ (- (eat--t-disp-width disp)
+                         (eat--t-cur-x cursor)))
+              (and (eat--t-face-bg face)
+                   (eat--t-face-face face)))))))
       (1
        ;; Delete beginning of line to cursor position (inclusive).
        (delete-region (car (eat--t-bol))
@@ -2723,9 +2721,11 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
                         (1+ (point))))
        ;; Fill the region with spaces, use SGR background attribute
        ;; if set.
-       (eat--t-repeated-insert ?\s (eat--t-cur-x cursor)
-                               (and (eat--t-face-bg face)
-                                    (eat--t-face-face face)))
+       (let ((cursor (eat--t-disp-cursor
+                      (eat--t-term-display eat--t-term))))
+         (eat--t-repeated-insert ?\s (eat--t-cur-x cursor)
+                                 (and (eat--t-face-bg face)
+                                      (eat--t-face-face face))))
        ;; We erased the character at the cursor position, so after
        ;; fill with spaces we are still off by one column; so move a
        ;; column backward.
@@ -2733,21 +2733,23 @@ N defaults to 0.  When N is 0, erase cursor to end of line.  When N is
       (2
        ;; Delete whole line.
        (delete-region (car (eat--t-bol)) (car (eat--t-eol)))
-       ;; Fill the region before cursor position with spaces, use SGR
-       ;; background attribute if set.
-       (eat--t-repeated-insert ?\s (1- (eat--t-cur-x cursor))
-                               (and (eat--t-face-bg face)
-                                    (eat--t-face-face face)))
-       ;; If the SGR background attribute is set, we need to fill the
-       ;; erased area including and after cursor position with that
-       ;; background.
-       (when (eat--t-face-bg face)
-         (save-excursion
-           (eat--t-repeated-insert
-            ?\s (1+ (- (eat--t-disp-width disp)
-                       (eat--t-cur-x cursor)))
-            (and (eat--t-face-bg face)
-                 (eat--t-face-face face)))))))))
+       (let* ((disp (eat--t-term-display eat--t-term))
+              (cursor (eat--t-disp-cursor disp)))
+         ;; Fill the region before cursor position with spaces, use
+         ;; SGR background attribute if set.
+         (eat--t-repeated-insert ?\s (1- (eat--t-cur-x cursor))
+                                 (and (eat--t-face-bg face)
+                                      (eat--t-face-face face)))
+         ;; If the SGR background attribute is set, we need to fill
+         ;; the erased area including and after cursor position with
+         ;; that background.
+         (when (eat--t-face-bg face)
+           (save-excursion
+             (eat--t-repeated-insert
+              ?\s (1+ (- (eat--t-disp-width disp)
+                         (eat--t-cur-x cursor)))
+              (and (eat--t-face-bg face)
+                   (eat--t-face-face face))))))))))
 
 (defun eat--t-erase-in-disp (&optional n)
   "Erase part of display.
@@ -2756,9 +2758,7 @@ N defaults to 0.  When N is 0, erase cursor to end of display.  When N
 is 1, erase beginning of display to cursor.  In both on the previous
 cases, don't move cursor.  When N is 2, erase display and reset cursor
 to (1, 1).  When N is 3, also erase the scrollback."
-  (let* ((disp (eat--t-term-display eat--t-term))
-         (face (eat--t-term-face eat--t-term))
-         (cursor (eat--t-disp-cursor disp)))
+  (let ((face (eat--t-term-face eat--t-term)))
     (pcase n
       ((or 0 'nil (pred (< 3)))
        ;; Delete from cursor position (inclusive) to end of terminal.
@@ -2769,7 +2769,9 @@ to (1, 1).  When N is 3, also erase the scrollback."
          ;; `save-excursion' probably uses marker to save point, which
          ;; doesn't work in this case.  So we the store the point as a
          ;; integer.
-         (let ((pos (point)))
+         (let* ((pos (point))
+                (disp (eat--t-term-display eat--t-term))
+                (cursor (eat--t-disp-cursor disp)))
            ;; Fill current line.
            (eat--t-repeated-insert ?\s (1+ (- (eat--t-disp-width disp)
                                               (eat--t-cur-x cursor)))
@@ -2783,10 +2785,12 @@ to (1, 1).  When N is 3, also erase the scrollback."
            ;; Restore position.
            (goto-char pos))))
       (1
-       (let ((y (eat--t-cur-y cursor))
-             (x (eat--t-cur-x cursor))
-             ;; Should we erase including the cursor position?
-             (incl-point (/= (point) (point-max))))
+       (let* ((disp (eat--t-term-display eat--t-term))
+              (cursor (eat--t-disp-cursor disp))
+              (y (eat--t-cur-y cursor))
+              (x (eat--t-cur-x cursor))
+              ;; Should we erase including the cursor position?
+              (incl-point (/= (point) (point-max))))
          ;; Delete the region to be erased.
          (delete-region (eat--t-disp-begin disp)
                         (if incl-point (1+ (point)) (point)))
@@ -2819,7 +2823,8 @@ to (1, 1).  When N is 3, also erase the scrollback."
          ;; `save-excursion' probably uses marker to save point, which
          ;; doesn't work in this case.  So we the store the point as a
          ;; integer.
-         (let ((pos (point)))
+         (let ((pos (point))
+               (disp (eat--t-term-display eat--t-term)))
            (dotimes (i (eat--t-disp-height disp))
              (unless (zerop i)
                (insert ?\n))
@@ -2951,28 +2956,30 @@ position."
 (defun eat--t-insert-char (n)
   "Insert N empty (space) characters, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (face (eat--t-term-face eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; Make sure N is positive.  If N is more than the number of
-         ;; available columns available, set N to the maximum possible
-         ;; value.
-         (n (min (- (eat--t-disp-width disp)
+         (cursor (eat--t-disp-cursor disp)))
+    ;; Make sure N is positive.  If N is more than the number of
+    ;; available columns available, set N to the maximum possible
+    ;; value.
+    (setq n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
-                 (max (or n 1) 1))))
+                 (max (or n 1) 1)))
     ;; Return if N is zero.
     (unless (zerop n)
       ;; If the position isn't safe, replace the multi-column
       ;; character with spaces to make it safe.
       (eat--t-make-pos-safe)
       (save-excursion
-        ;; Insert N spaces, with SGR background if that attribute is
-        ;; set.
-        (eat--t-repeated-insert ?\s n (and (eat--t-face-bg face)
-                                           (eat--t-face-face face)))
-        ;; Remove the characters that went beyond the edge of display.
+        (let ((face (eat--t-term-face eat--t-term)))
+          ;; Insert N spaces, with SGR background if that attribute is
+          ;; set.
+          (eat--t-repeated-insert
+           ?\s n (and (eat--t-face-bg face) (eat--t-face-face face))))
+        ;; Remove the characters that went beyond the edge of
+        ;; display.
         (eat--t-col-motion (- (eat--t-disp-width disp)
                               (+ (1- (eat--t-cur-x cursor)) n)))
-        ;; Make sure we delete any multi-column character completely.
+        ;; Make sure we delete any multi-column character
+        ;; completely.
         (eat--t-move-before-to-safe)
         (delete-region (point) (car (eat--t-eol)))))))
 
@@ -2980,13 +2987,13 @@ position."
   "Delete N characters, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; Make sure N is positive.  If N is more than the number of
-         ;; available columns available, set N to the maximum possible
-         ;; value.
-         (n (min (- (eat--t-disp-width disp)
+         (cursor (eat--t-disp-cursor disp)))
+    ;; Make sure N is positive.  If N is more than the number of
+    ;; available columns available, set N to the maximum possible
+    ;; value.
+    (setq n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
-                 (max (or n 1) 1))))
+                 (max (or n 1) 1)))
     ;; Return if N is zero.
     (unless (zerop n)
       ;; If the position isn't safe, replace the multi-column
@@ -3019,13 +3026,13 @@ position."
   "Make next N character cells empty, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
          (face (eat--t-term-face eat--t-term))
-         (cursor (eat--t-disp-cursor disp))
-         ;; Make sure N is positive.  If N is more than the number of
-         ;; available columns available, set N to the maximum possible
-         ;; value.
-         (n (min (- (eat--t-disp-width disp)
+         (cursor (eat--t-disp-cursor disp)))
+    ;; Make sure N is positive.  If N is more than the number of
+    ;; available columns available, set N to the maximum possible
+    ;; value.
+    (setq n (min (- (eat--t-disp-width disp)
                     (1- (eat--t-cur-x cursor)))
-                 (max (or n 1) 1))))
+                 (max (or n 1) 1)))
     ;; Return if N is zero.
     (unless (zerop n)
       ;; If the position isn't safe, replace the multi-column
@@ -3047,72 +3054,68 @@ position."
 (defun eat--t-insert-line (n)
   "Insert N empty lines, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
-         (scroll-end (eat--t-term-scroll-end eat--t-term))
-         ;; N should be positive and shouldn't exceed the number of
-         ;; lines below cursor position and inside current scroll
-         ;; region.
-         (n (min (- (1+ (- scroll-end scroll-begin))
+         (scroll-end (eat--t-term-scroll-end eat--t-term)))
+    ;; N should be positive and shouldn't exceed the number of lines
+    ;; below cursor position and inside current scroll region.
+    (setq n (min (- (1+ (- scroll-end scroll-begin))
                     (1- (eat--t-cur-y cursor)))
-                 (max (or n 1) 1))))
+                 (max (or n 1) 1)))
     ;; Make sure we are in the scroll region and N is positive, return
     ;; on failure.
     (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
                (not (zerop n)))
-      (goto-char
-       (prog1
-           (progn
-             ;; This function doesn't move the cursor, but pushes all
-             ;; the line below and including current line.  So to keep
-             ;; the cursor unmoved, go to the beginning of line and
-             ;; insert enough spaces to not move the cursor.
-             (eat--t-goto-bol)
-             (eat--t-repeated-insert ?\s (1- (eat--t-cur-x cursor))
-                                     (and (eat--t-face-bg face)
-                                          (eat--t-face-face face)))
-             (point))
-         ;; Insert N lines.
-         (if (not (eat--t-face-bg face))
-             (eat--t-repeated-insert ?\n n)
-           ;; SGR background attribute set, so fill the inserted lines
-           ;; with background.
-           (dotimes (i n)
-             ;; Fill a line.
-             (eat--t-repeated-insert
-              ?\s (if (not (zerop i))
-                      (eat--t-disp-width disp)
-                    ;; The first inserted line is already filled
-                    ;; partially, so calculate the number columns left
-                    ;; to fill.
-                    (1+ (- (eat--t-disp-width disp)
-                           (eat--t-cur-x cursor))))
-              (eat--t-face-face face))
-             ;; New line.
-             (insert ?\n)))
-         ;; Delete the lines that were just pushed beyond the end of
-         ;; scroll region.
-         (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin))
-                             (+ (- (eat--t-cur-y cursor)
-                                   (1- scroll-begin))
-                                n)))
-         (delete-region (point) (car (eat--t-eol n))))))))
+      ;; This function doesn't move the cursor, but pushes all the
+      ;; line below and including current line.  So to keep the cursor
+      ;; unmoved, go to the beginning of line and insert enough spaces
+      ;; to not move the cursor.
+      (eat--t-goto-bol)
+      (let ((face (eat--t-term-face eat--t-term)))
+        (eat--t-repeated-insert ?\s (1- (eat--t-cur-x cursor))
+                                (and (eat--t-face-bg face)
+                                     (eat--t-face-face face)))
+        (goto-char
+         (prog1 (point)
+           ;; Insert N lines.
+           (if (not (eat--t-face-bg face))
+               (eat--t-repeated-insert ?\n n)
+             ;; SGR background attribute set, so fill the inserted
+             ;; lines with background.
+             (dotimes (i n)
+               ;; Fill a line.
+               (eat--t-repeated-insert
+                ?\s (if (not (zerop i))
+                        (eat--t-disp-width disp)
+                      ;; The first inserted line is already filled
+                      ;; partially, so calculate the number columns
+                      ;; left to fill.
+                      (1+ (- (eat--t-disp-width disp)
+                             (eat--t-cur-x cursor))))
+                (eat--t-face-face face))
+               ;; New line.
+               (insert ?\n)))
+           ;; Delete the lines that were just pushed beyond the end of
+           ;; scroll region.
+           (eat--t-goto-eol (- (1+ (- scroll-end scroll-begin))
+                               (+ (- (eat--t-cur-y cursor)
+                                     (1- scroll-begin))
+                                  n)))
+           (delete-region (point) (car (eat--t-eol n)))))))))
 
 (defun eat--t-delete-line (n)
   "Delete N lines, preserving cursor."
   (let* ((disp (eat--t-term-display eat--t-term))
-         (face (eat--t-term-face eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (x (eat--t-cur-x cursor))
          (scroll-begin (eat--t-term-scroll-begin eat--t-term))
-         (scroll-end (eat--t-term-scroll-end eat--t-term))
-         ;; N should be positive and shouldn't exceed the number of
-         ;; lines below cursor position and inside current scroll
-         ;; region.
-         (n (min (- (1+ (- scroll-end scroll-begin))
+         (scroll-end (eat--t-term-scroll-end eat--t-term)))
+    ;; N should be positive and shouldn't exceed the number of
+    ;; lines below cursor position and inside current scroll
+    ;; region.
+    (setq n (min (- (1+ (- scroll-end scroll-begin))
                     (1- (eat--t-cur-y cursor)))
-                 (max (or n 1) 1))))
+                 (max (or n 1) 1)))
     ;; Make sure we are in the scroll region and N is positive, return
     ;; on failure.
     (when (and (<= scroll-begin (eat--t-cur-y cursor) scroll-end)
@@ -3123,27 +3126,28 @@ position."
         (let ((m (point)))
           (eat--t-goto-bol n)
           (delete-region m (point))))
-      ;; Keep the lines beyond end of scroll region unmoved.
-      (when (or (< scroll-end (eat--t-disp-height disp))
-                (eat--t-face-bg face))
-        (let* ((pos (point))
-               (move (- (1+ (- scroll-end scroll-begin))
-                        (- (+ (eat--t-cur-y cursor) n)
-                           (1- scroll-begin))))
-               (moved (eat--t-goto-eol move)))
-          (when (or (/= (point) (point-max))
-                    (eat--t-face-bg face))
-            ;; Move to the end of scroll region.
-            (eat--t-repeated-insert ?\n (- move moved))
-            ;; Insert enough new lines, fill them when SGR background
-            ;; attribute is set.
-            (if (not (eat--t-face-bg face))
-                (eat--t-repeated-insert ?\n n)
-              (dotimes (_ n)
-                (insert ?\n)
-                (eat--t-repeated-insert ?\s (eat--t-disp-width disp)
-                                        (eat--t-face-face face)))))
-          (goto-char pos)))
+      (let ((face (eat--t-term-face eat--t-term)))
+        ;; Keep the lines beyond end of scroll region unmoved.
+        (when (or (< scroll-end (eat--t-disp-height disp))
+                  (eat--t-face-bg face))
+          (let* ((pos (point))
+                 (move (- (1+ (- scroll-end scroll-begin))
+                          (- (+ (eat--t-cur-y cursor) n)
+                             (1- scroll-begin))))
+                 (moved (eat--t-goto-eol move)))
+            (when (or (/= (point) (point-max))
+                      (eat--t-face-bg face))
+              ;; Move to the end of scroll region.
+              (eat--t-repeated-insert ?\n (- move moved))
+              ;; Insert enough new lines, fill them when SGR
+              ;; background attribute is set.
+              (if (not (eat--t-face-bg face))
+                  (eat--t-repeated-insert ?\n n)
+                (dotimes (_ n)
+                  (insert ?\n)
+                  (eat--t-repeated-insert ?\s (eat--t-disp-width disp)
+                                          (eat--t-face-face face)))))
+            (goto-char pos))))
       ;; Go to column where cursor is to preserve cursor position, use
       ;; spaces if needed to reach the position.
       (eat--t-repeated-insert
@@ -3151,9 +3155,9 @@ position."
 
 (defun eat--t-repeat-last-char (&optional n)
   "Repeat last character N times."
+  ;; N must be at least one.
+  (setq n (max (or n 1) 1))
   (let* ((disp (eat--t-term-display eat--t-term))
-         ;; N must be at least one.
-         (n (max (or n 1) 1))
          (char
           ;; Get the character before cursor.
           (when (< (eat--t-disp-begin disp) (point))
@@ -3172,9 +3176,8 @@ position."
   "Change the scroll region from lines TOP to BOTTOM (inclusive).
 
 TOP defaults to 1 and BOTTOM defaults to the height of the display."
-  (let* ((disp (eat--t-term-display eat--t-term))
-         (top (or top 1))
-         (bottom (or bottom (eat--t-disp-height disp))))
+  (let ((disp (eat--t-term-display eat--t-term)))
+    (setq top (or top 1) bottom (or bottom (eat--t-disp-height disp)))
     ;; According to DEC's documentation (found somewhere on the
     ;; internet, but can't remember where), TOP and BOTTOM must be
     ;; within display, and BOTTOM must be below TOP.  Otherwise the
@@ -3466,16 +3469,16 @@ MODE should be one of nil and `x10', `normal', `button-event',
 
 PARAMS is the parameter list and FORMAT is the format of parameters in
 output."
-  (let ((params (or params '((0)))))
-    (pcase format
-      ('nil
-       (when (= (caar params) 0)
-         (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
-                  "\e[?1;2c")))
-      (?>
-       (when (= (caar params) 0)
-         (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
-                  "\e[>0;242;0c"))))))
+  (setq params (or params '((0))))
+  (pcase format
+    ('nil
+     (when (= (caar params) 0)
+       (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
+                "\e[?1;2c")))
+    (?>
+     (when (= (caar params) 0)
+       (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
+                "\e[>0;242;0c")))))
 
 (defun eat--t-report-foreground-color ()
   "Report the current default foreground color to the client."
@@ -4536,7 +4539,8 @@ client process may get confused."
            (when (symbolp char)
              ;; Convert `return' to C-m, etc.
              (let ((tmp (get char 'event-symbol-elements)))
-               (if tmp (setq char (car tmp)))
+               (when tmp
+                 (setq char (car tmp)))
                (and (symbolp char)
                     (setq tmp (get char 'ascii-character))
                     (setq char tmp))))
@@ -5241,9 +5245,11 @@ event."
   (interactive)
   ;; HACK: Quick hack to allow inputting `C-g'.  Any better way to do
   ;; this?
-  (eat-self-input 1 (let ((inhibit-quit t)
-                          (quit-flag nil))
-                      (read-event))))
+  (eat-self-input
+   1 (let ((inhibit-quit t)
+           ;; Don't trigger `quit' exiting this `let'.
+           (quit-flag nil))
+       (read-event))))
 
 (defun eat-yank (&optional arg)
   "Same as `yank', but for Eat.
@@ -6767,8 +6773,7 @@ FN is the original definition of `eat--eshell-cleanup', which see."
     (setq-local eat--trace-replay-marker (point-min-marker))
     (let ((ov (make-overlay (point-min) (point-min))))
       (overlay-put ov 'before-string
-                   (propertize " " 'display
-                               '(left-fringe right-triangle)))
+                   #(" " 0 1 (display (left-fringe right-triangle))))
       (setq-local eat--trace-replay-current-sexp-overlay ov))
     (goto-char (point-min))
     (let ((source (current-buffer))
