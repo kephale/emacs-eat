@@ -5366,24 +5366,24 @@ ARG is passed to `yank-pop', which see."
 (defun eat-semi-char-mode ()
   "Switch to semi-char mode."
   (interactive)
-  (if (not eat--terminal)
-      (error "Process not running")
-    (setq buffer-read-only nil)
-    (eat--char-mode -1)
-    (eat--semi-char-mode +1)
-    (eat--grab-mouse nil eat--mouse-grabbing-type)
-    (force-mode-line-update)))
+  (unless eat--terminal
+    (error "Process not running"))
+  (setq buffer-read-only nil)
+  (eat--char-mode -1)
+  (eat--semi-char-mode +1)
+  (eat--grab-mouse nil eat--mouse-grabbing-type)
+  (force-mode-line-update))
 
 (defun eat-char-mode ()
   "Switch to char mode."
   (interactive)
-  (if (not eat--terminal)
-      (error "Process not running")
-    (setq buffer-read-only nil)
-    (eat--semi-char-mode -1)
-    (eat--char-mode +1)
-    (eat--grab-mouse nil eat--mouse-grabbing-type)
-    (force-mode-line-update)))
+  (unless eat--terminal
+    (error "Process not running"))
+  (setq buffer-read-only nil)
+  (eat--semi-char-mode -1)
+  (eat--char-mode +1)
+  (eat--grab-mouse nil eat--mouse-grabbing-type)
+  (force-mode-line-update))
 
 (defvar eat--eshell-semi-char-mode)
 (defvar eat--eshell-char-mode)
