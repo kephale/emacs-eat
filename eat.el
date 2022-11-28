@@ -2409,131 +2409,137 @@ character or its the internal invisible spaces."
 The key is the output character from client, and value of the
 character to actually show.")
 
-(defun eat--t-write (str)
-  "Write STR on display."
-  (let ((face (eat--t-face-face (eat--t-term-face eat--t-term)))
-        ;; Alist of indices and width of multi-column characters.
-        (multi-col-char-indices nil)
-        (inserted-till 0))
-    ;; Copy STR and add face to it.
-    (setq str (propertize str 'face face))
-    ;; Convert STR to Unicode according to the current character
-    ;; set.
-    (pcase-exhaustive
-        (alist-get (car (eat--t-term-charset eat--t-term))
-                   (cdr (eat--t-term-charset eat--t-term)))
-      ;; For `us-ascii', the default, no conversion is
-      ;; necessary.
-      ('us-ascii
-       str)
-      ;; `dec-line-drawing' contains various characters useful
-      ;; for drawing line diagram, so it is a must.  This is
-      ;; also possible with `us-ascii', thanks to Unicode, but
-      ;; the character set `dec-line-drawing' is usually less
-      ;; expensive in terms of bytes needed to transfer than
-      ;; `us-ascii'.
-      ('dec-line-drawing
-       (dotimes (i (length str))
-         (let ((replacement
-                (gethash (aref str i) eat--t-dec-line-drawing-chars)))
-           (when replacement
-             (aset str i replacement))))))
+(defun eat--t-write (str &optional beg end)
+  "Write STR from BEG to END on display."
+  (setq beg (or beg 0))
+  (setq end (or end (length str)))
+  (let* ((disp (eat--t-term-display eat--t-term))
+         (cursor (eat--t-disp-cursor disp))
+         (scroll-end (eat--t-term-scroll-end eat--t-term))
+         (charset
+          (alist-get (car (eat--t-term-charset eat--t-term))
+                     (cdr (eat--t-term-charset eat--t-term))))
+         (face (eat--t-face-face (eat--t-term-face eat--t-term)))
+         ;; Alist of indices and width of multi-column characters.
+         (multi-col-char-indices nil)
+         (inserted-till beg))
+    (cl-assert charset)
     ;; Find all the multi-column wide characters in ST; hopefully it
     ;; won't slow down showing plain ASCII.
     (setq multi-col-char-indices
-          (cl-loop for i from 0 to (1- (length str))
+          (cl-loop for i from beg to (1- end)
                    when (/= (char-width (aref str i)) 1)
                    collect (cons i (char-width (aref str i)))))
+    ;; If the position isn't safe, replace the multi-column
+    ;; character with spaces to make it safe.
+    (eat--t-make-pos-safe)
     ;; TODO: Comment.
     ;; REVIEW: This probably needs to be updated.
-    (let* ((disp (eat--t-term-display eat--t-term))
-           (cursor (eat--t-disp-cursor disp))
-           (scroll-end (eat--t-term-scroll-end eat--t-term)))
-      ;; If the position isn't safe, replace the multi-column
-      ;; character with spaces to make it safe.
-      (eat--t-make-pos-safe)
-      (while (< inserted-till (length str))
-        ;; Insert STR, and record the width of STR inserted
-        ;; successfully.
-        (let ((ins-count
-               (named-let write
-                   ((max
-                     (min (- (eat--t-disp-width disp)
-                             (1- (eat--t-cur-x cursor)))
-                          (apply #'+ (- (length str) inserted-till)
-                                 (mapcar (lambda (p) (1- (cdr p)))
-                                         multi-col-char-indices))))
-                    (written 0))
-                 (let* ((next-multi-col (car multi-col-char-indices))
-                        (end (+ inserted-till max))
-                        (e (if next-multi-col
-                               ;; Exclude the multi-column character.
-                               (min (car next-multi-col) end)
-                             end))
-                        (wrote (- e inserted-till)))
-                   (cl-assert (>= wrote 0))
-                   (insert (substring str inserted-till e))
-                   (setq inserted-till e)
-                   (if (or (null next-multi-col)
-                           (< (- end e) (cdr next-multi-col)))
-                       ;; Either everything is done, or we reached
-                       ;; the limit.
-                       (+ written wrote)
-                     ;; There are many characters which are too narrow
-                     ;; for `char-width' to return 1.  XTerm, Kitty
-                     ;; and St seems to ignore them, so we too.
-                     (if (zerop (cdr next-multi-col))
-                         (cl-incf inserted-till)
-                       (insert
-                        ;; Make sure the multi-column character
-                        ;; occupies the same number of characters as
-                        ;; its width.
-                        (propertize
-                         (make-string (1- (cdr next-multi-col)) ?\s)
-                         'invisible t 'face face
-                         'eat--t-invisible-space t
-                         'eat--t-char-width (cdr next-multi-col))
-                        ;; Now insert the multi-column character.
-                        (propertize
-                         (substring str inserted-till
-                                    (cl-incf inserted-till))
-                         'face face
-                         'eat--t-char-width (cdr next-multi-col))))
-                     (setf multi-col-char-indices
-                           (cdr multi-col-char-indices))
-                     (write (- max wrote (cdr next-multi-col))
-                            (+ written wrote
-                               (cdr next-multi-col))))))))
-          (cl-incf (eat--t-cur-x cursor) ins-count)
-          (if (eat--t-term-ins-mode eat--t-term)
-              (delete-region
-               (save-excursion
-                 (eat--t-col-motion (- (eat--t-disp-width disp)
-                                       (1- (eat--t-cur-x cursor))))
-                 ;; Make sure the point is safe.
-                 (eat--t-move-before-to-safe)
-                 (point))
-               (car (eat--t-eol)))
-            (delete-region (point) (min (+ ins-count (point))
-                                        (car (eat--t-eol))))
-            ;; Replace any partially-overwritten character with
-            ;; spaces.
-            (eat--t-fix-partial-multi-col-char))
-          (when (> (eat--t-cur-x cursor) (eat--t-disp-width disp))
-            (if (not (eat--t-term-auto-margin eat--t-term))
-                (eat--t-cur-left 1)
-              (when (< inserted-till (length str))
-                (when (= (eat--t-cur-y cursor) scroll-end)
-                  (eat--t-scroll-up 1 'as-side-effect))
-                (if (= (eat--t-cur-y cursor) scroll-end)
-                    (eat--t-carriage-return)
-                  (if (= (point) (point-max))
-                      (insert #("\n" 0 1 (eat--t-wrap-line t)))
-                    (put-text-property (point) (1+ (point))
-                                       'eat--t-wrap-line t)
-                    (forward-char))
-                  (1value (setf (eat--t-cur-x cursor) 1))
-                  (cl-incf (eat--t-cur-y cursor)))))))))))
+    (while (< inserted-till end)
+      ;; Insert STR, and record the width of STR inserted
+      ;; successfully.
+      (let ((ins-count
+             (named-let write
+                 ((max (min (- (eat--t-disp-width disp)
+                               (1- (eat--t-cur-x cursor)))
+                            (+ (- end inserted-till)
+                               (cl-loop
+                                for p in multi-col-char-indices
+                                sum (1- (cdr p))))))
+                  (written 0))
+               (let* ((next-multi-col (car multi-col-char-indices))
+                      (end (+ inserted-till max))
+                      (e (if next-multi-col
+                             ;; Exclude the multi-column character.
+                             (min (car next-multi-col) end)
+                           end))
+                      (wrote (- e inserted-till)))
+                 (cl-assert (>= wrote 0))
+                 (let ((s (substring str inserted-till e)))
+                   ;; Convert STR to Unicode according to the
+                   ;; current character set.
+                   (pcase-exhaustive charset
+                     ;; For `us-ascii', the default, no conversion
+                     ;; is necessary.
+                     ('us-ascii)
+                     ;; `dec-line-drawing' contains various
+                     ;; characters useful for drawing line diagram,
+                     ;; so it is a must.  This is also possible
+                     ;; with `us-ascii', thanks to Unicode, but the
+                     ;; character set `dec-line-drawing' is usually
+                     ;; less expensive in terms of bytes needed to
+                     ;; transfer than `us-ascii'.
+                     ('dec-line-drawing
+                      (dotimes (i (length s))
+                        (when-let*
+                            ((r (gethash
+                                 (aref s i)
+                                 eat--t-dec-line-drawing-chars)))
+                          (aset s i r)))))
+                   ;; Add face.
+                   (put-text-property 0 (length s) 'face face s)
+                   (insert s))
+                 (setq inserted-till e)
+                 (if (or (null next-multi-col)
+                         (< (- end e) (cdr next-multi-col)))
+                     ;; Either everything is done, or we reached
+                     ;; the limit.
+                     (+ written wrote)
+                   ;; There are many characters which are too
+                   ;; narrow for `char-width' to return 1.  XTerm,
+                   ;; Kitty and St seems to ignore them, so we too.
+                   (if (zerop (cdr next-multi-col))
+                       (cl-incf inserted-till)
+                     (insert
+                      ;; Make sure the multi-column character
+                      ;; occupies the same number of characters as
+                      ;; its width.
+                      (propertize
+                       (make-string (1- (cdr next-multi-col)) ?\s)
+                       'invisible t 'face face
+                       'eat--t-invisible-space t
+                       'eat--t-char-width (cdr next-multi-col))
+                      ;; Now insert the multi-column character.
+                      (propertize
+                       (substring str inserted-till
+                                  (cl-incf inserted-till))
+                       'face face
+                       'eat--t-char-width (cdr next-multi-col))))
+                   (setf multi-col-char-indices
+                         (cdr multi-col-char-indices))
+                   (write (- max wrote (cdr next-multi-col))
+                          (+ written wrote
+                             (cdr next-multi-col))))))))
+        (cl-incf (eat--t-cur-x cursor) ins-count)
+        (if (eat--t-term-ins-mode eat--t-term)
+            (delete-region
+             (save-excursion
+               (eat--t-col-motion (- (eat--t-disp-width disp)
+                                     (1- (eat--t-cur-x cursor))))
+               ;; Make sure the point is safe.
+               (eat--t-move-before-to-safe)
+               (point))
+             (car (eat--t-eol)))
+          (delete-region (point) (min (+ ins-count (point))
+                                      (car (eat--t-eol))))
+          ;; Replace any partially-overwritten character with
+          ;; spaces.
+          (eat--t-fix-partial-multi-col-char))
+        (when (> (eat--t-cur-x cursor) (eat--t-disp-width disp))
+          (if (not (eat--t-term-auto-margin eat--t-term))
+              (eat--t-cur-left 1)
+            (when (< inserted-till end)
+              (when (= (eat--t-cur-y cursor) scroll-end)
+                (eat--t-scroll-up 1 'as-side-effect))
+              (if (= (eat--t-cur-y cursor) scroll-end)
+                  (eat--t-carriage-return)
+                (if (= (point) (point-max))
+                    (insert #("\n" 0 1 (eat--t-wrap-line t)))
+                  (put-text-property (point) (1+ (point))
+                                     'eat--t-wrap-line t)
+                  (forward-char))
+                (1value (setf (eat--t-cur-x cursor) 1))
+                (cl-incf (eat--t-cur-y cursor))))))))))
 
 (defun eat--t-horizontal-tab (&optional n)
   "Go to the Nth next tabulation stop.
@@ -3667,13 +3673,13 @@ DATA is the selection data encoded in base64."
                ;; The regex didn't match, so everything left to handle
                ;; is just plain text.
                (progn
-                 (eat--t-write (substring output index))
+                 (eat--t-write output index)
                  (setq index (length output)))
              (when (/= match index)
                ;; The regex matched, and the position is after the
                ;; current position.  Process the plain text between
                ;; them and advance to the control sequence.
-               (eat--t-write (substring output index match))
+               (eat--t-write output index match)
                (setq index match))
              ;; Dispatch control sequence.
              (cl-incf index)
