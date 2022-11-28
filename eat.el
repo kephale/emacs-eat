@@ -6129,17 +6129,16 @@ modify its argument to change the filter, the sentinel and invoke
                                       (expand-file-name command))
                                      args))))
               (apply make-process plist)
-            (plist-put plist :filter #'eat--eshell-filter)
-            (plist-put plist :sentinel #'eat--eshell-sentinel)
-            (plist-put
-             plist :command
-             `("/usr/bin/env" "sh" "-c"
-               ,(format "stty -nl echo rows %d columns %d \
+            (setf (plist-get plist :filter) #'eat--eshell-filter
+                  (plist-get plist :sentinel) #'eat--eshell-sentinel
+                  (plist-get plist :command)
+                  `("/usr/bin/env" "sh" "-c"
+                    ,(format "stty -nl echo rows %d columns %d \
 sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
-                        (window-text-height)
-                        (window-max-chars-per-line) null-device)
-               ".."
-               ,@(plist-get plist :command)))
+                             (window-text-height)
+                             (window-max-chars-per-line) null-device)
+                    ".."
+                    ,@(plist-get plist :command)))
             (let ((process (apply make-process plist)))
               (eat--eshell-setup-proc-and-term process)
               process)))))
