@@ -2296,6 +2296,7 @@ of range, place cursor at the edge of display."
   "Change character set to CHARSET.
 
 CHARSET should be one of `g0', `g1', `g2' and `g3'."
+  (cl-assert (memq charset '(g0 g1 g2 g3)))
   (setf (car (eat--t-term-charset eat--t-term)) charset))
 
 (defun eat--t-move-before-to-safe ()
