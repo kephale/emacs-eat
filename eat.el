@@ -4983,36 +4983,30 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (define-minor-mode eat-blink-mode
   "Toggle blinking of text with blink attribute."
   :lighter " Eat-Blink"
-  (cond
-   (eat-blink-mode
-    (setq eat-blink-mode nil)
-    (require 'face-remap)
-    (setq eat-blink-mode t)
-    (make-local-variable 'eat--slow-blink-state)
-    (make-local-variable 'eat--fast-blink-state)
-    (make-local-variable 'eat--slow-blink-remap)
-    (make-local-variable 'eat--fast-blink-remap)
-    (make-local-variable 'eat--slow-blink-timer)
-    (make-local-variable 'eat--fast-blink-timer)
-    (setq eat--slow-blink-state nil eat--fast-blink-state nil
-          eat--slow-blink-remap
-          (face-remap-add-relative 'eat-term-slow-blink '(:box nil))
-          eat--fast-blink-remap
-          (face-remap-add-relative 'eat-term-fast-blink '(:box nil)))
-    (add-hook 'pre-command-hook #'eat--blink-stop-timers nil t)
-    (add-hook 'post-command-hook #'eat--blink-start-timers nil t))
-   (t
-    (eat--blink-stop-timers)
-    (face-remap-remove-relative eat--slow-blink-remap)
-    (face-remap-remove-relative eat--fast-blink-remap)
-    (remove-hook 'pre-command-hook #'eat--blink-stop-timers t)
-    (remove-hook 'post-command-hook #'eat--blink-start-timers t)
-    (kill-local-variable 'eat--slow-blink-state)
-    (kill-local-variable 'eat--fast-blink-state)
-    (kill-local-variable 'eat--slow-blink-remap)
-    (kill-local-variable 'eat--fast-blink-remap)
-    (kill-local-variable 'eat--slow-blink-timer)
-    (kill-local-variable 'eat--fast-blink-timer))))
+  (let ((locals '( eat--slow-blink-state eat--fast-blink-state
+                   eat--slow-blink-remap eat--fast-blink-remap
+                   eat--slow-blink-timer eat--fast-blink-timer)))
+    (cond
+     (eat-blink-mode
+      (setq eat-blink-mode nil)
+      (require 'face-remap)
+      (setq eat-blink-mode t)
+      (mapc #'make-local-variable locals)
+      (setq eat--slow-blink-state nil eat--fast-blink-state nil
+            eat--slow-blink-remap
+            (face-remap-add-relative 'eat-term-slow-blink '(:box nil))
+            eat--fast-blink-remap
+            (face-remap-add-relative 'eat-term-fast-blink
+                                     '(:box nil)))
+      (add-hook 'pre-command-hook #'eat--blink-stop-timers nil t)
+      (add-hook 'post-command-hook #'eat--blink-start-timers nil t))
+     (t
+      (eat--blink-stop-timers)
+      (face-remap-remove-relative eat--slow-blink-remap)
+      (face-remap-remove-relative eat--fast-blink-remap)
+      (remove-hook 'pre-command-hook #'eat--blink-stop-timers t)
+      (remove-hook 'post-command-hook #'eat--blink-start-timers t)
+      (mapc #'kill-local-variable locals)))))
 
 
 ;;;; Buffer-local Cursor Blinking.
@@ -5059,23 +5053,24 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (define-minor-mode eat--cursor-blink-mode
   "Toggle blinking of cursor."
   :interactive nil
-  (cond
-   (eat--cursor-blink-mode
-    (make-local-variable 'eat--cursor-blink-state)
-    (make-local-variable 'eat--cursor-blink-timer)
-    (setq eat--cursor-blink-state nil eat--cursor-blink-timer nil)
-    (add-hook 'pre-command-hook #'eat--cursor-blink-stop-timers nil t)
-    (add-hook 'post-command-hook #'eat--cursor-blink-start-timers
-              nil t)
-    (when (current-idle-time)
-      (eat--cursor-blink-start-timers)))
-   (t
-    (eat--cursor-blink-stop-timers)
-    (remove-hook 'pre-command-hook #'eat--cursor-blink-stop-timers t)
-    (remove-hook 'post-command-hook #'eat--cursor-blink-start-timers
-                 t)
-    (kill-local-variable 'eat--cursor-blink-state)
-    (kill-local-variable 'eat--cursor-blink-timer))))
+  (let ((locals '(eat--cursor-blink-state eat--cursor-blink-timer)))
+    (cond
+     (eat--cursor-blink-mode
+      (mapc #'make-local-variable locals)
+      (setq eat--cursor-blink-state nil eat--cursor-blink-timer nil)
+      (add-hook 'pre-command-hook #'eat--cursor-blink-stop-timers nil
+                t)
+      (add-hook 'post-command-hook #'eat--cursor-blink-start-timers
+                nil t)
+      (when (current-idle-time)
+        (eat--cursor-blink-start-timers)))
+     (t
+      (eat--cursor-blink-stop-timers)
+      (remove-hook 'pre-command-hook #'eat--cursor-blink-stop-timers
+                   t)
+      (remove-hook 'post-command-hook #'eat--cursor-blink-start-timers
+                   t)
+      (mapc #'kill-local-variable locals)))))
 
 
 ;;;; User Interface.
@@ -5494,21 +5489,21 @@ END if it's safe to do so."
 (define-derived-mode eat-mode fundamental-mode "Eat"
   "Major mode for Eat."
   :group 'eat-ui
-  (make-local-variable 'buffer-read-only)
-  (make-local-variable 'buffer-undo-list)
-  (make-local-variable 'filter-buffer-substring-function)
-  (make-local-variable 'mode-line-process)
-  (make-local-variable 'mode-line-buffer-identification)
-  (make-local-variable 'glyphless-char-display)
-  (make-local-variable 'cursor-type)
-  (make-local-variable 'track-mouse)
-  (make-local-variable 'eat--terminal)
-  (make-local-variable 'eat--process)
-  (make-local-variable 'eat--synchronize-scroll-function)
-  (make-local-variable 'eat--mouse-grabbing-type)
-  (make-local-variable 'eat--pending-output-chunks)
-  (make-local-variable 'eat--output-queue-first-chunk-time)
-  (make-local-variable 'eat--process-output-queue-timer)
+  (mapc #'make-local-variable '(buffer-read-only
+                                buffer-undo-list
+                                filter-buffer-substring-function
+                                mode-line-process
+                                mode-line-buffer-identification
+                                glyphless-char-display
+                                cursor-type
+                                track-mouse
+                                eat--terminal
+                                eat--process
+                                eat--synchronize-scroll-function
+                                eat--mouse-grabbing-type
+                                eat--pending-output-chunks
+                                eat--output-queue-first-chunk-time
+                                eat--process-output-queue-timer))
   ;; This is intended; input methods don't work on read-only buffers.
   (setq buffer-read-only nil buffer-undo-list t
         eat--synchronize-scroll-function #'eat--synchronize-scroll
@@ -6168,42 +6163,33 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
   "Toggle Eat terminal emulation is Eshell."
   :interactive nil
   :keymap eat-eshell-emacs-mode-map
-  (cond
-   (eat--eshell-local-mode
-    (make-local-variable 'cursor-type)
-    (make-local-variable 'glyphless-char-display)
-    (make-local-variable 'track-mouse)
-    (make-local-variable 'filter-buffer-substring-function)
-    (make-local-variable 'eat--terminal)
-    (make-local-variable 'eat--process)
-    (make-local-variable 'eat--synchronize-scroll-function)
-    (make-local-variable 'eat--mouse-grabbing-type)
-    (make-local-variable 'eat--pending-output-chunks)
-    (make-local-variable 'eat--output-queue-first-chunk-time)
-    (make-local-variable 'eat--process-output-queue-timer)
-    (setq eat--synchronize-scroll-function
-          #'eat--eshell-synchronize-scroll
-          filter-buffer-substring-function
-          #'eat--filter-buffer-substring)
-    ;; Make sure glyphless character don't display a huge box glyph,
-    ;; that would break the display.
-    (eat--setup-glyphless-chars)
-    (when eat-enable-blinking-text
-      (eat-blink-mode +1)))
-   (t
-    (when eat-enable-blinking-text
-      (eat-blink-mode -1))
-    (kill-local-variable 'cursor-type)
-    (kill-local-variable 'glyphless-char-display)
-    (kill-local-variable 'track-mouse)
-    (make-local-variable 'filter-buffer-substring-function)
-    (kill-local-variable 'eat--terminal)
-    (kill-local-variable 'eat--process)
-    (kill-local-variable 'eat--synchronize-scroll-function)
-    (kill-local-variable 'eat--mouse-grabbing-type)
-    (kill-local-variable 'eat--pending-output-chunks)
-    (kill-local-variable 'eat--output-queue-first-chunk-time)
-    (kill-local-variable 'eat--process-output-queue-timer))))
+  (let ((locals '(cursor-type
+                  glyphless-char-display
+                  track-mouse
+                  filter-buffer-substring-function
+                  eat--terminal
+                  eat--process
+                  eat--synchronize-scroll-function
+                  eat--mouse-grabbing-type
+                  eat--pending-output-chunks
+                  eat--output-queue-first-chunk-time
+                  eat--process-output-queue-timer)))
+    (cond
+     (eat--eshell-local-mode
+      (mapc #'make-local-variable locals)
+      (setq eat--synchronize-scroll-function
+            #'eat--eshell-synchronize-scroll
+            filter-buffer-substring-function
+            #'eat--filter-buffer-substring)
+      ;; Make sure glyphless character don't display a huge box glyph,
+      ;; that would break the display.
+      (eat--setup-glyphless-chars)
+      (when eat-enable-blinking-text
+        (eat-blink-mode +1)))
+     (t
+      (when eat-enable-blinking-text
+        (eat-blink-mode -1))
+      (mapc #'kill-local-variable locals)))))
 
 (declare-function eshell-gather-process-output "esh-proc"
                   (command args))
@@ -6805,12 +6791,12 @@ N defaults to 1.  Interactively, N is the prefix argument."
 (define-derived-mode eat-trace-replay-mode special-mode
   "Eat-Trace-Replay"
   "Major mode for replaying terminal according to trace output."
-  (make-local-variable 'eat--terminal)
-  (make-local-variable 'eat--trace-replay-source-buffer)
-  (make-local-variable 'eat--trace-replay-recording-start-time)
-  (make-local-variable 'eat--trace-replay-progress)
-  (make-local-variable 'eat--trace-replay-frame-count)
-  (make-local-variable 'eat--trace-replay-progress-frame)
+  (mapc #'make-local-variable '(eat--terminal
+                                eat--trace-replay-source-buffer
+                                eat--trace-replay-recording-start-time
+                                eat--trace-replay-progress
+                                eat--trace-replay-frame-count
+                                eat--trace-replay-progress-frame))
   (setq-local
    mode-line-process
    '("[" (:eval (number-to-string eat--trace-replay-progress-frame))
