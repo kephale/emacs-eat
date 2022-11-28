@@ -4557,7 +4557,7 @@ client process may get confused."
                  (let ((ch (pcase (event-convert-list
                                    (append (remq 'meta mods)
                                            (list base)))
-                             (?\C-\  ?\C-@)
+                             (?\C-\s ?\C-@)
                              (?\C-/ ?\C-?)
                              (?\C-- ?\C-_)
                              (c c))))
@@ -4789,7 +4789,7 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
                         M-S-deletechar C-M-S-deletechar))
           (bind `[,key]))
         ;; Bind these non-encodable keys.  They are translated.
-        (dolist (key '(?\C-- ?\C-? ?\C-\ ))
+        (dolist (key '(?\C-- ?\C-? ?\C-\s))
           (bind `[,key]))
         ;; Bind M-<ASCII> keys.
         (unless (member `[,meta-prefix-char] exceptions)
