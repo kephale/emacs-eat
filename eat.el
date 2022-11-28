@@ -2438,28 +2438,12 @@ character to actually show.")
                 (gethash (aref str i) eat--t-dec-line-drawing-chars)))
            (when replacement
              (aset str i replacement))))))
-    ;; Find all the multi-column wide characters in STR, using a
-    ;; binary search like algorithm; hopefully it won't slow down
-    ;; showing ASCII.
-    (named-let find ((string str)
-                     (beg 0)
-                     (end (length str)))
-      ;; NOTE: `string-width' doesn't work correctly given a range of
-      ;; characters in a string.  This workarounds the bug partially.
-      ;; FIXME: This sometimes doesn't work.  To reproduce, do C-h h
-      ;; in emacs -nw in Eat.
-      (unless (= (- end beg) (string-width string))
-        (if (= (- end beg) 1)
-            ;; Record the character width here.  We only use
-            ;; `string-width', (= `string-width' `char-width') isn't
-            ;; always t.
-            (push (cons beg (string-width string))
-                  multi-col-char-indices)
-          (let ((mid (/ (+ beg end) 2)))
-            ;; Processing the latter half first in important,
-            ;; otherwise the order of indices will be reversed.
-            (find (substring str mid end) mid end)
-            (find (substring str beg mid) beg mid)))))
+    ;; Find all the multi-column wide characters in ST; hopefully it
+    ;; won't slow down showing plain ASCII.
+    (setq multi-col-char-indices
+          (cl-loop for i from 0 to (1- (length str))
+                   when (/= (char-width (aref str i)) 1)
+                   collect (cons i (char-width (aref str i)))))
     ;; TODO: Comment.
     ;; REVIEW: This probably needs to be updated.
     (let* ((disp (eat--t-term-display eat--t-term))
@@ -2473,9 +2457,12 @@ character to actually show.")
         ;; successfully.
         (let ((ins-count
                (named-let write
-                   ((max (min (- (eat--t-disp-width disp)
-                                 (1- (eat--t-cur-x cursor)))
-                              (string-width str inserted-till)))
+                   ((max
+                     (min (- (eat--t-disp-width disp)
+                             (1- (eat--t-cur-x cursor)))
+                          (apply #'+ (- (length str) inserted-till)
+                                 (mapcar (lambda (p) (1- (cdr p)))
+                                         multi-col-char-indices))))
                     (written 0))
                  (let* ((next-multi-col (car multi-col-char-indices))
                         (end (+ inserted-till max))
@@ -2484,9 +2471,7 @@ character to actually show.")
                                (min (car next-multi-col) end)
                              end))
                         (wrote (- e inserted-till)))
-                   (cl-assert
-                    (= (string-width str inserted-till e)
-                       (- e inserted-till)))
+                   (cl-assert (>= wrote 0))
                    (insert (substring str inserted-till e))
                    (setq inserted-till e)
                    (if (or (null next-multi-col)
@@ -2495,7 +2480,7 @@ character to actually show.")
                        ;; the limit.
                        (+ written wrote)
                      ;; There are many characters which are too narrow
-                     ;; for `string-width' to return 1.  XTerm, Kitty
+                     ;; for `char-width' to return 1.  XTerm, Kitty
                      ;; and St seems to ignore them, so we too.
                      (if (zerop (cdr next-multi-col))
                          (cl-incf inserted-till)
