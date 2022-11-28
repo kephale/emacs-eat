@@ -1988,33 +1988,31 @@ Don't `set' it, bind it to a value with `let'.")
   "Reset terminal."
   (let ((disp (eat--t-term-display eat--t-term)))
     ;; Reset most of the things to their respective default values.
-    (setf (eat--t-term-parser-state eat--t-term) nil)
-    (setf (eat--t-disp-begin disp) (point-min-marker))
-    (setf (eat--t-disp-old-begin disp) (point-min-marker))
-    (setf (eat--t-disp-cursor disp)
-          (eat--t-make-cur :position (point-min-marker)))
-    (setf (eat--t-disp-saved-cursor disp) (eat--t-make-cur))
-    (setf (eat--t-term-scroll-begin eat--t-term) 1)
-    (setf (eat--t-term-scroll-end eat--t-term)
-          (eat--t-disp-height disp))
-    (setf (eat--t-term-main-display eat--t-term) nil)
-    (setf (eat--t-term-face eat--t-term) (eat--t-make-face))
-    (setf (eat--t-term-auto-margin eat--t-term) t)
-    (setf (eat--t-term-ins-mode eat--t-term) nil)
-    (setf (eat--t-term-charset eat--t-term)
+    (setf (eat--t-term-parser-state eat--t-term) nil
+          (eat--t-disp-begin disp) (point-min-marker)
+          (eat--t-disp-old-begin disp) (point-min-marker)
+          (eat--t-disp-cursor disp) (eat--t-make-cur :position (point-min-marker))
+          (eat--t-disp-saved-cursor disp) (eat--t-make-cur)
+          (eat--t-term-scroll-begin eat--t-term) 1
+          (eat--t-term-scroll-end eat--t-term) (eat--t-disp-height disp)
+          (eat--t-term-main-display eat--t-term) nil
+          (eat--t-term-face eat--t-term) (eat--t-make-face)
+          (eat--t-term-auto-margin eat--t-term) t
+          (eat--t-term-ins-mode eat--t-term) nil
+          (eat--t-term-charset eat--t-term)
           '(g0 (g0 . us-ascii)
                (g1 . dec-line-drawing)
                (g2 . dec-line-drawing)
-               (g3 . dec-line-drawing)))
-    (setf (eat--t-term-saved-face eat--t-term) (eat--t-make-face))
-    (setf (eat--t-term-bracketed-yank eat--t-term) nil)
-    (setf (eat--t-term-cur-state eat--t-term) :default)
-    (setf (eat--t-term-cur-blinking-p eat--t-term) nil)
-    (setf (eat--t-term-title eat--t-term) "")
-    (setf (eat--t-term-keypad-mode eat--t-term) nil)
-    (setf (eat--t-term-mouse-mode eat--t-term) nil)
-    (setf (eat--t-term-mouse-encoding eat--t-term) nil)
-    (setf (eat--t-term-focus-event-mode eat--t-term) nil)
+               (g3 . dec-line-drawing))
+          (eat--t-term-saved-face eat--t-term) (eat--t-make-face)
+          (eat--t-term-bracketed-yank eat--t-term) nil
+          (eat--t-term-cur-state eat--t-term) :default
+          (eat--t-term-cur-blinking-p eat--t-term) nil
+          (eat--t-term-title eat--t-term) ""
+          (eat--t-term-keypad-mode eat--t-term) nil
+          (eat--t-term-mouse-mode eat--t-term) nil
+          (eat--t-term-mouse-encoding eat--t-term) nil
+          (eat--t-term-focus-event-mode eat--t-term) nil)
     ;; Clear everything.
     (delete-region (point-min) (point-max))
     ;; Inform the UI about our new state.
@@ -2257,8 +2255,8 @@ of range, place cursor at the edge of display."
       (let* ((disp (eat--t-term-display eat--t-term))
              (cursor (eat--t-disp-cursor disp)))
         (goto-char (eat--t-disp-begin disp))
-        (1value (setf (eat--t-cur-y cursor) 1))
-        (1value (setf (eat--t-cur-x cursor) 1)))
+        (1value (setf (eat--t-cur-y cursor) 1
+                      (eat--t-cur-x cursor) 1)))
     ;; Move to column one, go to Yth line and move to Xth column.
     ;; REVIEW: We move relative to cursor position, which faster for
     ;; positions near the point (usually the case), but slower for
@@ -2411,8 +2409,7 @@ character to actually show.")
 
 (defun eat--t-write (str &optional beg end)
   "Write STR from BEG to END on display."
-  (setq beg (or beg 0))
-  (setq end (or end (length str)))
+  (setq beg (or beg 0) end (or end (length str)))
   (let* ((disp (eat--t-term-display eat--t-term))
          (cursor (eat--t-disp-cursor disp))
          (scroll-end (eat--t-term-scroll-end eat--t-term))
@@ -2669,17 +2666,18 @@ N default to 1."
   (let ((disp (eat--t-term-display eat--t-term))
         (saved-face (eat--t-copy-face
                      (eat--t-term-face eat--t-term))))
-    ;; Save cursor position.
-    (setf (eat--t-disp-saved-cursor disp)
-          (eat--t-copy-cur (eat--t-disp-cursor disp)))
-    ;; Save SGR attributes.
-    (setf (eat--t-term-saved-face eat--t-term) saved-face)
-    ;; We use side-effects, so make sure the saved face doesn't share
-    ;; structure with the current face.
-    (setf (eat--t-face-face saved-face)
-          (copy-tree (eat--t-face-face saved-face)))
-    (setf (eat--t-face-underline-color saved-face)
-          (copy-tree (eat--t-face-underline-color saved-face)))))
+    (setf
+     ;; Save cursor position.
+     (eat--t-disp-saved-cursor disp)
+     (eat--t-copy-cur (eat--t-disp-cursor disp))
+     ;; Save SGR attributes.
+     (eat--t-term-saved-face eat--t-term) saved-face
+     ;; We use side-effects, so make sure the saved face doesn't share
+     ;; structure with the current face.
+     (eat--t-face-face saved-face)
+     (copy-tree (eat--t-face-face saved-face))
+     (eat--t-face-underline-color saved-face)
+     (copy-tree (eat--t-face-underline-color saved-face)))))
 
 (defun eat--t-restore-cur ()
   "Restore previously save cursor position."
@@ -2689,8 +2687,8 @@ N default to 1."
     (eat--t-goto (eat--t-cur-y saved) (eat--t-cur-x saved))
     ;; Restore SGR attributes.
     (setf (eat--t-term-face eat--t-term)
-          (copy-tree (eat--t-term-saved-face eat--t-term)))
-    (setf (eat--t-face-underline-color (eat--t-term-face eat--t-term))
+          (copy-tree (eat--t-term-saved-face eat--t-term))
+          (eat--t-face-underline-color (eat--t-term-face eat--t-term))
           (copy-tree (eat--t-face-underline-color
                       (eat--t-term-face eat--t-term))))))
 
@@ -2897,16 +2895,16 @@ STATE one of the `:default', `:invisible', `:very-visible'."
       (let ((main-disp (eat--t-copy-disp
                         (eat--t-term-display eat--t-term))))
         (setf (eat--t-disp-begin main-disp)
-              (- (eat--t-disp-begin main-disp) (point-min)))
-        (setf (eat--t-disp-old-begin main-disp)
-              (- (eat--t-disp-old-begin main-disp) (point-min)))
-        (setf (eat--t-disp-cursor main-disp)
-              (eat--t-copy-cur (eat--t-disp-cursor main-disp)))
-        (setf (eat--t-disp-saved-cursor main-disp)
-              (eat--t-copy-cur (eat--t-disp-saved-cursor main-disp)))
-        (setf (eat--t-cur-position (eat--t-disp-cursor main-disp))
-              (- (point) (point-min)))
-        (setf (eat--t-term-main-display eat--t-term)
+              (- (eat--t-disp-begin main-disp) (point-min))
+              (eat--t-disp-old-begin main-disp)
+              (- (eat--t-disp-old-begin main-disp) (point-min))
+              (eat--t-disp-cursor main-disp)
+              (eat--t-copy-cur (eat--t-disp-cursor main-disp))
+              (eat--t-disp-saved-cursor main-disp)
+              (eat--t-copy-cur (eat--t-disp-saved-cursor main-disp))
+              (eat--t-cur-position (eat--t-disp-cursor main-disp))
+              (- (point) (point-min))
+              (eat--t-term-main-display eat--t-term)
               (cons main-disp (buffer-string)))
         ;; Delete everything, and move to the beginning of terminal.
         (delete-region (point-min) (point-max))
@@ -2934,18 +2932,18 @@ position."
       (delete-region (point-min) (point-max))
       ;; Restore the main display.
       (insert (cdr main-disp))
-      (setf (eat--t-disp-begin (car main-disp))
-            (copy-marker (+ (point-min)
-                            (eat--t-disp-begin (car main-disp)))))
-      (setf (eat--t-disp-old-begin (car main-disp))
-            (copy-marker (+ (point-min)
-                            (eat--t-disp-old-begin (car main-disp)))))
       (setf (eat--t-cur-position (eat--t-disp-cursor (car main-disp)))
             (copy-marker (+ (point-min)
                             (eat--t-cur-position
-                             (eat--t-disp-cursor (car main-disp))))))
-      (setf (eat--t-term-display eat--t-term) (car main-disp))
-      (setf (eat--t-term-main-display eat--t-term) nil)
+                             (eat--t-disp-cursor (car main-disp)))))
+            (eat--t-disp-old-begin (car main-disp))
+            (copy-marker (+ (point-min)
+                            (eat--t-disp-old-begin (car main-disp))))
+            (eat--t-disp-begin (car main-disp))
+            (copy-marker (+ (point-min)
+                            (eat--t-disp-begin (car main-disp))))
+            (eat--t-term-display eat--t-term) (car main-disp)
+            (eat--t-term-main-display eat--t-term) nil)
       (goto-char (eat--t-cur-position
                   (eat--t-disp-cursor
                    (eat--t-term-display eat--t-term))))
@@ -3186,8 +3184,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
     ;; within display, and BOTTOM must be below TOP.  Otherwise the
     ;; control function is a nop.
     (when (< 0 top bottom (1+ (eat--t-disp-height disp)))
-      (setf (eat--t-term-scroll-begin eat--t-term) top)
-      (setf (eat--t-term-scroll-end eat--t-term) bottom)
+      (setf (eat--t-term-scroll-begin eat--t-term) top
+            (eat--t-term-scroll-end eat--t-term) bottom)
       (eat--t-goto 1 1))))
 
 (defun eat--t-insert-mode ()
@@ -3205,17 +3203,17 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
     (while params
       (pcase (pop params)
         (`(,(or 0 'nil))
-         (1value (setf (eat--t-face-fg face) nil))
-         (1value (setf (eat--t-face-bg face) nil))
-         (1value (setf (eat--t-face-intensity face) nil))
-         (1value (setf (eat--t-face-italic face) nil))
-         (1value (setf (eat--t-face-underline face) nil))
-         (1value (setf (eat--t-face-underline-color face) nil))
-         (1value (setf (eat--t-face-crossed face) nil))
-         (1value (setf (eat--t-face-conceal face) nil))
-         (1value (setf (eat--t-face-inverse face) nil))
-         (1value (setf (eat--t-face-blink face) nil))
-         (1value (setf (eat--t-face-font face) 'eat-term-font-0)))
+         (1value (setf (eat--t-face-fg face) nil
+                       (eat--t-face-bg face) nil
+                       (eat--t-face-intensity face) nil
+                       (eat--t-face-italic face) nil
+                       (eat--t-face-underline face) nil
+                       (eat--t-face-underline-color face) nil
+                       (eat--t-face-crossed face) nil
+                       (eat--t-face-conceal face) nil
+                       (eat--t-face-inverse face) nil
+                       (eat--t-face-blink face) nil
+                       (eat--t-face-font face) 'eat-term-font-0)))
         ('(1)
          (1value (setf (eat--t-face-intensity face) 'eat-term-bold)))
         ('(2)
@@ -3551,8 +3549,7 @@ DATA is the selection data encoded in base64."
          ;; No string to send, so send an empty string and an empty
          ;; target string meaning that we don't have any answer.
          (unless str
-           (setq str "")
-           (setq source ""))
+           (setq str "" source ""))
          (format "\e]52;%s;%s\e\\" source
                  (base64-encode-string str))))
     ;; The client is requesting to set clipboard content, let's try to
@@ -3813,21 +3810,18 @@ DATA is the selection data encoded in base64."
                                 string-end)
                             str)
                        (setq str (substring
-                                  str 0 (match-beginning 0)))
-                       (setq intermediate-bytes
+                                  str 0 (match-beginning 0))
+                             intermediate-bytes
                              (match-string 0 str))))
                    (when (and (not (string-empty-p str))
                               (= (aref str 0) ??))
-                     (setq format ??)
-                     (setq str (substring str 1)))
+                     (setq format ?? str (substring str 1)))
                    (when (and (not (string-empty-p str))
                               (= (aref str 0) ?>))
-                     (setq format ?>)
-                     (setq str (substring str 1)))
+                     (setq format ?> str (substring str 1)))
                    (when (and (not (string-empty-p str))
                               (= (aref str 0) ?=))
-                     (setq format ?=)
-                     (setq str (substring str 1)))
+                     (setq format ?= str (substring str 1)))
                    (setq index (match-end 0))
                    (list
                     (concat intermediate-bytes
@@ -4055,10 +4049,10 @@ DATA is the selection data encoded in base64."
                (>= width 1)
                (>= height 1))
       ;; Update state.
-      (setf (eat--t-disp-width disp) width)
-      (setf (eat--t-disp-height disp) height)
-      (setf (eat--t-term-scroll-begin eat--t-term) 1)
-      (setf (eat--t-term-scroll-end eat--t-term)
+      (setf (eat--t-disp-width disp) width
+            (eat--t-disp-height disp) height
+            (eat--t-term-scroll-begin eat--t-term) 1
+            (eat--t-term-scroll-end eat--t-term)
             (eat--t-disp-height disp))
       (set-marker (eat--t-cur-position cursor) (point))
       (if (eat--t-term-main-display eat--t-term)
@@ -4951,8 +4945,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   (setq eat--slow-blink-remap
         (face-remap-add-relative
          'eat-slow-blink
-         `(:box nil :inverse-video ,(not eat--slow-blink-state))))
-  (setq eat--slow-blink-state (not eat--slow-blink-state)))
+         `(:box nil :inverse-video ,(not eat--slow-blink-state)))
+        eat--slow-blink-state (not eat--slow-blink-state)))
 
 (defun eat--flip-fast-blink-state ()
   "Flip the state of rapidly blinking text."
@@ -4963,8 +4957,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   (setq eat--fast-blink-remap
         (face-remap-add-relative
          'eat-fast-blink
-         `(:box nil :inverse-video ,(not eat--fast-blink-state))))
-  (setq eat--fast-blink-state (not eat--fast-blink-state)))
+         `(:box nil :inverse-video ,(not eat--fast-blink-state)))
+        eat--fast-blink-state (not eat--fast-blink-state)))
 
 (defun eat--blink-stop-timers ()
   "Start blinking timers."
@@ -4980,8 +4974,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   (eat--blink-stop-timers)
   (setq eat--slow-blink-timer
         (run-with-timer t (/ (float eat-slow-blink-frequency))
-                        #'eat--flip-slow-blink-state))
-  (setq eat--fast-blink-timer
+                        #'eat--flip-slow-blink-state)
+        eat--fast-blink-timer
         (run-with-timer t (/ (float eat-fast-blink-frequency))
                         #'eat--flip-fast-blink-state)))
 
@@ -5001,11 +4995,10 @@ return \"eat-color\", otherwise return \"eat-mono\"."
     (make-local-variable 'eat--fast-blink-remap)
     (make-local-variable 'eat--slow-blink-timer)
     (make-local-variable 'eat--fast-blink-timer)
-    (setq eat--slow-blink-state nil)
-    (setq eat--fast-blink-state nil)
-    (setq eat--slow-blink-remap
-          (face-remap-add-relative 'eat-term-slow-blink '(:box nil)))
-    (setq eat--fast-blink-remap
+    (setq eat--slow-blink-state nil eat--fast-blink-state nil
+          eat--slow-blink-remap
+          (face-remap-add-relative 'eat-term-slow-blink '(:box nil))
+          eat--fast-blink-remap
           (face-remap-add-relative 'eat-term-fast-blink '(:box nil)))
     (add-hook 'pre-command-hook #'eat--blink-stop-timers nil t)
     (add-hook 'post-command-hook #'eat--blink-start-timers nil t))
@@ -5071,8 +5064,7 @@ return \"eat-color\", otherwise return \"eat-mono\"."
    (eat--cursor-blink-mode
     (make-local-variable 'eat--cursor-blink-state)
     (make-local-variable 'eat--cursor-blink-timer)
-    (setq eat--cursor-blink-state nil)
-    (setq eat--cursor-blink-timer nil)
+    (setq eat--cursor-blink-state nil eat--cursor-blink-timer nil)
     (add-hook 'pre-command-hook #'eat--cursor-blink-stop-timers nil t)
     (add-hook 'post-command-hook #'eat--cursor-blink-start-timers
               nil t)
@@ -5117,8 +5109,8 @@ return \"eat-color\", otherwise return \"eat-mono\"."
               (pcase state
                 (:invisible eat-invisible-cursor-type)
                 (:very-visible eat-very-visible-cursor-type)
-                (_ eat-default-cursor-type))) ; `:default'
-  (setq-local cursor-type (car eat--cursor-blink-type))
+                (_ eat-default-cursor-type)) ; `:default'
+              cursor-type (car eat--cursor-blink-type))
   (eat--cursor-blink-mode (if (cadr eat--cursor-blink-type) +1 -1)))
 
 
@@ -5216,8 +5208,8 @@ event."
               (unless eat--mouse-drag-transient-map-exit
                 (let ((old-track-mouse track-mouse)
                       (buffer (current-buffer)))
-                  (setq track-mouse 'dragging)
-                  (setq eat--mouse-drag-transient-map-exit
+                  (setq track-mouse 'dragging
+                        eat--mouse-drag-transient-map-exit
                         (set-transient-map
                          (let ((map (eat-term-make-keymap
                                      #'eat-self-input
@@ -5520,13 +5512,12 @@ END if it's safe to do so."
   (make-local-variable 'eat--output-queue-first-chunk-time)
   (make-local-variable 'eat--process-output-queue-timer)
   ;; This is intended; input methods don't work on read-only buffers.
-  (setq buffer-read-only nil)
-  (setq buffer-undo-list t)
-  (setq eat--synchronize-scroll-function #'eat--synchronize-scroll)
-  (setq eat--mouse-grabbing-type nil)
-  (setq filter-buffer-substring-function
-        #'eat--filter-buffer-substring)
-  (setq mode-line-process
+  (setq buffer-read-only nil buffer-undo-list t
+        eat--synchronize-scroll-function #'eat--synchronize-scroll
+        filter-buffer-substring-function
+        #'eat--filter-buffer-substring
+        eat--mouse-grabbing-type nil
+        mode-line-process
         '(""
           (:eval
            (when eat--process
@@ -5768,14 +5759,14 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
         (with-selected-window window
           (eat-term-resize eat--terminal (window-max-chars-per-line)
                            (window-text-height))))
-      (setf (eat-term-input-function eat--terminal) #'eat--send-input)
-      (setf (eat-term-set-cursor-function eat--terminal)
-            #'eat--set-cursor)
-      (setf (eat-term-grab-mouse-function eat--terminal)
-            #'eat--grab-mouse)
-      (setf (eat-term-manipulate-selection-function eat--terminal)
-            #'eat--manipulate-kill-ring)
-      (setf (eat-term-ring-bell-function eat--terminal) #'eat--bell)
+      (setf (eat-term-input-function eat--terminal) #'eat--send-input
+            (eat-term-set-cursor-function eat--terminal)
+            #'eat--set-cursor
+            (eat-term-grab-mouse-function eat--terminal)
+            #'eat--grab-mouse
+            (eat-term-manipulate-selection-function eat--terminal)
+            #'eat--manipulate-kill-ring
+            (eat-term-ring-bell-function eat--terminal) #'eat--bell)
       ;; Crank up a new process.
       (let* ((size (eat-term-size eat--terminal))
              (process-environment
@@ -6020,14 +6011,14 @@ PROGRAM can be a shell command."
     (setq eat--terminal (eat-term-make (current-buffer)
                                        (process-mark proc)))
     (set-marker (process-mark proc) (eat-term-end eat--terminal))
-    (setf (eat-term-input-function eat--terminal) #'eat--send-input)
-    (setf (eat-term-set-cursor-function eat--terminal)
-          #'eat--set-cursor)
-    (setf (eat-term-grab-mouse-function eat--terminal)
-          #'eat--grab-mouse)
-    (setf (eat-term-manipulate-selection-function eat--terminal)
-          #'eat--manipulate-kill-ring)
-    (setf (eat-term-ring-bell-function eat--terminal) #'eat--bell)
+    (setf (eat-term-input-function eat--terminal) #'eat--send-input
+          (eat-term-set-cursor-function eat--terminal)
+          #'eat--set-cursor
+          (eat-term-grab-mouse-function eat--terminal)
+          #'eat--grab-mouse
+          (eat-term-manipulate-selection-function eat--terminal)
+          #'eat--manipulate-kill-ring
+          (eat-term-ring-bell-function eat--terminal) #'eat--bell)
     (when-let ((window (get-buffer-window nil t)))
       (with-selected-window window
         (eat-term-resize eat--terminal (window-max-chars-per-line)
@@ -6053,8 +6044,7 @@ PROGRAM can be a shell command."
       (eat--grab-mouse nil nil)
       (eat-term-delete eat--terminal)
       (set-process-filter eat--process #'eshell-output-filter)
-      (setq eat--terminal nil)
-      (setq eat--process nil)
+      (setq eat--terminal nil eat--process nil)
       (kill-local-variable 'eshell-output-filter-functions)
       (eat--eshell-semi-char-mode -1)
       (eat--eshell-char-mode -1)
@@ -6197,8 +6187,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
     (make-local-variable 'eat--output-queue-first-chunk-time)
     (make-local-variable 'eat--process-output-queue-timer)
     (setq eat--synchronize-scroll-function
-          #'eat--eshell-synchronize-scroll)
-    (setq filter-buffer-substring-function
+          #'eat--eshell-synchronize-scroll
+          filter-buffer-substring-function
           #'eat--filter-buffer-substring)
     ;; Make sure glyphless character don't display a huge box glyph,
     ;; that would break the display.
@@ -6383,8 +6373,8 @@ allowed."
     (with-current-buffer eat-buf
       (switch-to-buffer eat-buf)
       (eat-mode)
-      (setq-local eshell-parent-buffer eshell-buf)
-      (setq-local eat-kill-buffer-on-exit nil)
+      (setq-local eshell-parent-buffer eshell-buf
+                  eat-kill-buffer-on-exit nil)
       (eat-exec eat-buf program program nil args)
       (let ((proc (get-buffer-process eat-buf)))
         (if (and proc (eq 'run (process-status proc)))
@@ -6486,8 +6476,7 @@ FN, `eat-exec', which see."
           (setq-local eat--trace-output-buffer buf)
           (add-hook 'kill-buffer-hook #'eat--trace-stop nil t)
           (let ((size (eat-term-size eat--terminal)))
-            (setq width (car size))
-            (setq height (cdr size)))
+            (setq width (car size) height (cdr size)))
           (dolist (var eat--trace-recorded-variables)
             (push (cons var (symbol-value var)) variables)))
         (with-current-buffer buf
@@ -6609,8 +6598,7 @@ see."
                   (setq-local eat--trace-output-buffer buf)
                   (add-hook 'kill-buffer-hook #'eat--trace-stop nil t)
                   (let ((size (eat-term-size eat--terminal)))
-                    (setq width (car size))
-                    (setq height (cdr size)))
+                    (setq width (car size) height (cdr size)))
                   (dolist (var eat--trace-recorded-variables)
                     (push (cons var (symbol-value var)) variables))
                   (with-current-buffer buf
@@ -6728,14 +6716,14 @@ FN is the original definition of `eat--eshell-cleanup', which see."
           (- (car data) eat--trace-replay-recording-start-time))
     (pcase data
       (`(,time create ,_ui ,width ,height ,variables)
-       (setq eat--trace-replay-recording-start-time time)
-       (setq eat--trace-replay-progress 0)
+       (setq eat--trace-replay-recording-start-time time
+             eat--trace-replay-progress 0)
        (dolist (var eat--trace-recorded-variables)
          (set (make-local-variable var) (alist-get var variables)))
        (setq eat--terminal (eat-term-make (current-buffer) (point)))
        (setf (eat-term-set-cursor-function eat--terminal)
-             #'eat--set-cursor)
-       (setf (eat-term-ring-bell-function eat--terminal) #'eat--bell)
+             #'eat--set-cursor
+             (eat-term-ring-bell-function eat--terminal) #'eat--bell)
        (eat-term-resize eat--terminal width height)
        (eat-term-redisplay eat--terminal))
       (`(,_time output ,string)
@@ -6772,8 +6760,8 @@ FN is the original definition of `eat--eshell-cleanup', which see."
   (unless (buffer-live-p eat--trace-replay-buffer)
     (setq-local eat--trace-replay-buffer
                 (generate-new-buffer
-                 (format "*eat-trace-replay*: %s" (buffer-name))))
-    (setq-local eat--trace-replay-marker (point-min-marker))
+                 (format "*eat-trace-replay*: %s" (buffer-name)))
+                eat--trace-replay-marker (point-min-marker))
     (let ((ov (make-overlay (point-min) (point-min))))
       (overlay-put ov 'before-string
                    #(" " 0 1 (display (left-fringe right-triangle))))
@@ -6787,8 +6775,8 @@ FN is the original definition of `eat--eshell-cleanup', which see."
       (goto-char (point-min))
       (with-current-buffer eat--trace-replay-buffer
         (eat-trace-replay-mode)
-        (setq eat--trace-replay-source-buffer source)
-        (setq eat--trace-replay-frame-count frame-count))))
+        (setq eat--trace-replay-source-buffer source
+              eat--trace-replay-frame-count frame-count))))
   (display-buffer eat--trace-replay-buffer))
 
 (defun eat-trace-replay-next-frame (&optional n)
@@ -6803,8 +6791,7 @@ N defaults to 1.  Interactively, N is the prefix argument."
   "Clean up the source buffer before the terminal being killed."
   (when (buffer-live-p eat--trace-replay-source-buffer)
     (with-current-buffer eat--trace-replay-source-buffer
-      (setq eat--trace-replay-buffer nil)
-      (setq eat--trace-replay-marker nil)
+      (setq eat--trace-replay-buffer nil eat--trace-replay-marker nil)
       (delete-overlay eat--trace-replay-current-sexp-overlay))))
 
 (defvar eat-trace-replay-mode-map
