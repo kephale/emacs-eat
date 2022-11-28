@@ -4776,7 +4776,7 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
         (cl-loop
          for i from ?\C-@ to ?~
          do (unless (= i meta-prefix-char)
-              (bind `[,i])))
+              (bind (vector i))))
         ;; Bind `backspace', `delete', `deletechar', and all modified
         ;; variants.
         (dolist (key '( backspace C-backspace
@@ -4787,18 +4787,19 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
                         deletechar C-deletechar M-deletechar
                         S-deletechar C-M-deletechar C-S-deletechar
                         M-S-deletechar C-M-S-deletechar))
-          (bind `[,key]))
+          (bind (vector key)))
         ;; Bind these non-encodable keys.  They are translated.
         (dolist (key '(?\C-- ?\C-? ?\C-\s))
-          (bind `[,key]))
+          (bind (vector key)))
         ;; Bind M-<ASCII> keys.
-        (unless (member `[,meta-prefix-char] exceptions)
-          (define-key map `[,meta-prefix-char] (make-sparse-keymap))
+        (unless (member (vector meta-prefix-char) exceptions)
+          (define-key map (vector meta-prefix-char)
+                      (make-sparse-keymap))
           (cl-loop
            for i from ?\C-@ to ?~
            do (unless (memq i '(?O ?\[))
-                (bind `[,meta-prefix-char ,i])))
-          (bind `[,meta-prefix-char ,meta-prefix-char])))
+                (bind (vector meta-prefix-char i))))
+          (bind (vector meta-prefix-char meta-prefix-char))))
       (when (memq :arrow categories)
         (dolist (key '( up down right left
                         C-up C-down C-right C-left
@@ -4808,7 +4809,7 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
                         C-S-up C-S-down C-S-right C-S-left
                         M-S-up M-S-down M-S-right M-S-left
                         C-M-S-up C-M-S-down C-M-S-right C-M-S-left))
-          (bind `[,key])))
+          (bind (vector key))))
       (when (memq :navigation categories)
         (dolist (key '( home C-home M-home S-home C-M-home C-S-home
                         M-S-home C-M-S-home
@@ -4818,15 +4819,15 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
                         C-S-prior M-S-prior C-M-S-prior
                         next C-next M-next S-next C-M-next C-S-next
                         M-S-next C-M-S-next))
-          (bind `[,key])))
+          (bind (vector key))))
       (when (memq :function categories)
         (cl-loop
          for i from 1 to 63
          do (let ((key (intern (format "f%i" i))))
-              (bind `[,key]))))
+              (bind (vector key)))))
       (when (memq :mouse-click categories)
         (dolist (key '(mouse-1 mouse-2 mouse-3))
-          (bind `[,key])))
+          (bind (vector key))))
       (when (memq :mouse-modifier categories)
         (dolist (key
                  '( down-mouse-1 drag-mouse-1 down-mouse-2
@@ -4883,7 +4884,7 @@ EXCEPTIONS is a list of key sequences to not bind.  Don't use
                     M-S-wheel-right M-S-wheel-left C-M-S-wheel-up
                     C-M-S-wheel-down C-M-S-wheel-right
                     C-M-S-wheel-left))
-          (bind `[,key])))
+          (bind (vector key))))
       (when (memq :mouse-movement categories)
         (bind [mouse-movement])))
     map))
