@@ -4766,9 +4766,9 @@ keywords:
 EXCEPTIONS is a list of key sequences to not bind.  Don't use
 \"M-...\" key sequences in EXCEPTIONS, use \"ESC ...\" instead."
   (let ((map (make-sparse-keymap)))
-    (cl-labels ((bind (key)
-                  (unless (member key exceptions)
-                    (define-key map key input-command))))
+    (cl-flet ((bind (key)
+                (unless (member key exceptions)
+                  (define-key map key input-command))))
       (when (memq :ascii categories)
         ;; Bind ASCII and self-insertable characters except ESC and
         ;; DEL.
