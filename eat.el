@@ -6481,7 +6481,7 @@ FN, `eat-exec', which see."
             (push (cons var (symbol-value var)) variables)))
         (with-current-buffer buf
           (lisp-data-mode)
-          (insert ";; -*- lisp-data -*-\n")
+          (insert ";; -*- mode: lisp-data -*-\n")
           (eat--trace-log time 'create 'eat width height
                           variables))))))
 
