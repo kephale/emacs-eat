@@ -1,7 +1,9 @@
 #!/bin/sh
 
-./gitlog-to-changelog --ignore-matching='^; ' --ignore-line='^; ' \
-                      --format='%B' >ChangeLog
+./gitlog-to-changelog \
+  --ignore-matching='^; ' --ignore-line='^; ' \
+  --ignore-commits='f3fed64957b4e88cfa1ff2c5ddfb665f249624cc' \
+  --format='%B' >ChangeLog
 
 # Find the years covered by the generated ChangeLog, so that
 # a proper copyright notice can be output.

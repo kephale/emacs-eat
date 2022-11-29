@@ -4,6 +4,7 @@
 # Convert git log output to ChangeLog format.
 
 # Copyright (C) 2008-2022 Free Software Foundation, Inc.
+# Copyright (C) 2022 Akib Azmain Turja.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 # Written by Jim Meyering
+# '--ignore-commits' implemented by Akib Azmain Turja.
 
 # This is a prologue that allows to run a perl script as an executable
 # on systems that are compliant to a POSIX version before POSIX:2017.
@@ -35,7 +37,7 @@
 eval 'exec perl -wSx "$0" "$@"'
      if 0;
 
-my $VERSION = '2022-01-27 18:49'; # UTC
+my $VERSION = '2022-11-29 10:18'; # UTC
 # The definition above must lie within the first 8 lines in order
 # for the Emacs time-stamp write hook (at end) to update it.
 # If you change this file with Emacs, please let the write hook
@@ -88,6 +90,7 @@ OPTIONS:
    --since=DATE convert only the logs since DATE;
                   the default is to convert all log entries.
    --until=DATE convert only the logs older than DATE.
+   --ignore-commits=HASHES Comma-separated list of commits to ignore
    --ignore-matching=PAT ignore commit messages whose first lines match PAT.
    --ignore-line=PAT ignore lines of commit messages that match PAT.
    --format=FMT set format string for commit subject and body;
@@ -243,6 +246,7 @@ sub git_dir_option($)
   my $amend_file;
   my $append_dot = 0;
   my $cluster = 1;
+  my $ignore_commits = '';
   my $ignore_matching;
   my $ignore_line;
   my $strip_tab = 0;
@@ -258,6 +262,7 @@ sub git_dir_option($)
      'amend=s' => \$amend_file,
      'append-dot' => \$append_dot,
      'cluster!' => \$cluster,
+     'ignore-commits=s' => \$ignore_commits,
      'ignore-matching=s' => \$ignore_matching,
      'ignore-line=s' => \$ignore_line,
      'strip-tab' => \$strip_tab,
@@ -286,6 +291,7 @@ sub git_dir_option($)
   my $prev_date_line = '';
   my @prev_coauthors = ();
   my @skipshas = ();
+
   while (1)
     {
       defined (my $in = <PIPE>)
@@ -307,6 +313,7 @@ sub git_dir_option($)
         or die "$ME:$.: invalid SHA1: $sha\n";
 
       my $skipflag = 0;
+
       if (@skipshas)
         {
           foreach(@skipshas)
@@ -398,8 +405,20 @@ sub git_dir_option($)
           }
       }
 
+      # Ignore commits that's in --ignore-commits, if specified.
+      my $ignored = 0;
+      foreach(split ',', $ignore_commits)
+      {
+          if ($sha =~ /^$_/)
+          {
+              $ignored = 1;
+              last;
+          }
+      }
+
       # Ignore commits that match the --ignore-matching pattern, if specified.
-      if (defined $ignore_matching && @line && $line[0] =~ /$ignore_matching/)
+      if ($ignored || (defined $ignore_matching && @line
+                       && $line[0] =~ /$ignore_matching/))
         {
           $skipflag = 1;
         }
