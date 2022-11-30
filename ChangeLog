@@ -1,0 +1,281 @@
+2022-11-30  Akib Azmain Turja  <akib@disroot.org>
+
+	Document eat-eshell-visual-command-mode in manual
+
+	* eat.texi (Eshell Terminal): Document
+	'eat-eshell-visual-command-mode' and suggest to set
+	'eshell-visual-commands' to nil.
+
+2022-11-30  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix compatibility issues with Emacs 28
+
+	* eat.el: Require 'subr-x'.
+	* eat.el (eat-yank, eat-yank-pop): Pass three arguments to
+	'mapconcat'.
+	* eat.el (eat--eshell-term-name): New function.
+	* eat.el (eat-eshell-mode): Use 'eat--eshell-term-name' instead
+	of using 'eat-term-name' directly.
+	* eat.el (eat-eshell-mode) [(< emacs-major-version 29)]: Use
+	'eshell-last-async-proc' instead of 'eshell-last-async-procs'.
+	* eat.el (eat--eshell-adjust-make-process-args)
+	[(< emacs-major-version 29)]: Don't check and set ':filter' and
+	':sentinel' of 'make-process' argument plist.  Set process
+	filter and sentinel from 'eshell-exec-hook'.
+	* eat.el (eat--eshell-adjust-make-process-args): Call
+	'eat--eshell-setup-proc-and-term' from 'eshell-exec-hook', not
+	just after 'make-process'.
+
+2022-11-29  Akib Azmain Turja  <akib@disroot.org>
+
+	Don't put 'error' as the only then part of 'if'
+
+	* eat.el (eat-semi-char-mode, eat-char-mode): Don't put 'error'
+	as only then part of 'if'.
+
+2022-11-29  Akib Azmain Turja  <akib@disroot.org>
+
+	Use 'mapc' to make & kill multiple local variables
+
+	* eat.el (eat-blink-mode, eat--cursor-blink-mode, eat-mode)
+	(eat--eshell-local-mode, eat-trace-replay-mode): Use 'mapc' to
+	make & kill multiple local variables.
+
+2022-11-29  Akib Azmain Turja  <akib@disroot.org>
+
+	Put declare-function and defvar outside functions
+
+	* eat.el (eat--flip-slow-blink-state)
+	(eat--flip-fast-blink-state, eat-blink-mode)
+	(eat--eshell-output-filter, eat--eshell-cleanup)
+	(eat--eshell-process-output-queue, eat--eshell-sentinel)
+	(eat-eshell-mode, eat--eshell-visual-sentinel)
+	(eat--eshell-exec-visual, eat-eshell-visual-command-mode)
+	(eat-project): Move 'declare-function's and 'defvar's outside.
+
+2022-11-29  Akib Azmain Turja  <akib@disroot.org>
+
+	Use 'vector' directly instead of backquote
+
+	* eat.el (eat-term-make-keymap): Use 'vector' directly instead
+	of backquote.
+
+2022-11-29  Akib Azmain Turja  <akib@disroot.org>
+
+	* eat.el (eat-term-make-keymap): Use 'cl-flet'
+
+2022-11-29  Akib Azmain Turja  <akib@disroot.org>
+
+	Use more readable '?\C-\s' instead of '?\C-\ '
+
+	* eat.el (eat-term-input-event, eat-term-make-keymap): Use more
+	readable '?\C-\s' instead of '?\C-\ '.
+
+2022-11-29  Akib Azmain Turja  <akib@disroot.org>
+
+	* eat.el (eat-mode): Fix char mode 'help-echo'
+
+	* eat.el (eat--bell): Use 'ding' instead of 'beep'
+
+	* eat.el (eat--trace-exec): Use "-*- mode: MD -*-"
+
+2022-11-29  Akib Azmain Turja  <akib@disroot.org>
+
+	Use 'setf' + 'plist-get' instead of 'plist-put'
+
+	* eat.el (eat--eshell-adjust-make-process-args): Use (setf (plist-get
+	...) ...) instead of 'plist-put' without taking the result, which is
+	not guaranteed to always work.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Prefer 'and-let*' and 'when-let*' over 'when-let'
+
+	* eat.el (eat--t-set-sgr-params): Use 'and-let*' instead of 'when-let'
+	for side-effect free 'when-let'.
+	* eat.el (eat--flip-cursor-blink-state, eat--synchronize-scroll)
+	(eat-exec, eat--eshell-setup-proc-and-term)
+	(eat--eshell-synchronize-scroll, eat--eshell-visual-sentinel)
+	(eat--trace-replay-eval-next): Use 'when-let*' instead of 'when-let'
+	for 'when-let's with side-effect.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Prefer 'pcase-exhaustive' over 'pcase'
+
+	* eat.el (eat--t-erase-in-line, eat--t-erase-in-disp)
+	(eat--t-set-mouse-mode, eat--t-send-device-attrs)
+	(eat--t-handle-output, eat-term-input-event)
+	(eat--manipulate-kill-ring, eat--trace-replay-eval):
+	Prefer 'pcase-exhaustive' over 'pcase'.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	* eat.el (eat--t-change-charset): Assert argument
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Combine multiple setq/setf/setq-local into one
+
+	* eat.el (eat--t-reset, eat--t-goto, eat--t-write)
+	(eat--t-save-cur, eat--t-enable-alt-disp)
+	(eat--t-change-scroll-region, eat--t-set-sgr-params)
+	(eat--t-manipulate-selection, eat--t-handle-output)
+	(eat--t-resize, eat--flip-slow-blink-state)
+	(eat--flip-fast-blink-state, eat-blink-mode)
+	(eat--cursor-blink-mode, eat--set-cursor, eat-self-input)
+	(eat-mode, eat-exec, eat--eshell-setup-proc-and-term)
+	(eat--eshell-cleanup, eat--eshell-local-mode)
+	(eat--eshell-exec-visual, eat--trace-exec)
+	(eat--eshell-trace-adjust-make-process-args)
+	(eat--trace-replay-eval, eat-trace-replay, eat-trace--cleanup):
+	Combine multiple setq/setf/setq-local into one wherever
+	possible.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Avoid copying STR to the extent possible
+
+	* eat.el (eat--t-write): Take two more optional arguments BEG
+	and END to avoid copying STR multiple times unneccessarily.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Support multi-column characters properly
+
+	* eat.el (eat--t-write): Use 'char-width' instead of the
+	unpredictable 'string-width' to support multi-column characters
+	properly.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Use hash table to convert from charset
+
+	* eat.el (eat--t-dec-line-drawing-chars): New constant
+	containing the hash table.
+	* eat.el (eat--t-write): Use hash-table instead alist while
+	converting from DEC Line Drawing charset.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Use as less let-bindings as possible
+
+	* eat.el (eat--t-goto-bol, eat--t-goto-eol)
+	(eat--t-repeated-insert, eat--t-cur-right, eat--t-cur-left)
+	(eat--t-cur-horizontal-abs, eat--t-beg-of-next-line)
+	(eat--t-beg-of-prev-line, eat--t-cur-down, eat--t-cur-up)
+	(eat--t-cur-vertical-abs, eat--t-scroll-up, eat--t-scroll-down)
+	(eat--t-write, eat--t-horizontal-tab)
+	(eat--t-horizontal-backtab, eat--t-reverse-index)
+	(eat--t-erase-in-line, eat--t-erase-in-disp)
+	(eat--t-insert-char, eat--t-delete-char, eat--t-erase-char)
+	(eat--t-insert-line, eat--t-delete-line)
+	(eat--t-repeat-last-char, eat--t-change-scroll-region)
+	(eat--t-send-device-attrs): Minimize let-binding count.
+	* eat.el (eat--t-break-long-line, eat--t-write)
+	(eat-trace-replay): Use replace 'propertize' call with already
+	propertized string.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Replace 'let*' with 'let' wherever possible
+
+	* eat.el (eat--t-eol, eat--t-reset, eat--t-erase-in-disp)
+	(eat--t-disable-alt-disp, eat--t-resize, eat-term-redisplay)
+	(eat-term-input-event, eat--adjust-process-window-size): Use
+	'let' instead of 'let*' wherever possible.
+	* eat.el (eat--eshell-exec-visual): Use (VAR nil) form instead
+	of VAR form in 'let*' variable list.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	* README.org (NonGNU ELPA Devel): New section
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Experimentally support for multi-column characters
+
+	* eat.el (eat--t-move-before-to-safe, eat--t-make-pos-safe)
+	(eat--t-fix-partial-multi-col-char): New function.
+	* eat.el (eat--t-write): Handle multi-column characters.
+	* eat.el (eat--t-insert-char, eat--t-delete-char)
+	(eat--t-erase-char): Handle multi-column characters on the
+	display while manipulating text.
+
+2022-11-28  Akib Azmain Turja  <akib@disroot.org>
+
+	* .elpaignore: New file.
+
+2022-11-25  Akib Azmain Turja  <akib@disroot.org>
+
+	Use third argument of posn-col-row on Emacs >= 29
+
+	* eat.el (eat-term-input-event): Use USE-WINDOW argument of
+	'posn-col-row' to support text scaling properly, but only on
+	Emacs >= 29 since on Emacs 28 'posn-col-row' takes only one
+	argument.
+
+2022-11-24  Akib Azmain Turja  <akib@disroot.org>
+
+	* Makefile (all): Remove "check" and "changelog."
+
+2022-11-24  Akib Azmain Turja  <akib@disroot.org>
+
+	Add documentation file generation code to Makefile
+
+	* Makefile (info, dvi, html, pdf, eat.info, eat.dvi, eat.html)
+	(eat.pdf): New targets.
+	* Makefile (all): New dependency "info."
+	* Makefile (.PHONY): Add "info", "dvi", "html" and "pdf."
+
+2022-11-24  Akib Azmain Turja  <akib@disroot.org>
+
+	Add proper dependencies to targets in Makefile
+
+	* Makefile (TIC): New variable.
+	* Makefile (eat.elc): Depend on eat.el.
+	* Makefile (e/eat-mono, e/eat-color, eat-256color)
+	(e/eat-truecolor): Depend on eat.ti.
+
+2022-11-24  Akib Azmain Turja  <akib@disroot.org>
+
+	Implement the terminal
+
+	This includes everything written from 2022-08-15 up to now.
+	* .dir-locals.el:
+	* CONTRIBUTE:
+	* COPYING:
+	* Makefile:
+	* NEWS:
+	* README.org:
+	* eat-tests.el:
+	* eat.el:
+	* eat.texi:
+	* eat.ti:
+	* fdl.texi:
+	* gitlog-to-changelog:
+	* gpl.texi:
+	* make-changelog:
+	* texinfo.tex:
+	New file.
+
+;; Local Variables:
+;; coding: utf-8
+;; End:
+
+  Copyright (C) 2022 Akib Azmain Turja.
+
+  This file is not part of GNU Emacs.
+
+  GNU Emacs is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  GNU Emacs is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
