@@ -2,7 +2,8 @@
 
 ./gitlog-to-changelog \
   --ignore-matching='^; ' --ignore-line='^; ' \
-  --ignore-commits='f3fed64957b4e88cfa1ff2c5ddfb665f249624cc' \
+  --ignore-commits="f3fed64957b4e88cfa1ff2c5ddfb665f249624cc,\
+1b2b7aee26dd611a44226530f9a010ec9bf22add" \
   --format='%B' >ChangeLog
 
 # Find the years covered by the generated ChangeLog, so that
