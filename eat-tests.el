@@ -231,20 +231,20 @@ any of the following properties:
 
 The following functions are available within BODY:
 
-(terminal)
+\(terminal)
   Return the terminal.
 
-(output &rest ARGS)
+\(output &rest ARGS)
   Output ARGS to the terminal, where ARGS is a list of string.
 
-(input-event EVENT &optional REF-POS N)
+\(input-event EVENT &optional REF-POS N)
   Input EVENT to the terminal.  REF-POS is the starting position of
   the terminal, a mouse position list.  N is how times to input EVENT.
 
-(input)
+\(input)
   Return all unread input.
 
-(should-term SCROLLBACK DISPLAY CURSOR)
+\(should-term SCROLLBACK DISPLAY CURSOR)
   Match the terminal with SCROLLBACK, DISPLAY and CURSOR.  SCROLLBACK
   is expected content of scrollback region.  DISPLAY is the expected
   display.  CURSOR is the expected cursor position, as a cons (X . Y),
@@ -255,7 +255,7 @@ The following functions are available within BODY:
   properties are also compared, and \"foo\" and \"foo   \" are assumed
   to be equivalent).
 
-(add-props STRING &rest INTERVALS)
+\(add-props STRING &rest INTERVALS)
   Add text properties to STRING as specified in INTERVALS.  Each
   argument in INTERVALS is of form ((BEGIN . END) PROPERTY VALUE
   PROPERTY VALUE...).  Here is all PROPERTY is applied on STRING from
@@ -5553,7 +5553,8 @@ automatic scrolling as a side effect."
               (should (eq term (terminal)))
               (setq bell-rang t)))
       (output "\a")
-      (should bell-rang))))
+      (should bell-rang)
+      (should-term :cursor '(1 . 1)))))
 
 (ert-deftest eat-test-character-sets ()
   "Test character sets."
