@@ -77,6 +77,7 @@
 
 ;;; Code:
 
+(require 'subr-x)
 (require 'cl-lib)
 (require 'ansi-color)
 (require 'shell)
@@ -5259,7 +5260,7 @@ ARG is passed to `yank', which see."
                                              (if (stringp arg)
                                                  arg
                                                (string arg)))
-                                           args)))))
+                                           args "")))))
                     (apply insert-for-yank args)))))
       (yank arg))))
 
@@ -5282,7 +5283,7 @@ ARG is passed to `yank-pop', which see."
                                              (if (stringp arg)
                                                  arg
                                                (string arg)))
-                                           args)))))
+                                           args "")))))
                     (apply insert-for-yank args)))))
       (yank-pop arg))))
 
@@ -5973,6 +5974,10 @@ PROGRAM can be a shell command."
 (defvar eshell-last-output-start) ; In `esh-mode'.
 (defvar eshell-last-output-end) ; In `esh-mode'.
 
+(defun eat--eshell-term-name (&rest _)
+  "Return the value of `TERM' environment variable for Eshell."
+  (eat-term-name))
+
 (defun eat--eshell-output-filter ()
   "Handle output from subprocess."
   (let ((inhibit-quit t)            ; Don't disturb!
@@ -6110,18 +6115,24 @@ modify its argument to change the filter, the sentinel and invoke
        ((symbol-function #'make-process)
         (lambda (&rest plist)
           ;; Make sure we don't attack wrong process.
-          (if (not (and (eq (plist-get plist :filter)
-                            #'eshell-output-filter)
-                        (eq (plist-get plist :sentinel)
-                            #'eshell-sentinel)
-                        (equal (plist-get plist :command)
+          (if (not (and (equal (plist-get plist :command)
                                (cons (file-local-name
                                       (expand-file-name command))
-                                     args))))
+                                     args))
+                        ;; Eshell on Emacs 28 uses
+                        ;; `start-file-process', so `:filter' and
+                        ;; `:sentinel' are nil now.
+                        (or (< emacs-major-version 29)
+                            (and (eq (plist-get plist :filter)
+                                     #'eshell-output-filter)
+                                 (eq (plist-get plist :sentinel)
+                                     #'eshell-sentinel)))))
               (apply make-process plist)
-            (setf (plist-get plist :filter) #'eat--eshell-filter
-                  (plist-get plist :sentinel) #'eat--eshell-sentinel
-                  (plist-get plist :command)
+            (unless (< emacs-major-version 29)
+              (setf (plist-get plist :filter) #'eat--eshell-filter
+                    (plist-get plist :sentinel)
+                    #'eat--eshell-sentinel))
+            (setf (plist-get plist :command)
                   `("/usr/bin/env" "sh" "-c"
                     ,(format "stty -nl echo rows %d columns %d \
 sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
@@ -6129,10 +6140,18 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                              (window-max-chars-per-line) null-device)
                     ".."
                     ,@(plist-get plist :command)))
-            (let ((process (apply make-process plist)))
-              (eat--eshell-setup-proc-and-term process)
-              process)))))
-    (funcall fn command args)))
+            (apply make-process plist)))))
+    (let ((hook
+           (lambda (proc)
+             (when (< emacs-major-version 29)
+               (set-process-filter proc #'eat--eshell-filter)
+               (set-process-sentinel proc #'eat--eshell-sentinel))
+             (eat--eshell-setup-proc-and-term proc))))
+      (unwind-protect
+          (progn
+            (add-hook 'eshell-exec-hook hook 99)
+            (funcall fn command args))
+        (remove-hook 'eshell-exec-hook hook)))))
 
 
 ;;;;; Minor Modes.
@@ -6194,6 +6213,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
 (declare-function eshell-gather-process-output "esh-proc"
                   (command args))
 (defvar eshell-variable-aliases-list) ; In `esh-var'.
+(defvar eshell-last-async-proc) ; In `esh-cmd'.
 (defvar eshell-last-async-procs) ; In `esh-cmd'.
 
 ;;;###autoload
@@ -6262,7 +6282,9 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
       (dolist (buffer (buffer-list))
         (with-current-buffer buffer
           (when (eq major-mode #'eshell-mode)
-            (when eshell-last-async-procs
+            (when (if (< emacs-major-version 29)
+                      (bound-and-true-p eshell-last-async-proc)
+                    (bound-and-true-p eshell-last-async-procs))
               (user-error
                (concat "Can't toggle Eat Eshell mode while"
                        " any Eshell process is running")))
@@ -6273,7 +6295,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
           (eat--eshell-local-mode +1))))
     (add-hook 'eshell-mode-hook #'eat--eshell-local-mode)
     (setq eshell-variable-aliases-list
-          `(("TERM" eat-term-name t t)
+          `(("TERM" eat--eshell-term-name t)
             ("TERMINFO" eat-term-terminfo-directory t)
             ("INSIDE_EMACS" eat-term-inside-emacs t)
             ,@eshell-variable-aliases-list))
@@ -6286,7 +6308,9 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
         (with-current-buffer buffer
           (when (and (eq major-mode #'eshell-mode)
                      eat--eshell-local-mode)
-            (when eshell-last-async-procs
+            (when (if (< emacs-major-version 29)
+                      (bound-and-true-p eshell-last-async-proc)
+                    (bound-and-true-p eshell-last-async-procs))
               (user-error
                (concat "Can't toggle Eat Eshell mode while"
                        " any Eshell process is running")))
@@ -6300,7 +6324,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
           (cl-delete-if
            (lambda (elem)
              (member elem
-                     '(("TERM" eat-term-name t t)
+                     '(("TERM" eat--eshell-term-name t)
                        ("TERMINFO" eat-term-terminfo-directory t)
                        ("INSIDE_EMACS" eat-term-inside-emacs t))))
            eshell-variable-aliases-list))
