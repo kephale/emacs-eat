@@ -70,6 +70,7 @@ Advanced Customizations
 * Cursor Types::        Cursor can displayed in many forms.
 * Mouse Tracking::      Eat tracks mouse, but this can be changed.
 * Clipboard::           Integrating kill ring with terminal.
+* Directory Tracking::  Tracking the working directory of program.
 * Colors::              Eat can show more than sixteen million colors.
 * Fonts::               Eat can show up to sixty font different fonts.
 * Blinking Text::       Annoying blinking texts.
@@ -468,6 +469,38 @@ the following user option to configure this:
 This controls sending kill ring texts to terminal.  When set to
 non-@code{nil}, programs can receive the kill ring contents.  This is
 disabled by default for security reasons.
+@end defopt
+
+@node Directory Tracking
+@cindex directory tracking
+@cindex tracking directory
+@cindex working directory tracking
+@cindex tracking working directory
+@cindex cwd tracking
+@cindex tracking cwd
+@chapter Directory Tracking
+
+Eat can track the current working directory of the program.  This also
+works in Eshell, but after the program exits, the current working
+directory is changed back to the directory from where the program was
+invoked.
+
+To track, Eat needs the program to send this information.  So, to
+enable directory tracking, you'll need to setup your shell.  You'll
+need to arrange that your shell sends appropriate escape sequence at
+each prompt, for example with the command:
+
+@example
+printf "\\e]7;file://%s%s\\e\\\\" "$HOSTNAME" "$PWD"
+@end example
+
+If you don't want Eat to track your program's working directory, you
+can set the following to nil:
+
+@vindex eat-enable-directory-tracking
+@defopt eat-enable-directory-tracking
+This controls directory tracking.  When set to non-@code{nil}, Eat
+tracks the current working directory of programs.
 @end defopt
 
 @node Colors

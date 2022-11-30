@@ -81,6 +81,7 @@
 (require 'cl-lib)
 (require 'ansi-color)
 (require 'shell)
+(require 'url)
 
 
 ;;;; User Options.
@@ -135,6 +136,16 @@ some text to `kill-ring'."
 
 When non-nil, terminal program can get killed text from `kill-ring'.
 This is left disabled for security reasons."
+  :type 'boolean
+  :group 'eat-ui
+  :group 'eat-eshell)
+
+(defcustom eat-enable-directory-tracking t
+  "Non-nil means do directory tracking.
+
+When non-nil, Eat will track the working directory of program.  You
+need to configure the program to send current working directory
+information."
   :type 'boolean
   :group 'eat-ui
   :group 'eat-eshell)
@@ -647,6 +658,9 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (begin nil :documentation "Beginning of terminal.")
   (end nil :documentation "End of terminal area.")
   (title "" :documentation "The title of the terminal.")
+  (cwd
+   default-directory
+   :documentation "The working directory of the terminal.")
   (bell-fn
    (1value #'ignore)
    :documentation "Function to ring the bell.")
@@ -662,6 +676,9 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (set-title-fn
    (1value #'ignore)
    :documentation "Function to set title.")
+  (set-cwd-fn
+   (1value #'ignore)
+   :documentation "Function to set the current working directory.")
   (grab-mouse-fn
    (1value #'ignore)
    :documentation "Function to grab mouse.")
@@ -2189,6 +2206,25 @@ MODE should be one of nil and `x10', `normal', `button-event',
   ;; Inform the UI.
   (funcall (eat--t-term-set-title-fn eat--t-term) eat--t-term title))
 
+(defun eat--t-set-cwd (url)
+  "Set the working directory of terminal to URL.
+
+URL should be a URL in the format \"file://HOST/CWD/\"; HOST can be
+empty."
+  (message "%S" url)
+  (let ((obj (url-generic-parse-url url)))
+    (when (and (string= (url-type obj) "file")
+               (or (null (url-host obj))
+                   (string= (url-host obj) (system-name))))
+      (let ((dir (expand-file-name
+                  (file-name-as-directory
+                   (url-unhex-string (url-filename obj))))))
+        ;; Update working directory.
+        (setf (eat--t-term-cwd eat--t-term) dir)
+        ;; Inform the UI.
+        (funcall (eat--t-term-set-cwd-fn eat--t-term)
+                 eat--t-term dir)))))
+
 (defun eat--t-send-device-attrs (params format)
   "Return device attributes.
 
@@ -2701,6 +2737,11 @@ DATA is the selection data encoded in base64."
                            (let title (zero-or-more anything))
                            string-end)
                        (eat--t-set-title title))
+                      ;; OSC 7 ; <t> ST.
+                      ((rx string-start ?7 ?\;
+                           (let url (zero-or-more anything))
+                           string-end)
+                       (eat--t-set-cwd url))
                       ;; OSC 10 ; ? ST.
                       ("10;?"
                        (eat--t-report-foreground-color))
@@ -2970,6 +3011,24 @@ FUNCTION), where FUNCTION is the function to set title."
 
 (gv-define-setter eat-term-set-title-function (function terminal)
   `(setf (eat--t-term-set-title-fn ,terminal) ,function))
+
+(defun eat-term-cwd (terminal)
+  "Return the current working directory of TERMINAL."
+  (eat--t-term-cwd terminal))
+
+(defun eat-term-set-cwd-function (terminal)
+  "Return the function used to set the working directory of TERMINAL.
+
+The function is called with two arguments, TERMINAL and the new
+\(current) working directory of TERMINAL.  The function should not
+change point and buffer restriction.
+
+To set it, use (`setf' (`eat-term-set-cwd-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to set title."
+  (eat--t-term-set-cwd-fn terminal))
+
+(gv-define-setter eat-term-set-cwd-function (function terminal)
+  `(setf (eat--t-term-set-cwd-fn ,terminal) ,function))
 
 (defun eat-term-grab-mouse-function (terminal)
   "Return the function used to grab the mouse.
@@ -4185,6 +4244,12 @@ selection, or nil if none."
   "Ring the bell."
   (ding t))
 
+(defun eat--set-cwd (_ cwd)
+  "Set CWD as the current working directory (`default-directory')."
+  (when eat-enable-directory-tracking
+    (ignore-errors
+      (cd-absolute cwd))))
+
 
 ;;;;; Major Mode.
 
@@ -4488,7 +4553,8 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
             #'eat--grab-mouse
             (eat-term-manipulate-selection-function eat--terminal)
             #'eat--manipulate-kill-ring
-            (eat-term-ring-bell-function eat--terminal) #'eat--bell)
+            (eat-term-ring-bell-function eat--terminal) #'eat--bell
+            (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd)
       ;; Crank up a new process.
       (let* ((size (eat-term-size eat--terminal))
              (process-environment
@@ -4702,6 +4768,9 @@ PROGRAM can be a shell command."
 
 ;;;;; Process Handling.
 
+(defvar eat--eshell-invocation-directory nil
+  "The directory from where the current process was started.")
+
 (defvar eshell-last-output-start) ; In `esh-mode'.
 (defvar eshell-last-output-end) ; In `esh-mode'.
 
@@ -4732,7 +4801,8 @@ PROGRAM can be a shell command."
 (defun eat--eshell-setup-proc-and-term (proc)
   "Setup process PROC and a new terminal for it."
   (unless (or eat--terminal eat--process)
-    (setq eat--process proc)
+    (setq eat--process proc
+          eat--eshell-invocation-directory default-directory)
     (process-put proc 'adjust-window-size-function
                  #'eat--adjust-process-window-size)
     (setq eat--terminal (eat-term-make (current-buffer)
@@ -4745,20 +4815,22 @@ PROGRAM can be a shell command."
           #'eat--grab-mouse
           (eat-term-manipulate-selection-function eat--terminal)
           #'eat--manipulate-kill-ring
-          (eat-term-ring-bell-function eat--terminal) #'eat--bell)
+          (eat-term-ring-bell-function eat--terminal) #'eat--bell
+          (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd)
     (when-let* ((window (get-buffer-window nil t)))
       (with-selected-window window
         (eat-term-resize eat--terminal (window-max-chars-per-line)
                          (window-text-height))))
     (eat-term-redisplay eat--terminal)
-    (make-local-variable 'eshell-output-filter-functions)
-    (setq eshell-output-filter-functions '(eat--eshell-output-filter))
+    (setq-local eshell-output-filter-functions
+                '(eat--eshell-output-filter))
     (eat-eshell-semi-char-mode)))
 
 (defun eat--eshell-cleanup ()
   "Cleanup everything."
   (when eat--terminal
     (let ((inhibit-read-only t))
+      (cd-absolute eat--eshell-invocation-directory)
       (goto-char (eat-term-end eat--terminal))
       (unless (or (= (point) (point-min))
                   (= (char-before) ?\n))
@@ -4923,7 +4995,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
                   eat--mouse-grabbing-type
                   eat--pending-output-chunks
                   eat--output-queue-first-chunk-time
-                  eat--process-output-queue-timer)))
+                  eat--process-output-queue-timer
+                  eat--eshell-invocation-directory)))
     (cond
      (eat--eshell-local-mode
       (mapc #'make-local-variable locals)

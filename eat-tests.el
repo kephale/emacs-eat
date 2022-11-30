@@ -5748,6 +5748,30 @@ Write plain text and newline to move cursor."
                             "frob")
                  :cursor '(1 . 4))))
 
+(ert-deftest eat-test-set-cwd ()
+  "Test setting current working directory."
+  (eat--tests-with-term '()
+    (let ((cwd default-directory))
+      (should (string= (eat-term-cwd (terminal)) default-directory))
+      (setf (eat-term-set-cwd-function (terminal))
+            (lambda (term dir)
+              (should (eq term (terminal)))
+              (setq cwd dir)))
+      ;; file://HOST/PATH/.
+      (output (format "\e]7;file://%s/foo/bar/\e\\" (system-name)))
+      (should (string= cwd "/foo/bar/"))
+      (should (string= (eat-term-cwd (terminal)) "/foo/bar/"))
+      ;; file://HOST/PATH (note the missing trailing slash).
+      (output (format "\e]7;file://%s/bar/baz\a" (system-name)))
+      (should (string= cwd "/bar/baz/"))
+      (should (string= (eat-term-cwd (terminal)) "/bar/baz/"))
+      ;; file://SOME-OTHER-HOST/PATH/
+      (output (format "\e]7;file://%s/baz/foo/\e\\"
+                      (if (string= (system-name) "foo") "bar" "foo")))
+      (should (string= cwd "/bar/baz/"))
+      (should (string= (eat-term-cwd (terminal)) "/bar/baz/"))
+      (should-term :cursor '(1 . 1)))))
+
 
 ;;;;; Input Event Tests.
 
