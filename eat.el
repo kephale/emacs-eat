@@ -145,7 +145,8 @@ This is left disabled for security reasons."
 
 When non-nil, Eat will track the working directory of program.  You
 need to configure the program to send current working directory
-information."
+information.  See Info node `(eat)Directory Tracking' for instructions
+to setup your shell."
   :type 'boolean
   :group 'eat-ui
   :group 'eat-eshell)
