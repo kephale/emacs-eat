@@ -3320,7 +3320,9 @@ client process may get confused."
                          (event-start mouse)))
                   (x-y (if (< emacs-major-version 29)
                            (posn-col-row pos)
-                         (posn-col-row pos 'use-window)))
+                         (with-suppressed-warnings
+                             ((callargs posn-col-row))
+                           (posn-col-row pos 'use-window))))
                   (x (1+ (car x-y)))
                   (y (1+ (cdr x-y)))
                   (button
@@ -3335,9 +3337,12 @@ client process may get confused."
                        (cl-incf b 16))
                      b)))
              (when ref-pos
-               (let ((ref-x-y (if (< emacs-major-version 29)
-                                  (posn-col-row ref-pos)
-                                (posn-col-row ref-pos 'use-window))))
+               (let ((ref-x-y
+                      (if (< emacs-major-version 29)
+                          (posn-col-row ref-pos)
+                        (with-suppressed-warnings
+                            ((callargs posn-col-row))
+                          (posn-col-row ref-pos 'use-window)))))
                  (cl-decf x (car ref-x-y))
                  (cl-decf y (cdr ref-x-y))))
              (when (and (<= 1 x (eat--t-disp-width disp))
@@ -3413,7 +3418,9 @@ client process may get confused."
            (let* ((pos (event-start movement))
                   (x-y (if (< emacs-major-version 29)
                            (posn-col-row pos)
-                         (posn-col-row pos 'use-window)))
+                         (with-suppressed-warnings
+                             ((callargs posn-col-row))
+                           (posn-col-row pos 'use-window))))
                   (x (1+ (car x-y)))
                   (y (1+ (cdr x-y)))
                   (button
@@ -3422,9 +3429,12 @@ client process may get confused."
                           32)
                      35)))
              (when ref-pos
-               (let ((ref-x-y (if (< emacs-major-version 29)
-                                  (posn-col-row ref-pos)
-                                (posn-col-row ref-pos 'use-window))))
+               (let ((ref-x-y
+                      (if (< emacs-major-version 29)
+                          (posn-col-row ref-pos)
+                        (with-suppressed-warnings
+                            ((callargs posn-col-row))
+                          (posn-col-row ref-pos 'use-window)))))
                  (cl-decf x (car ref-x-y))
                  (cl-decf y (cdr ref-x-y))))
              (when (and (or (eq (eat--t-term-mouse-mode terminal)
