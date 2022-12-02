@@ -407,7 +407,7 @@ If your process is choking on big inputs, try lowering the value."
 ;; Font faces, 1 to 9 (inclusive).
 (cl-loop for counter from 1 to 9
          do (custom-declare-face
-             (intern (format "eat-term-face-%i" counter)) '((t))
+             (intern (format "eat-term-font-%i" counter)) '((t))
              (format "Alternative font %i." counter)
              :group 'eat-term))
 
