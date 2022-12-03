@@ -66,15 +66,14 @@ following:
 
 Eat requires at least Emacs 28.1 or above.
 
-** NonGNU ELPA Devel
+** NonGNU ELPA
 
-Eat is available on NonGNU ELPA Devel.  If you don't have the archive
-setup put something like the following in your init file:
+Eat is available on NonGNU ELPA.  If you don't have the archive setup,
+put something like the following in your init file:
 
 #+begin_src emacs-lisp
 (add-to-list 'package-archives
-             '("nongnu-dev"
-               . "https://elpa.nongnu.org/nongnu-devel/"))
+             '("nongnu" . "https://elpa.nongnu.org/nongnu/"))
 #+end_src
 
 ** Quelpa
