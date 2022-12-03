@@ -1,13 +1,13 @@
-function _eat_prompt_command () {
+__eat_prompt_command () {
   # Send the current working directory, for directory tracking.
   printf "\\e]7;file://%s%s\\e\\\\" "$HOSTNAME" "$PWD"
 }
 
-# Add '_eat_prompt_command' as the last element of 'PROMPT_COMMAND'.
-if [ -z "$_eat_bash_integration_enabled" ]
+# Add '__eat_prompt_command' as the last element of 'PROMPT_COMMAND'.
+if test -z "$__eat_bash_integration_enabled"
 then
-  _eat_bash_integration_enabled=yes
-  PROMPT_COMMAND+=(_eat_prompt_command)
+  __eat_bash_integration_enabled=yes
+  PROMPT_COMMAND+=(__eat_prompt_command)
 fi
 
 # Local Variables:
