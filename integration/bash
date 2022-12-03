@@ -4,7 +4,11 @@ function _eat_prompt_command () {
 }
 
 # Add '_eat_prompt_command' as the last element of 'PROMPT_COMMAND'.
-PROMPT_COMMAND[${#PROMPT_COMMAND[*]}]=_eat_prompt_command
+if [ -z "$_eat_bash_integration_enabled" ]
+then
+  _eat_bash_integration_enabled=yes
+  PROMPT_COMMAND[${#PROMPT_COMMAND[*]}]=_eat_prompt_command
+fi
 
 # Local Variables:
 # mode: sh
