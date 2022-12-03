@@ -5396,7 +5396,7 @@ FN is original definition of `eat-reset'."
           (funcall eat-term-redisplay terminal))))
     (funcall fn)))
 
-(defun eat--eshell-trace-adjust-make-process-args (fn &rest args)
+(defun eat--trace-eshell-adjust-make-process-args (fn &rest args)
   "Trace `eat--eshell-adjust-make-process-args'.
 
 ARGS is passed to FN, `eat--eshell-adjust-make-process-args', which
@@ -5439,7 +5439,7 @@ see."
                                     variables)))))))))
     (apply fn args)))
 
-(defun eat--eshell-trace-output-filter (fn)
+(defun eat--trace-eshell-output-filter (fn)
   "Trace `eat--eshell-output-filter'.
 
 FN is the original definition of `eat--eshell-output-filter', which
@@ -5462,7 +5462,7 @@ see."
                   (funcall eat-term-redisplay terminal))))
       (funcall fn))))
 
-(defun eat--eshell-trace-cleanup (fn)
+(defun eat--trace-eshell-cleanup (fn)
   "Trace `eat--eshell-cleanup'.
 
 FN is the original definition of `eat--eshell-cleanup', which see."
@@ -5490,11 +5490,11 @@ FN is the original definition of `eat--eshell-cleanup', which see."
         (advice-add #'eat--sentinel :around #'eat--trace-sentinel)
         (advice-add #'eat-reset :around #'eat--trace-reset)
         (advice-add #'eat--eshell-adjust-make-process-args :around
-                    #'eat--eshell-trace-adjust-make-process-args)
+                    #'eat--trace-eshell-adjust-make-process-args)
         (advice-add #'eat--eshell-output-filter :around
-                    #'eat--eshell-trace-output-filter)
+                    #'eat--trace-eshell-output-filter)
         (advice-add #'eat--eshell-cleanup :around
-                    #'eat--eshell-trace-cleanup))
+                    #'eat--trace-eshell-cleanup))
     (advice-remove #'eat-exec #'eat--trace-exec)
     (advice-remove #'eat--process-output-queue
                    #'eat--trace-process-output-queue)
@@ -5503,11 +5503,11 @@ FN is the original definition of `eat--eshell-cleanup', which see."
     (advice-remove #'eat--sentinel #'eat--trace-sentinel)
     (advice-remove #'eat-reset #'eat--trace-reset)
     (advice-remove #'eat--eshell-adjust-make-process-args
-                   #'eat--eshell-trace-adjust-make-process-args)
+                   #'eat--trace-eshell-adjust-make-process-args)
     (advice-remove #'eat--eshell-output-filter
-                   #'eat--eshell-trace-output-filter)
+                   #'eat--trace-eshell-output-filter)
     (advice-remove #'eat--eshell-cleanup
-                   #'eat--eshell-trace-cleanup)
+                   #'eat--trace-eshell-cleanup)
     (dolist (buffer (buffer-list))
       (when (buffer-local-value 'eat--trace-output-buffer buffer)
         (with-current-buffer buffer
