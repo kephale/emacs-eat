@@ -255,6 +255,7 @@ This value is used by terminal programs to identify the terminal."
   "Path to directory where Eat is installed.")
 
 (defvar eat-term-terminfo-directory)
+(defvar eat-term-shell-integration-directory)
 (let ((old-install-path eat--install-path))
   (setq eat--install-path
         (copy-sequence
@@ -262,15 +263,27 @@ This value is used by terminal programs to identify the terminal."
                                   buffer-file-name))))
 
   (defcustom eat-term-terminfo-directory eat--install-path
-    "Directory where require terminfo databases can be found.
+    "Directory where required terminfo databases can be found.
 
 This value is used by terminal programs to find the terminfo databases
 that describe the capabilities of the terminal."
     :type 'directory
     :group 'eat-term)
 
+  (defcustom eat-term-shell-integration-directory
+    (expand-file-name "integration" eat--install-path)
+    "Directory where Eat shell integration scripts can be found.
+
+This value is exposed to terminal programs as
+`EAT_SHELL_INTEGRATION_DIR' environment variable."
+    :type 'directory
+    :group 'eat-ui
+    :group 'eat-eshell)
+
   (when (eq eat-term-terminfo-directory old-install-path)
-    (setq eat-term-terminfo-directory eat--install-path)))
+    (setq eat-term-terminfo-directory eat--install-path
+          eat-term-shell-integration-directory
+          (expand-file-name "integration" eat--install-path))))
 
 (defcustom eat-term-inside-emacs (format "%s,eat" emacs-version)
   "Value for the `INSIDE_EMACS' environment variable."
@@ -2212,7 +2225,6 @@ MODE should be one of nil and `x10', `normal', `button-event',
 
 URL should be a URL in the format \"file://HOST/CWD/\"; HOST can be
 empty."
-  (message "%S" url)
   (let ((obj (url-generic-parse-url url)))
     (when (and (string= (url-type obj) "file")
                (or (null (url-host obj))
@@ -4563,7 +4575,9 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
                (list
                 (concat "TERM=" (eat-term-name))
                 (concat "TERMINFO=" eat-term-terminfo-directory)
-                (concat "INSIDE_EMACS=" eat-term-inside-emacs))
+                (concat "INSIDE_EMACS=" eat-term-inside-emacs)
+                (concat "EAT_SHELL_INTEGRATION_DIR="
+                        eat-term-shell-integration-directory))
                process-environment))
              (process-connection-type t)
              ;; We should suppress conversion of end-of-line format.
@@ -5103,6 +5117,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
           `(("TERM" eat--eshell-term-name t)
             ("TERMINFO" eat-term-terminfo-directory t)
             ("INSIDE_EMACS" eat-term-inside-emacs t)
+            ("EAT_SHELL_INTEGRATION_DIR"
+             eat-term-shell-integration-directory t)
             ,@eshell-variable-aliases-list))
     (advice-add #'eshell-gather-process-output :around
                 #'eat--eshell-adjust-make-process-args))

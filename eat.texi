@@ -71,6 +71,7 @@ Advanced Customizations
 * Mouse Tracking::      Eat tracks mouse, but this can be changed.
 * Clipboard::           Integrating kill ring with terminal.
 * Directory Tracking::  Tracking the working directory of program.
+* Shell Integration::   Getting the most from Eat and your shell.
 * Colors::              Eat can show more than sixteen million colors.
 * Fonts::               Eat can show up to sixty font different fonts.
 * Blinking Text::       Annoying blinking texts.
@@ -486,9 +487,10 @@ directory is changed back to the directory from where the program was
 invoked.
 
 To track, Eat needs the program to send this information.  So, to
-enable directory tracking, you'll need to setup your shell.  You'll
-need to arrange that your shell sends appropriate escape sequence at
-each prompt, for example with the command:
+enable directory tracking, you'll need to setup your shell
+(@pxref{Shell Integration}).  You'll need to arrange that your shell
+sends appropriate escape sequence at each prompt, for example with the
+command:
 
 @example
 printf "\\e]7;file://%s%s\\e\\\\" "$HOSTNAME" "$PWD"
@@ -502,6 +504,24 @@ can set the following to nil:
 This controls directory tracking.  When set to non-@code{nil}, Eat
 tracks the current working directory of programs.
 @end defopt
+
+@node Shell Integration
+@cindex shell integration
+@cindex integration, shell
+@chapter Shell Integration
+
+Eat comes with shell scripts to integrate your favorite shell with
+Eat.  You can include the script in your shell configuration file,
+it'll take care of everything.
+
+Currently only GNU Bash is supported.
+
+If you use GNU Bash, put the following in your @samp{.bashrc} file:
+
+@example
+[ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \
+  source "$EAT_SHELL_INTEGRATION_DIR/bash"
+@end example
 
 @node Colors
 @cindex colors

@@ -1,0 +1,11 @@
+function _eat_prompt_command () {
+  # Send the current working directory, for directory tracking.
+  printf "\\e]7;file://%s%s\\e\\\\" "$HOSTNAME" "$PWD"
+}
+
+# Add '_eat_prompt_command' as the last element of 'PROMPT_COMMAND'.
+PROMPT_COMMAND[${#PROMPT_COMMAND[*]}]=_eat_prompt_command
+
+# Local Variables:
+# mode: sh
+# End:
