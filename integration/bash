@@ -50,10 +50,9 @@ __eat_before_exec () {
   fi
 }
 
-# Add '__eat_prompt_command' as the last element of 'PROMPT_COMMAND'.
-if test -z "$__eat_bash_integration_enabled"
-then
-  __eat_bash_integration_enabled=yes
+__eat_enable_integration ()
+{
+  __eat_integration_enabled=yes
   PS1='\[\e]2;\u@\h:\w$\e\\\]'"$PS1"
   PROMPT_COMMAND+=(__eat_prompt_command)
   trap '__eat_before_exec' DEBUG
@@ -73,7 +72,10 @@ then
   done
   # Step 2.2: Assign the first element.
   PROMPT_COMMAND[0]=__eat_before_prompt_command
-fi
+}
+
+# Enable.
+test -z "$__eat_integration_enabled" && __eat_enable_integration
 
 # Local Variables:
 # mode: sh
