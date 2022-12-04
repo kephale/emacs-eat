@@ -61,11 +61,11 @@ __eat_enable_integration ()
   PROMPT_COMMAND+=(__eat_after_prompt_command)
   # Step 2: Prepend to PROMPT_COMMAND.
   # Step 2.1: Move all elements to make the first index free.
-  # Fun fact: Microsoft doesn't still know this simple trick.  They
-  # use something as silly and pityful as 'VAR=$PROMPT_COMMAND' to
-  # copy a Bash array in VSCode Bash integration script, that simply
-  # won't work ever, and then complain about Bash in the comments!
-  # LOL.  xD
+  # Fun fact: Microsoft doesn't still about know this simple trick.
+  # They ended up using something as silly and pityful as
+  # 'VAR=$PROMPT_COMMAND' to copy a Bash array in VSCode Bash
+  # integration script, which simply won't work ever, and then
+  # complain about Bash in the comments!  xD
   for i in $(eval "echo {${#PROMPT_COMMAND[*]}..1..-1}")
   do
     PROMPT_COMMAND[$i]=${PROMPT_COMMAND[$((i-1))]}
