@@ -4572,7 +4572,7 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
       (when-let* ((window (get-buffer-window nil t)))
         (with-selected-window window
           (eat-term-resize eat--terminal (window-max-chars-per-line)
-                           (window-text-height))))
+                           (floor (window-screen-lines)))))
       (setf (eat-term-input-function eat--terminal) #'eat--send-input
             (eat-term-set-cursor-function eat--terminal)
             #'eat--set-cursor
@@ -4850,7 +4850,7 @@ PROGRAM can be a shell command."
     (when-let* ((window (get-buffer-window nil t)))
       (with-selected-window window
         (eat-term-resize eat--terminal (window-max-chars-per-line)
-                         (window-text-height))))
+                         (floor (window-screen-lines)))))
     (eat-term-redisplay eat--terminal)
     (setq-local eshell-output-filter-functions
                 '(eat--eshell-output-filter))
@@ -4969,7 +4969,7 @@ modify its argument to change the filter, the sentinel and invoke
                   `("/usr/bin/env" "sh" "-c"
                     ,(format "stty -nl echo rows %d columns %d \
 sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
-                             (window-text-height)
+                             (floor (window-screen-lines))
                              (window-max-chars-per-line) null-device)
                     ".."
                     ,@(plist-get plist :command)))
@@ -5001,7 +5001,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
          (narrow-to-region
           (eat-term-beginning eat--terminal)
           (eat-term-end eat--terminal))
-         (let ((start-line (- (window-text-height window)
+         (let ((start-line (- (floor (window-screen-lines))
                               (line-number-at-pos (point-max)))))
            (goto-char (point-min))
            (widen)
