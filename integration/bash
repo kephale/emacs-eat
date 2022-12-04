@@ -19,14 +19,60 @@
 
 __eat_prompt_command () {
   # Send the current working directory, for directory tracking.
-  printf "\\e]7;file://%s%s\\e\\\\" "$HOSTNAME" "$PWD"
+  printf '\e]7;file://%s%s\e\\' "$HOSTNAME" "$PWD"
+}
+
+__eat_preexec () {
+  # "${PWD/$HOME/'~'}" converts "/home/akib/org/" to "~/org/".
+  # The next one is substituted with '$', or '#' if we're "root".
+  printf '\e]2;%s@%s:%s%s %s\e\\' "$USER" "$HOSTNAME" \
+         "${PWD/$HOME/'~'}" \
+         "$(test $UID -eq 0 && echo '#' || echo '$')" "$BASH_COMMAND"
+}
+
+__eat_in_prompt_command=no
+
+__eat_before_prompt_command ()
+{
+  __eat_in_prompt_command=yes
+}
+
+__eat_after_prompt_command ()
+{
+  __eat_in_prompt_command=no
+}
+
+__eat_before_exec () {
+  if test $__eat_in_prompt_command = no \
+      && test "$BASH_COMMAND" != __eat_before_prompt_command
+  then
+    __eat_preexec
+  fi
 }
 
 # Add '__eat_prompt_command' as the last element of 'PROMPT_COMMAND'.
 if test -z "$__eat_bash_integration_enabled"
 then
   __eat_bash_integration_enabled=yes
+  PS1='\[\e]2;\u@\h:\w$\e\\\]'"$PS1"
   PROMPT_COMMAND+=(__eat_prompt_command)
+  trap '__eat_before_exec' DEBUG
+  # Wrap 'PROMPT_COMMAND' to avoid it getting trapped in 'DEBUG' trap.
+  # Step 1: Append to PROMPT_COMMAND.
+  PROMPT_COMMAND+=(__eat_after_prompt_command)
+  # Step 2: Prepend to PROMPT_COMMAND.
+  # Step 2.1: Move all elements to make the first index free.
+  # Fun fact: Microsoft doesn't still know this simple trick.  They
+  # use something as silly and pityful as 'VAR=$PROMPT_COMMAND' to
+  # copy a Bash array in VSCode Bash integration script, that simply
+  # won't work ever, and then complain about Bash in the comments!
+  # LOL.  ;D
+  for i in $(eval "printf {${#PROMPT_COMMAND[*]}..1..-1}")
+  do
+    PROMPT_COMMAND[$i]=${PROMPT_COMMAND[$((i-1))]}
+  done
+  # Step 2.2: Assign the first element.
+  PROMPT_COMMAND[0]=__eat_before_prompt_command
 fi
 
 # Local Variables:
