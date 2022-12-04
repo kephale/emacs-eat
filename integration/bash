@@ -25,27 +25,31 @@ __eat_prompt_command () {
 __eat_preexec () {
   # "${PWD/$HOME/'~'}" converts "/home/akib/org/" to "~/org/".
   # The next one is substituted with '$', or '#' if we're "root".
+  # The final one gets the real command typed by the user from the
+  # history.
   printf '\e]2;%s@%s:%s%s %s\e\\' "$USER" "$HOSTNAME" \
          "${PWD/$HOME/'~'}" \
-         "$(test $UID -eq 0 && echo '#' || echo '$')" "$BASH_COMMAND"
+         "$(test $UID -eq 0 && echo '#' || echo '$')" \
+         "$(history 1 | sed 's/ *[0-9]* *//')"
 }
 
-__eat_in_prompt_command=no
+__eat_inhibit_preexec=yes
 
 __eat_before_prompt_command ()
 {
-  __eat_in_prompt_command=yes
+  __eat_inhibit_preexec=yes
 }
 
 __eat_after_prompt_command ()
 {
-  __eat_in_prompt_command=no
+  __eat_inhibit_preexec=no
 }
 
 __eat_before_exec () {
-  if test $__eat_in_prompt_command = no \
+  if test $__eat_inhibit_preexec = no \
       && test "$BASH_COMMAND" != __eat_before_prompt_command
   then
+    __eat_inhibit_preexec=yes
     __eat_preexec
   fi
 }

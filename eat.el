@@ -249,8 +249,9 @@ This value is used by terminal programs to identify the terminal."
           (function :tag "Function"))
   :group 'eat-term)
 
-;; Upgrading Eat causes `eat-term-terminfo-directory' to be outdated,
-;; so update it if not modified by user (or something else).
+;; Upgrading Eat causes `eat-term-terminfo-directory' and
+;; `eat-term-shell-integration-directory' to be outdated, so update it
+;; if not modified by user (or something else).
 (defvar eat--install-path nil
   "Path to directory where Eat is installed.")
 
