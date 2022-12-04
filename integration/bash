@@ -65,8 +65,8 @@ __eat_enable_integration ()
   # use something as silly and pityful as 'VAR=$PROMPT_COMMAND' to
   # copy a Bash array in VSCode Bash integration script, that simply
   # won't work ever, and then complain about Bash in the comments!
-  # LOL.  ;D
-  for i in $(eval "printf {${#PROMPT_COMMAND[*]}..1..-1}")
+  # LOL.  xD
+  for i in $(eval "echo {${#PROMPT_COMMAND[*]}..1..-1}")
   do
     PROMPT_COMMAND[$i]=${PROMPT_COMMAND[$((i-1))]}
   done
