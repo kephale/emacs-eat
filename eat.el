@@ -377,7 +377,8 @@ If your process is choking on big inputs, try lowering the value."
     (dolist (color colors)
       (let ((face (intern (format "eat-term-color-%i" face-counter))))
         (custom-declare-face
-         face `((t :inherit ,(intern (format "ansi-color-%s" color))))
+         face `((t :inherit ,(intern (format "ansi-color-bright-%s"
+                                             color))))
          (format "Face used to render bright %s color text." color)
          :group 'eat-term)
         (put (intern (format "eat-term-color-bright-%s" color))
