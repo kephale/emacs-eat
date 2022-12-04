@@ -4035,7 +4035,7 @@ event."
       (eat-term-input-event eat--terminal n e))))
 
 (defun eat-quoted-input ()
-  "Read a char and send it as INPUT."
+  "Read a character and send it as INPUT."
   (declare (interactive-only "Use `eat-self-input' instead."))
   (interactive)
   ;; HACK: Quick hack to allow inputting `C-g'.  Any better way to do
@@ -4045,6 +4045,17 @@ event."
            ;; Don't trigger `quit' exiting this `let'.
            (quit-flag nil))
        (read-event))))
+
+(defun eat-input-char (character count)
+  "Input CHARACTER, COUNT times.
+
+Interactively, ask for the character CHARACTER to input.  The numeric prefix
+argument COUNT specifies how many times to insert CHARACTER."
+  (declare (interactive-only "Use `eat-self-input' instead."))
+  (interactive (list (read-char-by-name
+                      "Insert character (Unicode name or hex): ")
+                     (prefix-numeric-value current-prefix-arg)))
+  (eat-self-input count character))
 
 (defun eat-yank (&optional arg)
   "Same as `yank', but for Eat.
@@ -4114,6 +4125,7 @@ ARG is passed to `yank-pop', which see."
     (define-key map [?\M-y] #'eat-yank-pop)
     (define-key map [?\C-c ?\C-c] #'eat-self-input)
     (define-key map [?\C-c ?\C-e] #'eat-emacs-mode)
+    (define-key map [remap insert-char] #'eat-input-char)
     map)
   "Keymap for Eat semi-char mode.")
 
@@ -4708,6 +4720,7 @@ PROGRAM can be a shell command."
     (define-key map [?\C-y] #'eat-yank)
     (define-key map [?\M-y] #'eat-yank-pop)
     (define-key map [?\C-c ?\C-e] #'eat-eshell-emacs-mode)
+    (define-key map [remap insert-char] #'eat-input-char)
     map)
   "Keymap for Eat Eshell semi-char mode.")
 
