@@ -689,18 +689,39 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (manipulate-selection-fn
    (1value #'ignore)
    :documentation "Function to manipulate selection.")
-  (set-title-fn
-   (1value #'ignore)
-   :documentation "Function to set title.")
-  (set-cwd-fn
-   (1value #'ignore)
-   :documentation "Function to set the current working directory.")
   (grab-mouse-fn
    (1value #'ignore)
    :documentation "Function to grab mouse.")
   (set-focus-ev-mode-fn
    (1value #'ignore)
    :documentation "Function to set focus event mode.")
+  (set-title-fn
+   (1value #'ignore)
+   :documentation "Function to set the title.")
+  (set-cwd-fn
+   (1value #'ignore)
+   :documentation "Function to set the current working directory.")
+  (prompt-start-fn
+   (1value #'ignore)
+   :documentation "Function to call when prompt starts.")
+  (prompt-end-fn
+   (1value #'ignore)
+   :documentation "Function to call when prompt ends.")
+  (cont-prompt-start-fn
+   (1value #'ignore)
+   :documentation "Function to call when prompt starts.")
+  (cont-prompt-end-fn
+   (1value #'ignore)
+   :documentation "Function to call when prompt ends.")
+  (set-cmd-fn
+   (1value #'ignore)
+   :documentation "Function to set the command being executed.")
+  (cmd-start-fn
+   (1value #'ignore)
+   :documentation "Function to call just before a command is run.")
+  (cmd-finish-fn
+   (1value #'ignore)
+   :documentation "Function to call after a command has finished.")
   (parser-state nil :documentation "State of parser.")
   (scroll-begin 1 :documentation "First line of scroll region.")
   (scroll-end 24 :documentation "Last line of scroll region.")
@@ -2222,23 +2243,38 @@ MODE should be one of nil and `x10', `normal', `button-event',
   ;; Inform the UI.
   (funcall (eat--t-term-set-title-fn eat--t-term) eat--t-term title))
 
-(defun eat--t-set-cwd (url)
+(defun eat--t-set-cwd (format host path)
   "Set the working directory of terminal to URL.
 
-URL should be a URL in the format \"file://HOST/CWD/\"; HOST can be
-empty."
-  (let ((obj (url-generic-parse-url url)))
-    (when (and (string= (url-type obj) "file")
-               (or (null (url-host obj))
-                   (string= (url-host obj) (system-name))))
-      (let ((dir (expand-file-name
-                  (file-name-as-directory
-                   (url-unhex-string (url-filename obj))))))
-        ;; Update working directory.
-        (setf (eat--t-term-cwd eat--t-term) dir)
-        ;; Inform the UI.
-        (funcall (eat--t-term-set-cwd-fn eat--t-term)
-                 eat--t-term dir)))))
+If FORMAT is `base64', HOST should be base64 encoded hostname and PATH
+should be base64 encoded working directory path.
+
+If FORMAT is `url', HOST should be nil and PATH should be an URL in
+the format \"file://HOST/CWD/\"; HOST can be empty."
+  (pcase-exhaustive format
+    ('base64
+     (let ((dir (ignore-errors (expand-file-name
+                                (file-name-as-directory
+                                 (base64-decode-string path)))))
+           (hostname (ignore-errors (base64-decode-string host))))
+       (when (and dir hostname)
+         ;; Update working directory.
+         (setf (eat--t-term-cwd eat--t-term) (cons hostname dir))
+         ;; Inform the UI.
+         (funcall (eat--t-term-set-cwd-fn eat--t-term)
+                  eat--t-term hostname dir))))
+    ('url
+     (let ((url (url-generic-parse-url path)))
+       (when (string= (url-type url) "file")
+         (let ((host (url-host url))
+               (dir (expand-file-name
+                     (file-name-as-directory
+                      (url-unhex-string (url-filename url))))))
+           ;; Update working directory.
+           (setf (eat--t-term-cwd eat--t-term) (cons host dir))
+           ;; Inform the UI.
+           (funcall (eat--t-term-set-cwd-fn eat--t-term)
+                    eat--t-term host dir)))))))
 
 (defun eat--t-send-device-attrs (params format)
   "Return device attributes.
@@ -2354,6 +2390,38 @@ DATA is the selection data encoded in base64."
                 i)
            (aset (eat--t-term-cut-buffers eat--t-term) (- i ?0)
                  str)))))))
+
+(defun eat--t-prompt-start ()
+  "Call shell prompt start hook."
+  (funcall (eat--t-term-prompt-start-fn eat--t-term) eat--t-term))
+
+(defun eat--t-prompt-end ()
+  "Call shell prompt end hook."
+  (funcall (eat--t-term-prompt-end-fn eat--t-term) eat--t-term))
+
+(defun eat--t-cont-prompt-start ()
+  "Call shell prompt start hook."
+  (funcall (eat--t-term-cont-prompt-start-fn eat--t-term)
+           eat--t-term))
+
+(defun eat--t-cont-prompt-end ()
+  "Call shell prompt end hook."
+  (funcall (eat--t-term-cont-prompt-end-fn eat--t-term) eat--t-term))
+
+(defun eat--t-set-cmd (cmd)
+  "Set the command being executed to CMD."
+  (let ((c (ignore-errors (base64-decode-string cmd))))
+    (when c
+      (funcall (eat--t-term-set-cmd-fn eat--t-term) eat--t-term c))))
+
+(defun eat--t-cmd-start ()
+  "Call shell command start hook."
+  (funcall (eat--t-term-cmd-start-fn eat--t-term) eat--t-term))
+
+(defun eat--t-cmd-finish (status)
+  "Call shell command finish hook with exit status STATUS."
+  (funcall (eat--t-term-cmd-finish-fn eat--t-term) eat--t-term
+           status))
 
 (defun eat--t-set-modes (params format)
   "Set modes according to PARAMS in format FORMAT."
@@ -2756,20 +2824,58 @@ DATA is the selection data encoded in base64."
                       ((rx string-start ?7 ?\;
                            (let url (zero-or-more anything))
                            string-end)
-                       (eat--t-set-cwd url))
-                      ;; OSC 10 ; ? ST.
+                       (eat--t-set-cwd 'url nil url))
+                      ;; OSC 1 0 ; ? ST.
                       ("10;?"
                        (eat--t-report-foreground-color))
-                      ;; OSC 11 ; ? ST.
+                      ;; OSC 1 1 ; ? ST.
                       ("11;?"
                        (eat--t-report-background-color))
-                      ;; OSC 52 ; <t> ; <s> ST.
+                      ;; In XTerm, OSC 51 is reserved for Emacs shell.
+                      ;; I have no idea why, but Vterm uses this OSC
+                      ;; to set the current directory and remotely
+                      ;; execute Emacs Lisp code.  Vterm uses the
+                      ;; characters 'A' and 'E' as the first character
+                      ;; of second parameter of this OSC.  We use 'e'
+                      ;; as the second parameter, followed by one or
+                      ;; more parameters.
+                      ;; OSC 5 1 ; e ; A ; <t> ; <s> ST
+                      ((rx string-start "51;e;A;"
+                           (let host (zero-or-more (not ?\;)))
+                           ?\; (let path (zero-or-more anything))
+                           string-end)
+                       (eat--t-set-cwd 'base64 host path))
+                      ;; OSC 5 1 ; e ; B ST
+                      ("51;e;B"
+                       (eat--t-prompt-start))
+                      ;; OSC 5 1 ; e ; C ST
+                      ("51;e;C"
+                       (eat--t-prompt-end))
+                      ;; OSC 5 1 ; e ; D ST
+                      ("51;e;D"
+                       (eat--t-cont-prompt-start))
+                      ;; OSC 5 1 ; e ; E ST
+                      ("51;e;E"
+                       (eat--t-cont-prompt-end))
+                      ;; OSC 5 1 ; e ; F ; <t> ST
+                      ((rx string-start "51;e;F;"
+                           (let cmd (zero-or-more anything))
+                           string-end)
+                       (eat--t-set-cmd cmd))
+                      ;; OSC 5 1 ; e ; G ST
+                      ("51;e;G"
+                       (eat--t-cmd-start))
+                      ;; OSC 5 1 ; e ; H ; <n> ST
+                      ((rx string-start "51;e;H;"
+                           (let status (one-or-more digit))
+                           string-end)
+                       (eat--t-cmd-finish (string-to-number status)))
+                      ;; OSC 5 2 ; <t> ; <s> ST.
                       ((rx string-start "52;"
                            (let targets
                              (zero-or-more (any ?c ?p ?q ?s
                                                 (?0 . ?9))))
-                           ";"
-                           (let data (zero-or-more anything))
+                           ?\; (let data (zero-or-more anything))
                            string-end)
                        (eat--t-manipulate-selection
                         targets data))))))))))
@@ -3009,42 +3115,6 @@ FUNCTION), where FUNCTION is the function to set cursor."
 (gv-define-setter eat-term-set-cursor-function (function terminal)
   `(setf (eat--t-term-set-cursor-fn ,terminal) ,function))
 
-(defun eat-term-title (terminal)
-  "Return the current title of TERMINAL."
-  (eat--t-term-title terminal))
-
-(defun eat-term-set-title-function (terminal)
-  "Return the function used to set the title of TERMINAL.
-
-The function is called with two arguments, TERMINAL and the new title
-of TERMINAL.  The function should not change point and buffer
-restriction.
-
-To set it, use (`setf' (`eat-term-set-title-function' TERMINAL)
-FUNCTION), where FUNCTION is the function to set title."
-  (eat--t-term-set-title-fn terminal))
-
-(gv-define-setter eat-term-set-title-function (function terminal)
-  `(setf (eat--t-term-set-title-fn ,terminal) ,function))
-
-(defun eat-term-cwd (terminal)
-  "Return the current working directory of TERMINAL."
-  (eat--t-term-cwd terminal))
-
-(defun eat-term-set-cwd-function (terminal)
-  "Return the function used to set the working directory of TERMINAL.
-
-The function is called with two arguments, TERMINAL and the new
-\(current) working directory of TERMINAL.  The function should not
-change point and buffer restriction.
-
-To set it, use (`setf' (`eat-term-set-cwd-function' TERMINAL)
-FUNCTION), where FUNCTION is the function to set title."
-  (eat--t-term-set-cwd-fn terminal))
-
-(gv-define-setter eat-term-set-cwd-function (function terminal)
-  `(setf (eat--t-term-set-cwd-fn ,terminal) ,function))
-
 (defun eat-term-grab-mouse-function (terminal)
   "Return the function used to grab the mouse.
 
@@ -3113,7 +3183,8 @@ selection."
 (defun eat-term-ring-bell-function (terminal)
   "Return the function used to ring the bell.
 
-The function is called with a single argument TERMINAL.
+The function is called with a single argument TERMINAL.  The function
+should not change point and buffer restriction.
 
 To set it, use (`setf' (`eat-term-ring-bell-function' TERMINAL)
 FUNCTION), where FUNCTION is the function to ring the bell."
@@ -3121,6 +3192,150 @@ FUNCTION), where FUNCTION is the function to ring the bell."
 
 (gv-define-setter eat-term-ring-bell-function (function terminal)
   `(setf (eat--t-term-bell-fn ,terminal) ,function))
+
+(defun eat-term-title (terminal)
+  "Return the current title of TERMINAL."
+  (eat--t-term-title terminal))
+
+(defun eat-term-set-title-function (terminal)
+  "Return the function used to set the title of TERMINAL.
+
+The function is called with two arguments, TERMINAL and the new title
+of TERMINAL.  The function should not change point and buffer
+restriction.
+
+Note that the client is responsible for the arguments to the function,
+verify them before using.
+
+To set it, use (`setf' (`eat-term-set-title-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to set title."
+  (eat--t-term-set-title-fn terminal))
+
+(gv-define-setter eat-term-set-title-function (function terminal)
+  `(setf (eat--t-term-set-title-fn ,terminal) ,function))
+
+(defun eat-term-cwd (terminal)
+  "Return the current working directory of TERMINAL with the hostname.
+
+The return value is of form (HOST . PATH), where HOST is the hostname
+and PATH is the working directory."
+  (eat--t-term-cwd terminal))
+
+(defun eat-term-set-cwd-function (terminal)
+  "Return the function used to set the working directory of TERMINAL.
+
+The function is called with three arguments, TERMINAL, the host where
+the directory is, and the new (current) working directory of TERMINAL.
+The function should not change point and buffer restriction.
+
+Note that the client is responsible for the arguments to the function,
+verify them before using.
+
+To set it, use (`setf' (`eat-term-set-cwd-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to set the current working
+directory."
+  (eat--t-term-set-cwd-fn terminal))
+
+(gv-define-setter eat-term-set-cwd-function (function terminal)
+  `(setf (eat--t-term-set-cwd-fn ,terminal) ,function))
+
+(defun eat-term-prompt-start-function (terminal)
+  "Return the function called just before shell prompt.
+
+The function is called with with a single argument, TERMINAL.  The
+function should not change point and buffer restriction.
+
+To set it, use (`setf' (`eat-term-prompt-start-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to call."
+  (eat--t-term-prompt-start-fn terminal))
+
+(gv-define-setter eat-term-prompt-start-function (function terminal)
+  `(setf (eat--t-term-prompt-start-fn ,terminal) ,function))
+
+(defun eat-term-prompt-end-function (terminal)
+  "Return the function called just after shell prompt.
+
+The function is called with with a single argument, TERMINAL.  The
+function should not change point and buffer restriction.
+
+To set it, use (`setf' (`eat-term-prompt-end-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to call."
+  (eat--t-term-prompt-end-fn terminal))
+
+(gv-define-setter eat-term-prompt-end-function (function terminal)
+  `(setf (eat--t-term-prompt-end-fn ,terminal) ,function))
+
+(defun eat-term-continuation-prompt-start-function (terminal)
+  "Return the function called just before shell continuation prompt.
+
+The function is called with with a single argument, TERMINAL.  The
+function should not change point and buffer restriction.
+
+To set it, use (`setf' (`eat-term-continuation-prompt-start-function'
+TERMINAL) FUNCTION), where FUNCTION is the function to call."
+  (eat--t-term-cont-prompt-start-fn terminal))
+
+(gv-define-setter eat-term-continuation-prompt-start-function
+    (function terminal)
+  `(setf (eat--t-term-cont-prompt-start-fn ,terminal) ,function))
+
+(defun eat-term-continuation-prompt-end-function (terminal)
+  "Return the function called just after shell continuation prompt.
+
+The function is called with with a single argument, TERMINAL.  The
+function should not change point and buffer restriction.
+
+To set it, use (`setf' (`eat-term-continuation-prompt-end-function'
+TERMINAL) FUNCTION), where FUNCTION is the function to call."
+  (eat--t-term-cont-prompt-end-fn terminal))
+
+(gv-define-setter eat-term-continuation-prompt-end-function
+    (function terminal)
+  `(setf (eat--t-term-cont-prompt-end-fn ,terminal) ,function))
+
+(defun eat-term-set-cmd-function (terminal)
+  "Return the function used to set the command being run in TERMINAL.
+
+The function is called with two arguments, TERMINAL, the host where
+the directory is, and the new (current) working directory of TERMINAL.
+The function should not change point and buffer restriction.
+
+Note that the client is responsible for the arguments to the function,
+verify them before using.
+
+To set it, use (`setf' (`eat-term-set-cwd-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to set the command."
+  (eat--t-term-set-cmd-fn terminal))
+
+(gv-define-setter eat-term-set-cmd-function (function terminal)
+  `(setf (eat--t-term-set-cmd-fn ,terminal) ,function))
+
+(defun eat-term-cmd-start-function (terminal)
+  "Return the function called just before a command is run in shell.
+
+The function is called with with a single argument, TERMINAL.  The
+function should not change point and buffer restriction.
+
+To set it, use (`setf' (`eat-term-cmd-start-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to call."
+  (eat--t-term-cmd-start-fn terminal))
+
+(gv-define-setter eat-term-cmd-start-function (function terminal)
+  `(setf (eat--t-term-cmd-start-fn ,terminal) ,function))
+
+(defun eat-term-cmd-finish-function (terminal)
+  "Return the function called after a command has finished in shell.
+
+The function is called with with a two arguments, TERMINAL and the
+exit status of the command.  The function should not change point and
+buffer restriction.
+
+To set it, use (`setf' (`eat-term-cmd-finish-function' TERMINAL)
+FUNCTION), where FUNCTION is the function to call."
+  (eat--t-term-cmd-finish-fn terminal))
+
+(gv-define-setter eat-term-cmd-finish-function (function terminal)
+  `(setf (eat--t-term-cmd-finish-fn ,terminal) ,function))
 
 (defun eat-term-size (terminal)
   "Return the size of TERMINAL as (WIDTH . HEIGHT)."
@@ -3898,13 +4113,13 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (defun eat--set-cursor (_ state)
   "Set cursor type according to STATE.
 
-  STATE can be one of the following:
+STATE can be one of the following:
 
-  `:default'            Default cursor.
-  `:invisible'          Invisible cursor.
-  `:very-visible'       Very visible cursor.  Can also be implemented
-                        as blinking cursor.
-  Any other value     Default cursor."
+`:default'            Default cursor.
+`:invisible'          Invisible cursor.
+`:very-visible'       Very visible cursor.  Can also be implemented as
+                      blinking cursor.
+Any other value     Default cursor."
   (setq-local eat--cursor-blink-type
               (pcase state
                 (:invisible eat-invisible-cursor-type)
@@ -3913,6 +4128,37 @@ return \"eat-color\", otherwise return \"eat-mono\"."
               cursor-type (car eat--cursor-blink-type))
   (eat--cursor-blink-mode (if (cadr eat--cursor-blink-type) +1 -1)))
 
+(defun eat--manipulate-kill-ring (_ selection data)
+  "Manipulate `kill-ring'.
+
+SELECTION can be one of `:clipboard', `:primary', `:secondary',
+`:select'.  When DATA is a string, set the selection to that string,
+when DATA is nil, unset the selection, and when DATA is t, return the
+selection, or nil if none."
+  (let ((inhibit-eol-conversion t)
+        (select-enable-clipboard (eq selection :clipboard))
+        (select-enable-primary (eq selection :primary)))
+    (pcase-exhaustive data
+      ('t
+       (when eat-enable-yank-to-terminal
+         (ignore-error error
+           (current-kill 0 'do-not-move))))
+      ((and (pred stringp) str)
+       (when eat-enable-kill-from-terminal
+         (kill-new str))))))
+
+(defun eat--bell (_)
+  "Ring the bell."
+  (ding t))
+
+(defun eat--set-cwd (_ host cwd)
+  "Set CWD as the current working directory (`default-directory').
+
+If HOST isn't the host Emacs is running on, don't do anything."
+  (when (and eat-enable-directory-tracking
+             (string= host (system-name)))
+    (ignore-errors
+      (cd-absolute cwd))))
 
 ;;;;; Input.
 
@@ -4248,35 +4494,6 @@ MODE should one of:
      (eat--mouse-modifier-click-mode -1)
      (eat--mouse-movement-mode -1))))
 
-(defun eat--manipulate-kill-ring (_ selection data)
-  "Manipulate `kill-ring'.
-
-SELECTION can be one of `:clipboard', `:primary', `:secondary',
-`:select'.  When DATA is a string, set the selection to that string,
-when DATA is nil, unset the selection, and when DATA is t, return the
-selection, or nil if none."
-  (let ((inhibit-eol-conversion t)
-        (select-enable-clipboard (eq selection :clipboard))
-        (select-enable-primary (eq selection :primary)))
-    (pcase-exhaustive data
-      ('t
-       (when eat-enable-yank-to-terminal
-         (ignore-error error
-           (current-kill 0 'do-not-move))))
-      ((and (pred stringp) str)
-       (when eat-enable-kill-from-terminal
-         (kill-new str))))))
-
-(defun eat--bell (_)
-  "Ring the bell."
-  (ding t))
-
-(defun eat--set-cwd (_ cwd)
-  "Set CWD as the current working directory (`default-directory')."
-  (when eat-enable-directory-tracking
-    (ignore-errors
-      (cd-absolute cwd))))
-
 
 ;;;;; Major Mode.
 
@@ -4329,7 +4546,8 @@ END if it's safe to do so."
                                 eat--output-queue-first-chunk-time
                                 eat--process-output-queue-timer))
   ;; This is intended; input methods don't work on read-only buffers.
-  (setq buffer-read-only nil buffer-undo-list t
+  (setq buffer-read-only nil
+        buffer-undo-list t
         eat--synchronize-scroll-function #'eat--synchronize-scroll
         filter-buffer-substring-function
         #'eat--filter-buffer-substring

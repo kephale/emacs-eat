@@ -17,26 +17,49 @@
 # For a full copy of the GNU General Public License
 # see <https://www.gnu.org/licenses/>.
 
+__eat_current_command=""
+__eat_exit_status=0
+
 __eat_prompt_command () {
+  # Send exit status.
+  if test -n "$__eat_current_command"
+  then
+    printf '\e]51;e;H;%i\e\\' "$__eat_exit_status"
+  fi
+  __eat_current_command=""
   # Send the current working directory, for directory tracking.
-  printf '\e]7;file://%s%s\e\\' "$HOSTNAME" "$PWD"
+  printf '\e]51;e;A;%s;%s\e\\' "$(printf "%s" "$HOSTNAME" | base64)" \
+         "$(printf "%s" "$PWD" | base64)"
+  # Update title.
+  # "${PWD/$HOME/'~'}" converts "/home/akib/org/" to "~/org/".
+  # The next one is substituted with '$', or '#' if we're "root".
+  printf '\e]2;%s@%s:%s%s\e\\' "$USER" "$HOSTNAME" \
+         "${PWD/$HOME/'~'}" \
+         "$(test $UID -eq 0 && echo '#' || echo '$')"
 }
 
 __eat_preexec () {
+  # Get the real command typed by the user from the history.
+  __eat_current_command="$(history 1 | sed 's/ *[0-9]* *//')"
+  # Send current command.
+  printf '\e]51;e;F;%s\e\\' \
+         "$(printf "%s" "$__eat_current_command" | base64)"
+  # Send pre-exec sequence.
+  printf '\e]51;e;G\e\\'
+  # Update title to including the command running.
   # "${PWD/$HOME/'~'}" converts "/home/akib/org/" to "~/org/".
   # The next one is substituted with '$', or '#' if we're "root".
-  # The final one gets the real command typed by the user from the
-  # history.
   printf '\e]2;%s@%s:%s%s %s\e\\' "$USER" "$HOSTNAME" \
          "${PWD/$HOME/'~'}" \
          "$(test $UID -eq 0 && echo '#' || echo '$')" \
-         "$(history 1 | sed 's/ *[0-9]* *//')"
+         "$__eat_current_command"
 }
 
 __eat_inhibit_preexec=yes
 
 __eat_before_prompt_command ()
 {
+  __eat_exit_status="$?"
   __eat_inhibit_preexec=yes
 }
 
@@ -54,10 +77,16 @@ __eat_before_exec () {
   fi
 }
 
+__eat_prompt_start='\e]51;e;B\e\\'
+__eat_prompt_end='\e]51;e;C\e\\'
+__eat_continuation_start='\e]51;e;D\e\\'
+__eat_continuation_end='\e]51;e;E\e\\'
+
 __eat_enable_integration ()
 {
   __eat_integration_enabled=yes
-  PS1='\[\e]2;\u@\h:\w$\e\\\]'"$PS1"
+  PS1="\[$__eat_prompt_start\]$PS1\[$__eat_prompt_end\]"
+  PS2="\[$__eat_continuation_start\]$PS2\[$__eat_continuation_end\]"
   PROMPT_COMMAND+=(__eat_prompt_command)
   trap '__eat_before_exec' DEBUG
   # Wrap 'PROMPT_COMMAND' to avoid it getting trapped in 'DEBUG' trap.
