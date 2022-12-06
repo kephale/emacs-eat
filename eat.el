@@ -151,6 +151,16 @@ to setup your shell."
   :group 'eat-ui
   :group 'eat-eshell)
 
+(defcustom eat-enable-shell-command-history t
+  "Non-nil means add shell commands to Emacs history.
+
+When non-nil, any command you run in your shell will also appear in
+the history of commands like `eat', `shell-command' and
+`async-shell-command'."
+  :type 'boolean
+  :group 'eat-ui
+  :group 'eat-eshell)
+
 (defconst eat--cursor-type-value-type
   (let ((cur-type
          '(choice
@@ -4159,6 +4169,12 @@ If HOST isn't the host Emacs is running on, don't do anything."
              (string= host (system-name)))
     (ignore-errors
       (cd-absolute cwd))))
+
+(defun eat--set-cmd (_ cmd)
+  "Add CMD to `shell-command-history'."
+  (when eat-enable-shell-command-history
+    (add-to-history 'shell-command-history cmd)))
+
 
 ;;;;; Input.
 
@@ -4799,7 +4815,8 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
             (eat-term-manipulate-selection-function eat--terminal)
             #'eat--manipulate-kill-ring
             (eat-term-ring-bell-function eat--terminal) #'eat--bell
-            (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd)
+            (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd
+            (eat-term-set-cmd-function eat--terminal) #'eat--set-cmd)
       ;; Crank up a new process.
       (let* ((size (eat-term-size eat--terminal))
              (process-environment
@@ -5064,7 +5081,8 @@ PROGRAM can be a shell command."
           (eat-term-manipulate-selection-function eat--terminal)
           #'eat--manipulate-kill-ring
           (eat-term-ring-bell-function eat--terminal) #'eat--bell
-          (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd)
+          (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd
+          (eat-term-set-cmd-function eat--terminal) #'eat--set-cmd)
     (when-let* ((window (get-buffer-window nil t)))
       (with-selected-window window
         (eat-term-resize eat--terminal (window-max-chars-per-line)
