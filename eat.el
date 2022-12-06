@@ -4241,8 +4241,7 @@ If HOST isn't the host Emacs is running on, don't do anything."
 
 (defun eat--pre-prompt (_)
   "Save the beginning position of shell prompt."
-  (when eat-enable-shell-prompt-annotation
-    (setq eat--shell-prompt-begin (point-marker))))
+  (setq eat--shell-prompt-begin (point-marker)))
 
 (defun eat--post-prompt (_)
   "Put a mark in the marginal area on current line."
@@ -4279,11 +4278,13 @@ If HOST isn't the host Emacs is running on, don't do anything."
              (list 'eat--before-string before-str
                    'eat--shell-prompt-mark-id identifier
                    'eat--shell-prompt-mark-overlay ov))
-            (push ov eat--shell-prompt-mark-overlays))
-          ;; Put a text property to allow previous or next prompts.
-          (put-text-property (1- (point)) (point)
-                             'eat--shell-prompt-end t))
-        (setq eat--shell-prompt-begin nil)))))
+            (push ov eat--shell-prompt-mark-overlays)))
+        (setq eat--shell-prompt-begin nil))))
+  (when eat--shell-prompt-begin
+    (when (< eat--shell-prompt-begin (point))
+      ;; Put a text property to allow previous or next prompts.
+      (put-text-property (1- (point)) (point)
+                         'eat--shell-prompt-end t))))
 
 (defun eat--update-shell-prompt-mark-overlays (buffer)
   "Update all overlays used to add mark before shell prompt.
