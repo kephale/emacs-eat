@@ -161,6 +161,63 @@ the history of commands like `eat', `shell-command' and
   :group 'eat-ui
   :group 'eat-eshell)
 
+(defcustom eat-enable-shell-prompt-annotation t
+  "Non-nil means annotate shell prompt with the status of command.
+
+When non-nil, display a mark in front of shell prompt describing the
+status of the command executed in that prompt."
+  :type 'boolean
+  :group 'eat-ui)
+
+(defcustom eat-shell-prompt-annotation-position 'left-margin
+  "The position where to display shell prompt annotation.
+
+The value can be one of the following:
+
+`left-margin'   Use the left margin.
+`right-margin'  Use the right margin."
+  :type '(choice (const :tag "Left margin" left-margin)
+                 (const :tag "Right margin" right-margin))
+  :group 'eat-ui)
+
+(defcustom eat-shell-prompt-annotation-running-margin-indicator "-"
+  "String in margin annotation to indicate the command is running."
+  :type 'string
+  :group 'eat-ui)
+
+(defface eat-shell-prompt-annotation-running
+  '((t :inherit compilation-info))
+  "Face used in annotation to indicate the command is running."
+  :group 'eat-ui)
+
+(defcustom eat-shell-prompt-annotation-success-margin-indicator "0"
+  "String in margin annotation to indicate the command has succeeded."
+  :type 'string
+  :group 'eat-ui)
+
+(defface eat-shell-prompt-annotation-success
+  '((t :inherit success))
+  "Face used in annotation to indicate the command has succeeded."
+  :group 'eat-ui)
+
+(defcustom eat-shell-prompt-annotation-failure-margin-indicator "X"
+  "String in margin annotation to indicate the command has failed."
+  :type 'string
+  :group 'eat-ui)
+
+(defface eat-shell-prompt-annotation-failure
+  '((t :inherit error))
+  "Face used in annotation to indicate the command has failed."
+  :group 'eat-ui)
+
+(defcustom eat-shell-prompt-annotation-delay 0.1
+  "Seconds to wait before updating prompt annotations.
+
+Nil means update immediately."
+  :type '(choice (const :tag "Immediately" nil)
+                 number)
+  :group 'eat-ui)
+
 (defconst eat--cursor-type-value-type
   (let ((cur-type
          '(choice
@@ -4112,6 +4169,18 @@ return \"eat-color\", otherwise return \"eat-mono\"."
 (defvar eat--synchronize-scroll-function nil
   "Function to synchronize scrolling between terminal and window.")
 
+(defvar eat--shell-command-status 0
+  "If the current shell command has finished, its exit status.")
+
+(defvar eat--shell-prompt-begin nil
+  "Beginning of last shell prompt.")
+
+(defvar eat--shell-prompt-mark nil
+  "Display property used to put a mark before the previous prompt.")
+
+(defvar eat--shell-prompt-mark-overlays nil
+  "List of overlay used to put marks before shell prompts.")
+
 (defun eat-reset ()
   "Perform a terminal reset."
   (interactive)
@@ -4170,10 +4239,117 @@ If HOST isn't the host Emacs is running on, don't do anything."
     (ignore-errors
       (cd-absolute cwd))))
 
+(defun eat--pre-prompt (_)
+  "Save the beginning position of shell prompt."
+  (when eat-enable-shell-prompt-annotation
+    (setq eat--shell-prompt-begin (point-marker))))
+
+(defun eat--post-prompt (_)
+  "Put a mark in the marginal area on current line."
+  (when eat-enable-shell-prompt-annotation
+    (let ((indicator
+           (if (zerop eat--shell-command-status)
+               (propertize
+                eat-shell-prompt-annotation-success-margin-indicator
+                'face 'eat-shell-prompt-annotation-success)
+             (propertize
+              eat-shell-prompt-annotation-failure-margin-indicator
+              'face 'eat-shell-prompt-annotation-failure))))
+      ;; Update previous prompt's indicator using side-effect.
+      (when eat--shell-prompt-mark
+        (setf (cadr eat--shell-prompt-mark) indicator)
+        (setq eat--shell-prompt-mark nil))
+      ;; Show this prompt's indicator.
+      (when eat--shell-prompt-begin
+        (when (< eat--shell-prompt-begin (point))
+          ;; Save it, we'll use side-effect.
+          (setq eat--shell-prompt-mark
+                `((margin ,eat-shell-prompt-annotation-position)
+                  ,indicator))
+          ;; Make overlay and put bookkeeping properties.
+          (let ((identifier (gensym "eat--prompt-mark-identifier-"))
+                (before-str
+                 (propertize " " 'display eat--shell-prompt-mark))
+                (ov (make-overlay eat--shell-prompt-begin
+                                  (1+ eat--shell-prompt-begin))))
+            (overlay-put ov 'before-string before-str)
+            (overlay-put ov 'eat--shell-prompt-mark-id identifier)
+            (add-text-properties
+             eat--shell-prompt-begin (1+ eat--shell-prompt-begin)
+             (list 'eat--before-string before-str
+                   'eat--shell-prompt-mark-id identifier
+                   'eat--shell-prompt-mark-overlay ov))
+            (push ov eat--shell-prompt-mark-overlays)))
+        (setq eat--shell-prompt-begin nil)))))
+
+(defun eat--update-shell-prompt-mark-overlays (buffer)
+  "Update all overlays used to add mark before shell prompt.
+
+BUFFER is the terminal buffer."
+  (when (and (buffer-live-p buffer)
+             eat-enable-shell-prompt-annotation)
+    (with-current-buffer buffer
+      (while-no-input
+        ;; Delete all outdated overlays.
+        (dolist (ov eat--shell-prompt-mark-overlays)
+          (unless (eq (overlay-get ov 'eat--shell-prompt-mark-id)
+                      (get-text-property (overlay-start ov)
+                                         'eat--shell-prompt-mark-id))
+            (delete-overlay ov)
+            (setq eat--shell-prompt-mark-overlays
+                  (delq ov eat--shell-prompt-mark-overlays))))
+        (save-excursion
+          ;; Recreate overlays if needed.
+          (goto-char (eat-term-beginning eat--terminal))
+          (while (< (point) (eat-term-end eat--terminal))
+            (when (get-text-property
+                   (point) 'eat--shell-prompt-mark-id)
+              (let ((ov (get-text-property
+                         (point) 'eat--shell-prompt-mark-overlay)))
+                (unless
+                    (and ov
+                         (overlay-buffer ov)
+                         (eq (overlay-get
+                              ov 'eat--shell-prompt-mark-id)
+                             (get-text-property
+                              (point) 'eat--shell-prompt-mark-id)))
+                  ;; Recreate.
+                  (when ov
+                    (delete-overlay ov)
+                    (setq eat--shell-prompt-mark-overlays
+                          (delq ov eat--shell-prompt-mark-overlays)))
+                  (setq ov (make-overlay (point) (1+ (point))))
+                  (overlay-put ov 'before-string
+                               (get-text-property
+                                (point) 'eat--before-string))
+                  (overlay-put ov 'eat--shell-prompt-mark-id
+                               (get-text-property
+                                (point) 'eat--shell-prompt-mark-id))
+                  (push ov eat--shell-prompt-mark-overlays))))
+            (goto-char (or (next-single-property-change
+                            (point) 'eat--shell-prompt-mark-id nil
+                            (eat-term-end eat--terminal))
+                           (eat-term-end eat--terminal)))))))))
+
 (defun eat--set-cmd (_ cmd)
   "Add CMD to `shell-command-history'."
   (when eat-enable-shell-command-history
     (add-to-history 'shell-command-history cmd)))
+
+(defun eat--pre-cmd (_)
+  "Update shell prompt mark to indicate command is running."
+  (when (and eat-enable-shell-prompt-annotation
+             eat--shell-prompt-mark)
+    (setf (cadr eat--shell-prompt-mark)
+          (propertize
+           eat-shell-prompt-annotation-running-margin-indicator
+           'face 'eat-shell-prompt-annotation-running))))
+
+(defun eat--set-cmd-status (_ code)
+  "Set CODE as the current shell command's exit status."
+  (when eat-enable-shell-prompt-annotation
+    ;; We'll update the mark later when the prompt appears.
+    (setq eat--shell-command-status code)))
 
 
 ;;;;; Input.
@@ -4546,21 +4722,27 @@ END if it's safe to do so."
 (define-derived-mode eat-mode fundamental-mode "Eat"
   "Major mode for Eat."
   :group 'eat-ui
-  (mapc #'make-local-variable '(buffer-read-only
-                                buffer-undo-list
-                                filter-buffer-substring-function
-                                mode-line-process
-                                mode-line-buffer-identification
-                                glyphless-char-display
-                                cursor-type
-                                track-mouse
-                                eat--terminal
-                                eat--process
-                                eat--synchronize-scroll-function
-                                eat--mouse-grabbing-type
-                                eat--pending-output-chunks
-                                eat--output-queue-first-chunk-time
-                                eat--process-output-queue-timer))
+  (mapc #'make-local-variable
+        '(buffer-read-only
+          buffer-undo-list
+          filter-buffer-substring-function
+          mode-line-process
+          mode-line-buffer-identification
+          glyphless-char-display
+          cursor-type
+          track-mouse
+          eat--terminal
+          eat--process
+          eat--synchronize-scroll-function
+          eat--mouse-grabbing-type
+          eat--shell-command-status
+          eat--shell-prompt-begin
+          eat--shell-prompt-mark
+          eat--shell-prompt-mark-overlays
+          eat--pending-output-chunks
+          eat--output-queue-first-chunk-time
+          eat--process-output-queue-timer
+          eat--shell-prompt-annotation-update-timer))
   ;; This is intended; input methods don't work on read-only buffers.
   (setq buffer-read-only nil
         buffer-undo-list t
@@ -4634,7 +4816,24 @@ mouse-3: Switch to char mode"
   ;; that would break the display.
   (eat--setup-glyphless-chars)
   (when eat-enable-blinking-text
-    (eat-blink-mode +1)))
+    (eat-blink-mode +1))
+  (when eat-enable-shell-prompt-annotation
+    (let ((margin-width
+           (max
+            (string-width
+             eat-shell-prompt-annotation-running-margin-indicator)
+            (string-width
+             eat-shell-prompt-annotation-success-margin-indicator)
+            (string-width
+             eat-shell-prompt-annotation-failure-margin-indicator))))
+      (pcase-exhaustive eat-shell-prompt-annotation-position
+        ('left-margin
+         (setq left-margin-width margin-width))
+        ('right-margin
+         (setq right-margin-width margin-width))))
+    ;; Make sure the marginal area is resized.
+    (dolist (win (get-buffer-window-list))
+      (set-window-buffer win (current-buffer)))))
 
 
 ;;;;; Process Handling.
@@ -4652,6 +4851,9 @@ The output chunks are pushed, so last output appears first.")
 
 (defvar eat--process-output-queue-timer nil
   "Timer to process output queue.")
+
+(defvar eat--shell-prompt-annotation-update-timer nil
+  "Timer to update shell prompt annotations.")
 
 (defun eat-kill-process ()
   "Kill Eat process in current buffer."
@@ -4708,6 +4910,13 @@ OS's."
            (max (point-min)
                 (- (eat-term-display-beginning eat--terminal)
                    eat-term-scrollback-size))))
+        (if (null eat-shell-prompt-annotation-delay)
+            (eat--update-shell-prompt-mark-overlays buffer)
+          (setq eat--shell-prompt-annotation-update-timer
+                (run-with-timer
+                 eat-shell-prompt-annotation-delay
+                 nil #'eat--update-shell-prompt-mark-overlays
+                 buffer)))
         (when synchronize-scroll
           (funcall eat--synchronize-scroll-function))))))
 
@@ -4717,6 +4926,8 @@ OS's."
     (with-current-buffer (process-buffer process)
       (when eat--process-output-queue-timer
         (cancel-timer eat--process-output-queue-timer))
+      (when eat--shell-prompt-annotation-update-timer
+        (cancel-timer eat--shell-prompt-annotation-update-timer))
       (unless eat--output-queue-first-chunk-time
         (setq eat--output-queue-first-chunk-time (current-time)))
       (push output eat--pending-output-chunks)
@@ -4816,7 +5027,14 @@ same Eat buffer.  The hook `eat-exec-hook' is run after each exec."
             #'eat--manipulate-kill-ring
             (eat-term-ring-bell-function eat--terminal) #'eat--bell
             (eat-term-set-cwd-function eat--terminal) #'eat--set-cwd
-            (eat-term-set-cmd-function eat--terminal) #'eat--set-cmd)
+            (eat-term-prompt-start-function eat--terminal)
+            #'eat--pre-prompt
+            (eat-term-prompt-end-function eat--terminal)
+            #'eat--post-prompt
+            (eat-term-set-cmd-function eat--terminal) #'eat--set-cmd
+            (eat-term-cmd-start-function eat--terminal) #'eat--pre-cmd
+            (eat-term-cmd-finish-function eat--terminal)
+            #'eat--set-cmd-status)
       ;; Crank up a new process.
       (let* ((size (eat-term-size eat--terminal))
              (process-environment
