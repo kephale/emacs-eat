@@ -742,7 +742,7 @@ For example: when THRESHOLD is 3, \"*foobarbaz\" is converted to
   (end nil :documentation "End of terminal area.")
   (title "" :documentation "The title of the terminal.")
   (cwd
-   default-directory
+   (cons (system-name) default-directory)
    :documentation "The working directory of the terminal.")
   (bell-fn
    (1value #'ignore)
