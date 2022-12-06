@@ -4279,7 +4279,10 @@ If HOST isn't the host Emacs is running on, don't do anything."
              (list 'eat--before-string before-str
                    'eat--shell-prompt-mark-id identifier
                    'eat--shell-prompt-mark-overlay ov))
-            (push ov eat--shell-prompt-mark-overlays)))
+            (push ov eat--shell-prompt-mark-overlays))
+          ;; Put a text property to allow previous or next prompts.
+          (put-text-property (1- (point)) (point)
+                             'eat--shell-prompt-end t))
         (setq eat--shell-prompt-begin nil)))))
 
 (defun eat--update-shell-prompt-mark-overlays (buffer)
@@ -4350,6 +4353,40 @@ BUFFER is the terminal buffer."
   (when eat-enable-shell-prompt-annotation
     ;; We'll update the mark later when the prompt appears.
     (setq eat--shell-command-status code)))
+
+(defun eat-previous-shell-prompt (&optional arg)
+  "Go to the previous shell prompt.
+
+When numeric prefix argument, ARG, is given, go to ARGth previous
+shell prompt."
+  (interactive "p")
+  (dotimes (_ (or arg 1))
+    (let ((previous (previous-single-property-change
+                     (point) 'eat--shell-prompt-end)))
+      (goto-char (or previous (point-min)))
+      (when (get-text-property (point) 'eat--shell-prompt-end)
+        (setq previous (previous-single-property-change
+                        (point) 'eat--shell-prompt-end))
+        (goto-char (or previous (point-min))))
+      (unless previous
+        (user-error "No previous prompt")))))
+
+(defun eat-next-shell-prompt (&optional arg)
+  "Go to the next shell prompt.
+
+When numeric prefix argument, ARG, is given, go to ARGth next shell
+prompt."
+  (interactive "p")
+  (dotimes (_ (or arg 1))
+    (let ((next (next-single-property-change
+                 (point) 'eat--shell-prompt-end)))
+      (goto-char (or next (point-max)))
+      (when (get-text-property (point) 'eat--shell-prompt-end)
+        (goto-char (or (next-single-property-change
+                        (point) 'eat--shell-prompt-end)
+                       (point-max))))
+      (unless next
+        (user-error "No next prompt")))))
 
 
 ;;;;; Input.
@@ -4548,6 +4585,8 @@ ARG is passed to `yank-pop', which see."
     (define-key map [?\C-c ?\M-d] #'eat-char-mode)
     (define-key map [?\C-c ?\C-j] #'eat-semi-char-mode)
     (define-key map [?\C-c ?\C-k] #'eat-kill-process)
+    (define-key map [?\C-c ?\C-p] #'eat-previous-shell-prompt)
+    (define-key map [?\C-c ?\C-n] #'eat-next-shell-prompt)
     map)
   "Keymap for Eat mode.")
 
