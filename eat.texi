@@ -65,13 +65,12 @@ Basic Operations
 * Input Modes::         Input modes for various use-cases.
 
 Advanced Customizations
+* Shell Integration::   Getting the most from Eat and your shell.
 * Display::             The region where everything is shown.
 * Scrollback::          Region for things that went out of display.
 * Cursor Types::        Cursor can displayed in many forms.
 * Mouse Tracking::      Eat tracks mouse, but this can be changed.
 * Clipboard::           Integrating kill ring with terminal.
-* Directory Tracking::  Tracking the working directory of program.
-* Shell Integration::   Getting the most from Eat and your shell.
 * Colors::              Eat can show more than sixteen million colors.
 * Fonts::               Eat can show up to sixty font different fonts.
 * Blinking Text::       Annoying blinking texts.
@@ -104,7 +103,7 @@ Firstly, it's in Emacs, which means you don't need to leave the
 comfort of Emacs to use Emacs.
 
 Secondly, it's easy and convenient to use.  It is tries to stay out of
-your way, allow you to maximize your productivity.
+your way, allowing you to maximize your productivity.
 
 Finally, special care has been taken while designing the keybindings,
 so that the terminal doesn't conflict with Emacs default keybindings
@@ -327,6 +326,111 @@ command @command{eshell-toggle-direct-send} is remapped to enable
 
 @part Part III:@* Advanced Customizations
 
+@node Shell Integration
+@cindex shell integration
+@cindex integration, shell
+@chapter Shell Integration
+
+Eat comes with shell scripts to integrate your favorite shell with
+Eat.  When shell integration is enabled and the script is loaded in
+your shell, it'll take care of everything and provide many useful
+features.
+
+Currently only GNU Bash is supported.
+
+If you use GNU Bash, put the following in your @samp{.bashrc} file:
+
+@example
+[ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \
+  source "$EAT_SHELL_INTEGRATION_DIR/bash"
+@end example
+
+@cindex directory tracking
+@cindex tracking directory
+@cindex working directory tracking
+@cindex tracking working directory
+@cindex cwd tracking
+@cindex tracking cwd
+After you've setup shell integration, the Eat will track the working
+directory of your shell.  That means @command{find-file} will start
+from your shell's current working directory.  This also works in
+Eshell, but after the program exits, the current working directory is
+changed back to the directory from where the program was invoked.
+
+@vindex eat-enable-directory-tracking
+@defopt eat-enable-directory-tracking
+This controls directory tracking.  When set to non-@code{nil}, Eat
+tracks the current working directory of programs.
+@end defopt
+
+@cindex shell prompt navigation
+@cindex shell navigation, shell prompt
+@cindex prompt navigation
+@cindex navigation, prompt
+@kindex C-c C-p @r{(``emacs mode''})
+@kindex C-c C-p @r{(``semi-char mode'')}
+@findex eat-previous-shell-prompt
+@kindex C-c C-n @r{(``emacs mode'')}
+@kindex C-c C-n @r{(``semi-char mode'')}
+@findex eat-next-shell-prompt
+You can navigate shell prompts in ``emacs'' and ``semi-char'' mode.
+@kbd{C-c C-p}, bound to @command{eat-previous-shell-prompt}, goes to
+the previous shell prompt.  @kbd{C-c C-n}, bound to
+@command{eat-next-shell-prompt}, is the opposite, it goes to the next
+shell prompt.  This doesn't work in Eshell.
+
+@cindex shell prompt annotation
+@cindex annotation, shell prompt
+@cindex annotate, shell prompt
+@cindex prompt annotation
+@cindex annotation, prompt
+@cindex annotate, prompt
+When shell integration is setup, Eat annotates each shell prompt.  Eat
+puts a mark on the shell prompt indicating the whether the command
+entered in that prompt is running, exited successfully or exited with
+non-zero status.  This doesn't work in Eshell.  You can disable this
+feature if you want.
+
+@vindex eat-enable-shell-prompt-annotation
+@defopt eat-enable-shell-prompt-annotation
+This controls shell prompt annotation by Eat.  When set to
+non-@code{nil}, Eat annotates shell prompts to indicate the status of
+the command entered in that prompt.
+@end defopt
+
+Eat uses the marginal area
+(@pxref{Display Margins,,, emacs, GNU Emacs Manual}) on the left side
+to display the annotation.  You also use the right margin.
+
+@vindex eat-shell-prompt-annotation-position
+@defopt eat-shell-prompt-annotation-position
+This controls where the shell prompt annotations are displayed.  When
+set to @code{left-margin} (the default), Eat uses the left margin.
+When set to @code{right-margin}, Eat uses the right margin.
+@end defopt
+
+@vindex eat-shell-prompt-annotation-running-margin-indicator
+@vindex eat-shell-prompt-annotation-running
+@vindex eat-shell-prompt-annotation-success-margin-indicator
+@vindex eat-shell-prompt-annotation-success
+@vindex eat-shell-prompt-annotation-failure-margin-indicator
+@vindex eat-shell-prompt-annotation-failure
+
+Eat uses the strings ``-'', ``0'' and ``X'' respectively to indicate
+the command is running, the command has succeeded and the command has
+failed.  You can also customize the them. The user option
+@code{eat-shell-prompt-annotation-running-margin-indicator} and the
+face @code{eat-shell-prompt-annotation-running} control the indicator
+used to indicate the command is running.  The user option
+@code{eat-shell-prompt-annotation-success-margin-indicator} and the
+face @code{eat-shell-prompt-annotation-success} control the indicator
+used to indicate the command has exited successfully.  And finally
+the user option
+@code{eat-shell-prompt-annotation-failure-margin-indicator} and the
+face @code{eat-shell-prompt-annotation-failure} control the indicator
+used to indicate the command has exited unsuccessfully with non-zero
+exit status.
+
 @node Display
 @cindex display
 @chapter Display
@@ -471,57 +575,6 @@ This controls sending kill ring texts to terminal.  When set to
 non-@code{nil}, programs can receive the kill ring contents.  This is
 disabled by default for security reasons.
 @end defopt
-
-@node Directory Tracking
-@cindex directory tracking
-@cindex tracking directory
-@cindex working directory tracking
-@cindex tracking working directory
-@cindex cwd tracking
-@cindex tracking cwd
-@chapter Directory Tracking
-
-Eat can track the current working directory of the program.  This also
-works in Eshell, but after the program exits, the current working
-directory is changed back to the directory from where the program was
-invoked.
-
-To track, Eat needs the program to send this information.  So, to
-enable directory tracking, you'll need to setup your shell
-(@pxref{Shell Integration}).  You'll need to arrange that your shell
-sends appropriate escape sequence at each prompt, for example with the
-command:
-
-@example
-printf "\\e]7;file://%s%s\\e\\\\" "$HOSTNAME" "$PWD"
-@end example
-
-If you don't want Eat to track your program's working directory, you
-can set the following to nil:
-
-@vindex eat-enable-directory-tracking
-@defopt eat-enable-directory-tracking
-This controls directory tracking.  When set to non-@code{nil}, Eat
-tracks the current working directory of programs.
-@end defopt
-
-@node Shell Integration
-@cindex shell integration
-@cindex integration, shell
-@chapter Shell Integration
-
-Eat comes with shell scripts to integrate your favorite shell with
-Eat.  You can include the script in your shell configuration file,
-it'll take care of everything.
-
-Currently only GNU Bash is supported.
-
-If you use GNU Bash, put the following in your @samp{.bashrc} file:
-
-@example
-[ -n "$EAT_SHELL_INTEGRATION_DIR" ] && \
-  source "$EAT_SHELL_INTEGRATION_DIR/bash"
-@end example
 
 @node Colors
 @cindex colors
