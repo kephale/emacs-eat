@@ -5752,25 +5752,32 @@ Write plain text and newline to move cursor."
 (ert-deftest eat-test-set-cwd ()
   "Test setting current working directory."
   (eat--tests-with-term '()
-    (let ((cwd default-directory))
-      (should (string= (eat-term-cwd (terminal)) default-directory))
+    (let ((cwd default-directory)
+          (host (system-name)))
+      (should (string= (car (eat-term-cwd (terminal))) host))
+      (should (string= (cdr (eat-term-cwd (terminal))) cwd))
       (setf (eat-term-set-cwd-function (terminal))
-            (lambda (term dir)
+            (lambda (term hostname dir)
               (should (eq term (terminal)))
-              (setq cwd dir)))
+              (setq cwd dir)
+              (setq host hostname)))
       ;; file://HOST/PATH/.
-      (output (format "\e]7;file://%s/foo/bar/\e\\" (system-name)))
+      (output (format "\e]51;e;A;%s;%s\e\\"
+                      (base64-encode-string "frob")
+                      (base64-encode-string "/foo/bar/")))
+      (should (string= host "frob"))
+      (should (string= (car (eat-term-cwd (terminal))) "frob"))
       (should (string= cwd "/foo/bar/"))
-      (should (string= (eat-term-cwd (terminal)) "/foo/bar/"))
+      (should (string= (cdr (eat-term-cwd (terminal))) "/foo/bar/"))
+      (should-term :cursor '(1 . 1))
       ;; file://HOST/PATH (note the missing trailing slash).
-      (output (format "\e]7;file://%s/bar/baz\a" (system-name)))
+      (output (format "\e]51;e;A;%s;%s\e\\"
+                      (base64-encode-string "foo")
+                      (base64-encode-string "/bar/baz")))
+      (should (string= host "foo"))
+      (should (string= (car (eat-term-cwd (terminal))) "foo"))
       (should (string= cwd "/bar/baz/"))
-      (should (string= (eat-term-cwd (terminal)) "/bar/baz/"))
-      ;; file://SOME-OTHER-HOST/PATH/
-      (output (format "\e]7;file://%s/baz/foo/\e\\"
-                      (if (string= (system-name) "foo") "bar" "foo")))
-      (should (string= cwd "/bar/baz/"))
-      (should (string= (eat-term-cwd (terminal)) "/bar/baz/"))
+      (should (string= (cdr (eat-term-cwd (terminal))) "/bar/baz/"))
       (should-term :cursor '(1 . 1)))))
 
 
