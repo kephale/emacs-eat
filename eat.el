@@ -210,10 +210,13 @@ The value can be one of the following:
   "Face used in annotation to indicate the command has failed."
   :group 'eat-ui)
 
-(defcustom eat-shell-prompt-annotation-delay 0.1
-  "Seconds to wait before updating prompt annotations.
+(defcustom eat-shell-prompt-annotation-correction-delay 0.1
+  "Seconds to wait before correcting shell prompt annotations.
 
-Nil means update immediately."
+Wait this many second after terminal update before correcting shell
+prompt annotation.
+
+Nil means correct immediately after terminal update."
   :type '(choice (const :tag "Immediately" nil)
                  number)
   :group 'eat-ui)
@@ -4286,8 +4289,8 @@ If HOST isn't the host Emacs is running on, don't do anything."
       (put-text-property (1- (point)) (point)
                          'eat--shell-prompt-end t))))
 
-(defun eat--update-shell-prompt-mark-overlays (buffer)
-  "Update all overlays used to add mark before shell prompt.
+(defun eat--correct-shell-prompt-mark-overlays (buffer)
+  "Correct all overlays used to add mark before shell prompt.
 
 BUFFER is the terminal buffer."
   (when (and (buffer-live-p buffer)
@@ -4782,7 +4785,7 @@ END if it's safe to do so."
           eat--pending-output-chunks
           eat--output-queue-first-chunk-time
           eat--process-output-queue-timer
-          eat--shell-prompt-annotation-update-timer))
+          eat--shell-prompt-annotation-correction-timer))
   ;; This is intended; input methods don't work on read-only buffers.
   (setq buffer-read-only nil
         buffer-undo-list t
@@ -4892,8 +4895,8 @@ The output chunks are pushed, so last output appears first.")
 (defvar eat--process-output-queue-timer nil
   "Timer to process output queue.")
 
-(defvar eat--shell-prompt-annotation-update-timer nil
-  "Timer to update shell prompt annotations.")
+(defvar eat--shell-prompt-annotation-correction-timer nil
+  "Timer to correct shell prompt annotations.")
 
 (defun eat-kill-process ()
   "Kill Eat process in current buffer."
@@ -4950,12 +4953,12 @@ OS's."
            (max (point-min)
                 (- (eat-term-display-beginning eat--terminal)
                    eat-term-scrollback-size))))
-        (if (null eat-shell-prompt-annotation-delay)
-            (eat--update-shell-prompt-mark-overlays buffer)
-          (setq eat--shell-prompt-annotation-update-timer
+        (if (null eat-shell-prompt-annotation-correction-delay)
+            (eat--correct-shell-prompt-mark-overlays buffer)
+          (setq eat--shell-prompt-annotation-correction-timer
                 (run-with-timer
-                 eat-shell-prompt-annotation-delay
-                 nil #'eat--update-shell-prompt-mark-overlays
+                 eat-shell-prompt-annotation-correction-delay
+                 nil #'eat--correct-shell-prompt-mark-overlays
                  buffer)))
         (when synchronize-scroll
           (funcall eat--synchronize-scroll-function))))))
@@ -4966,8 +4969,8 @@ OS's."
     (with-current-buffer (process-buffer process)
       (when eat--process-output-queue-timer
         (cancel-timer eat--process-output-queue-timer))
-      (when eat--shell-prompt-annotation-update-timer
-        (cancel-timer eat--shell-prompt-annotation-update-timer))
+      (when eat--shell-prompt-annotation-correction-timer
+        (cancel-timer eat--shell-prompt-annotation-correction-timer))
       (unless eat--output-queue-first-chunk-time
         (setq eat--output-queue-first-chunk-time (current-time)))
       (push output eat--pending-output-chunks)
