@@ -5027,11 +5027,8 @@ of window displaying PROCESS's buffer."
             (height (max (cdr size) 1))
             (inhibit-read-only t)
             (synchronize-scroll
-             (and (<= (eat-term-display-beginning eat--terminal)
-                      (point))
-                  (or (< (point) (eat-term-end eat--terminal))
-                      (= (point) (eat-term-end eat--terminal)
-                         (point-max))))))
+             (or (= (eat-term-display-cursor eat--terminal) (point))
+                 eat--char-mode)))
         (eat-term-resize eat--terminal width height)
         (eat-term-redisplay eat--terminal)
         (when synchronize-scroll
