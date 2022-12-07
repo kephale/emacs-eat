@@ -4848,8 +4848,7 @@ mouse-3: Switch to char mode"
                     (when (and eat--terminal
                                (not (string-empty-p (eat-term-title
                                                      eat--terminal))))
-                      (format "(%s)"  (eat-term-title
-                                       eat--terminal))))
+                      (format "(%s)" (eat-term-title eat--terminal))))
                    help-echo "Title"))))))
   (eat-emacs-mode)
   ;; Make sure glyphless character don't display a huge box glyph,

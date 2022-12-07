@@ -806,7 +806,7 @@ an empty Bash prompt, the next prompt won't appear before this much
 time.
 
 You should set the time to something comfortable for you.  You can
-also set this to zero is disable waiting and showing the output
+also set this to zero to disable waiting and showing the output
 instantly, but this would likely cause a lot of flickering.
 @end defopt
 
@@ -826,11 +826,27 @@ of large burst of output, redisplay is never deferred more than this
 many seconds, and cause a latency of up to this many seconds.
 
 You should set the time to something comfortable for you.  You can
-also set this to zero is disable waiting and showing the output
+also set this to zero to disable waiting and showing the output
 instantly, but this would likely cause a lot of flickering.
 @end defopt
 
-The user option described in this chapter have reasonable default
+Due to some limitations, shell prompt annotations
+(@pxref{Shell Integration}) can get messed up sometimes.  Eat
+automatically corrects them after each terminal redisplay.  However,
+this can have some performance impact when the terminal scrollback and
+display is large enough.  So Eat defers the correction.
+
+@vindex eat-shell-prompt-annotation-delay
+@defopt eat-shell-prompt-annotation-delay
+The value is the time in seconds to wait for more output before
+correcting shell prompt annotations.
+
+You should set the time to something comfortable for you.  You can
+also set this to zero to disable waiting and correct annotations
+instantly, but this may cause the terminal to slow down in some cases.
+@end defopt
+
+The user options described in this chapter have reasonable default
 values, but they may change anytime.
 
 @part Part IV:@* Recovering from Problems
