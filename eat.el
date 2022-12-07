@@ -5789,7 +5789,8 @@ to the end of (accessible portion of) buffer."
   (goto-char (point-max))
   ;; Hope that `float-time' won't roll over while tracing.  ;-)
   (insert (replace-regexp-in-string
-           "\n" "\\\\n"
+           (rx (any (0 . 31)))
+           (lambda (string) (format "\\\\x%02x" (aref string 0)))
            (format "%S" `(,(float-time time) ,operation ,@args)))
           ?\n))
 
