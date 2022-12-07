@@ -214,11 +214,8 @@ The value can be one of the following:
   "Seconds to wait before correcting shell prompt annotations.
 
 Wait this many second after terminal update before correcting shell
-prompt annotation.
-
-Nil means correct immediately after terminal update."
-  :type '(choice (const :tag "Immediately" nil)
-                 number)
+prompt annotation."
+  :type 'number
   :group 'eat-ui)
 
 (defconst eat--cursor-type-value-type
@@ -4953,13 +4950,11 @@ OS's."
            (max (point-min)
                 (- (eat-term-display-beginning eat--terminal)
                    eat-term-scrollback-size))))
-        (if (null eat-shell-prompt-annotation-correction-delay)
-            (eat--correct-shell-prompt-mark-overlays buffer)
-          (setq eat--shell-prompt-annotation-correction-timer
-                (run-with-timer
-                 eat-shell-prompt-annotation-correction-delay
-                 nil #'eat--correct-shell-prompt-mark-overlays
-                 buffer)))
+        (setq eat--shell-prompt-annotation-correction-timer
+              (run-with-timer
+               eat-shell-prompt-annotation-correction-delay
+               nil #'eat--correct-shell-prompt-mark-overlays
+               buffer))
         (when synchronize-scroll
           (funcall eat--synchronize-scroll-function))))))
 
