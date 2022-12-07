@@ -17,9 +17,6 @@
 # For a full copy of the GNU General Public License
 # see <https://www.gnu.org/licenses/>.
 
-__eat_current_command=""
-__eat_exit_status=0
-
 __eat_prompt_command () {
   # Send exit status.
   if test -n "$__eat_current_command"
@@ -55,8 +52,6 @@ __eat_preexec () {
          "$__eat_current_command"
 }
 
-__eat_inhibit_preexec=yes
-
 __eat_before_prompt_command ()
 {
   __eat_exit_status="$?"
@@ -77,14 +72,16 @@ __eat_before_exec () {
   fi
 }
 
-__eat_prompt_start='\e]51;e;B\e\\'
-__eat_prompt_end='\e]51;e;C\e\\'
-__eat_continuation_start='\e]51;e;D\e\\'
-__eat_continuation_end='\e]51;e;E\e\\'
-
 __eat_enable_integration ()
 {
   __eat_integration_enabled=yes
+  __eat_current_command=""
+  __eat_exit_status=0
+  __eat_inhibit_preexec=yes
+  local __eat_prompt_start='\e]51;e;B\e\\'
+  local __eat_prompt_end='\e]51;e;C\e\\'
+  local __eat_continuation_start='\e]51;e;D\e\\'
+  local __eat_continuation_end='\e]51;e;E\e\\'
   PS1="\[$__eat_prompt_start\]$PS1\[$__eat_prompt_end\]"
   PS2="\[$__eat_continuation_start\]$PS2\[$__eat_continuation_end\]"
   PROMPT_COMMAND+=(__eat_prompt_command)
