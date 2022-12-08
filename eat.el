@@ -4300,6 +4300,7 @@ If HOST isn't the host Emacs is running on, don't do anything."
 
 BUFFER is the terminal buffer."
   (when (and (buffer-live-p buffer)
+             (buffer-local-value 'eat--terminal buffer)
              eat-enable-shell-prompt-annotation)
     (with-current-buffer buffer
       (while-no-input
@@ -5001,7 +5002,21 @@ to it."
               (kill-buffer buffer)
             (with-current-buffer buffer
               (let ((inhibit-read-only t))
-                (eat--process-output-queue (current-buffer))
+                (when eat--process-output-queue-timer
+                  (cancel-timer eat--process-output-queue-timer)
+                  (setq eat--process-output-queue-timer nil))
+                (eat--process-output-queue buffer)
+                (when eat--shell-prompt-annotation-correction-timer
+                  (cancel-timer
+                   eat--shell-prompt-annotation-correction-timer)
+                  (setq eat--shell-prompt-annotation-correction-timer
+                        nil))
+                (when eat-enable-shell-prompt-annotation
+                  (eat--correct-shell-prompt-mark-overlays buffer)
+                  (setq eat--shell-command-status 0)
+                  (setq eat--shell-prompt-begin nil)
+                  (setq eat--shell-prompt-mark nil)
+                  (setq eat--shell-prompt-mark-overlays nil))
                 (eat-emacs-mode)
                 (setq eat--process nil)
                 (delete-process process)
