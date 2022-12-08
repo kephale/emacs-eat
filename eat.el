@@ -483,9 +483,11 @@ If your process is choking on big inputs, try lowering the value."
        `((t :foreground ,color :background ,color))
        (format "Face used to render text with %i%s color of 256 color\
  palette."
-               face-counter (or (nth (% face-counter 10)
-                                     '(nil "st" "nd" "rd"))
-                                "th"))
+               face-counter
+               (or (and (not (<= 11 (% face-counter 100) 13))
+                        (nth (% face-counter 10)
+                             '(nil "st" "nd" "rd")))
+                   "th"))
        :group 'eat-term))
     (cl-incf face-counter)))
 
