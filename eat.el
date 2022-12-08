@@ -5342,8 +5342,7 @@ PROGRAM can be a shell command."
 (defun eat--eshell-setup-proc-and-term (proc)
   "Setup process PROC and a new terminal for it."
   (unless (or eat--terminal eat--process)
-    (setq eat--process proc
-          eat--eshell-invocation-directory default-directory)
+    (setq eat--process proc)
     (process-put proc 'adjust-window-size-function
                  #'eat--adjust-process-window-size)
     (setq eat--terminal (eat-term-make (current-buffer)
@@ -5523,6 +5522,10 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
              (point)))))))
   (goto-char (eat-term-display-cursor eat--terminal)))
 
+(defun eat--eshell-update-cwd ()
+  "Update the current working directory."
+  (setq eat--eshell-invocation-directory default-directory))
+
 (define-minor-mode eat--eshell-local-mode
   "Toggle Eat terminal emulation is Eshell."
   :interactive nil
@@ -5640,6 +5643,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
         (with-current-buffer buffer
           (eat--eshell-local-mode +1))))
     (add-hook 'eshell-mode-hook #'eat--eshell-local-mode)
+    (add-hook 'eshell-directory-change-hook #'eat--eshell-update-cwd)
+    (eat--eshell-update-cwd)
     (setq eshell-variable-aliases-list
           `(("TERM" eat--eshell-term-name t)
             ("TERMINFO" eat-term-terminfo-directory t)
@@ -5668,6 +5673,8 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
         (with-current-buffer buffer
           (eat--eshell-local-mode -1))))
     (remove-hook 'eshell-mode-hook #'eat--eshell-local-mode)
+    (remove-hook 'eshell-directory-change-hook
+                 #'eat--eshell-update-cwd)
     (setq eshell-variable-aliases-list
           (cl-delete-if
            (lambda (elem)
