@@ -2377,7 +2377,10 @@ output."
   "Report the current default foreground color to the client."
   (funcall
    (eat--t-term-input-fn eat--t-term) eat--t-term
-   (let ((rgb (color-values (face-foreground 'default))))
+   (let ((rgb (or (color-values (face-foreground 'default))
+                  ;; On terminals like TTYs the above returns nil.
+                  ;; Terminals usually have a white foreground, so...
+                  '(255 255 255))))
      (format "\e]10;%04x/%04x/%04x\e\\"
              (pop rgb) (pop rgb) (pop rgb)))))
 
@@ -2385,7 +2388,10 @@ output."
   "Report the current default background color to the client."
   (funcall
    (eat--t-term-input-fn eat--t-term) eat--t-term
-   (let ((rgb (color-values (face-background 'default))))
+   (let ((rgb (or (color-values (face-background 'default))
+                  ;; On terminals like TTYs the above returns nil.
+                  ;; Terminals usually have a black background, so...
+                  '(0 0 0))))
      (format "\e]11;%04x/%04x/%04x\e\\"
              (pop rgb) (pop rgb) (pop rgb)))))
 
