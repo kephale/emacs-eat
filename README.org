@@ -52,16 +52,14 @@ with Eshell.  Eat has two global minor modes for Eshell:
   the above three keybinding modes here too, except that =C-c C-k= is
   not special (i.e. not bound by Eat) in "emacs" mode and "line" mode.
 
-You can add any of these to ~eshell-first-time-mode-hook~ like the
-following:
+You can add any of these to ~eshell-load-hook~ like the following:
 
 #+begin_src emacs-lisp
-;; For `eat-eshell-visual-command-mode'.
-(add-hook 'eshell-first-time-mode-hook
-          #'eat-eshell-visual-command-mode)
-
 ;; For `eat-eshell-mode'.
-(add-hook 'eshell-first-time-mode-hook #'eat-eshell-mode)
+(add-hook 'eshell-load-hook #'eat-eshell-mode)
+
+;; For `eat-eshell-visual-command-mode'.
+(add-hook 'eshell-load-hook #'eat-eshell-visual-command-mode)
 #+end_src
 
 To setup shell integration for GNU Bash, put the following at the end
