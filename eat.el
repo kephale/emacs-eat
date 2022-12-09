@@ -831,7 +831,8 @@ Nil when not in alternative display mode.")
   (focus-event-mode nil :documentation "Whether to send focus event.")
   (cut-buffers
    (1value (make-vector 10 nil))
-   :documentation "Cut buffers."))
+   :documentation "Cut buffers.")
+  (params nil :documentation "Hash table of terminal parameters."))
 
 (defvar eat--t-term nil
   "The current terminal.
@@ -3156,6 +3157,20 @@ DATA is the selection data encoded in base64."
   (let ((inhibit-quit t))
     (eat--t-with-env terminal
       (eat--t-reset))))
+
+(defun eat-term-parameter (terminal parameter)
+  "Return the value of parameter PARAMETER of TERMINAL."
+  (cdr (assq parameter (eat--t-term-params terminal))))
+
+(defun eat-term-set-parameter (terminal parameter value)
+  "Set the value of parameter PARAMETER of TERMINAL to VALUE."
+  (let ((pair (assq parameter (eat--t-term-params terminal))))
+    (if pair
+        (setcdr pair value)
+      (push (cons parameter value) (eat--t-term-params terminal)))))
+
+(gv-define-setter eat-term-parameter (value terminal parameter)
+  `(eat-term-set-parameter ,terminal ,parameter ,value))
 
 (defun eat-term-input-function (terminal)
   "Return the function used to send input from TERMINAL.
