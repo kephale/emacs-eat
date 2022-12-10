@@ -5470,41 +5470,46 @@ Call FN with COMMAND and ARGS, and whenever `make-process' is called,
 modify its argument to change the filter, the sentinel and invoke
 `stty' from the new process."
   (cl-letf*
-      ((make-process (symbol-function #'make-process))
+      (;; For Emacs 29 and above.
+       (make-process (symbol-function #'make-process))
        ((symbol-function #'make-process)
-        (lambda (&rest plist)
-          ;; Make sure we don't attack wrong process.
-          (if (not (and (equal (plist-get plist :command)
-                               (cons (file-local-name
-                                      (expand-file-name command))
-                                     args))
-                        ;; Eshell on Emacs 28 uses
-                        ;; `start-file-process', so `:filter' and
-                        ;; `:sentinel' are nil now.
-                        (or (< emacs-major-version 29)
-                            (and (eq (plist-get plist :filter)
-                                     #'eshell-output-filter)
-                                 (eq (plist-get plist :sentinel)
-                                     #'eshell-sentinel)))))
-              (apply make-process plist)
-            (unless (< emacs-major-version 29)
-              (setf (plist-get plist :filter) #'eat--eshell-filter)
-              (setf (plist-get plist :sentinel)
-                    #'eat--eshell-sentinel))
-            (setf (plist-get plist :command)
-                  `("/usr/bin/env" "sh" "-c"
-                    ,(format "stty -nl echo rows %d columns %d \
+        (if (< emacs-major-version 29)
+            make-process
+          (lambda (&rest plist)
+            ;; Make sure we don't attack wrong process.
+            (if (not (equal (plist-get plist :command)
+                            (cons (file-local-name
+                                   (expand-file-name command))
+                                  args)))
+                (apply make-process plist)
+              (setf (plist-get plist :command)
+                    `("/usr/bin/env" "sh" "-c"
+                      ,(format "stty -nl echo rows %d columns %d \
 sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
-                             (floor (window-screen-lines))
-                             (window-max-chars-per-line) null-device)
-                    ".."
-                    ,@(plist-get plist :command)))
-            (apply make-process plist)))))
+                               (floor (window-screen-lines))
+                               (window-max-chars-per-line)
+                               null-device)
+                      ".." ,@(plist-get plist :command)))
+              (apply make-process plist)))))
+       ;; For Emacs 28.
+       (start-file-process (symbol-function #'start-file-process))
+       ((symbol-function #'start-file-process)
+        (if (< emacs-major-version 29)
+            (lambda (name buffer &rest command)
+              (apply start-file-process name buffer
+                     `("/usr/bin/env" "sh" "-c"
+                       ,(format "stty -nl echo rows %d columns %d \
+sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
+                                (floor (window-screen-lines))
+                                (window-max-chars-per-line)
+                                null-device)
+                       ".." ,@command)))
+          ;; Don't override on Emacs 28.
+          start-file-process)))
     (let ((hook
            (lambda (proc)
-             (when (< emacs-major-version 29)
-               (set-process-filter proc #'eat--eshell-filter)
-               (set-process-sentinel proc #'eat--eshell-sentinel))
+             (set-process-filter proc #'eat--eshell-filter)
+             (set-process-sentinel proc #'eat--eshell-sentinel)
              (eat--eshell-setup-proc-and-term proc))))
       (unwind-protect
           (progn
