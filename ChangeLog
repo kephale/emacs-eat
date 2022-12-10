@@ -1,3 +1,413 @@
+2022-12-10  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix yanking text into terminal
+
+	* eat.el (eat-yank): Use simpler, saner and better approach to get the
+	yanked string instead of the previous stupid, insane and buggy
+	approach.
+	* eat.el (eat-yank-pop): Remove, because it's not cancel the text
+	already sent to the terminal.
+	* eat.el (eat-yank-from-kill-ring): New function.  Behaves essentially
+	the same the previous (not properly working) 'eat-yank-pop'.
+	* eat.el (eat-semi-char-mode-map, eat-eshell-semi-char-mode-map):
+	Replace 'eat-yank-pop' with 'eat-yank-from-kill-ring'.
+
+2022-12-10  Akib Azmain Turja  <akib@disroot.org>
+
+	Implement terminal parameters
+
+	* eat.el (eat--t-term): New slot: 'params'.
+	* eat.el (eat-term-parameter): New function and generalized
+	variable.
+	* eat.el (eat-set-term-parameter): New function.
+
+2022-12-09  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix terminal color reporting in text terminals
+
+	* eat.el (eat--t-report-foreground-color): Fix foreground color
+	reporting in text terminals.
+	* eat.el (eat--t-report-background-color): Fix background color
+	reporting in text terminals.
+
+2022-12-08  Akib Azmain Turja  <akib@disroot.org>
+
+	Break combined 'setq'/'setf'/'setq-local's
+
+	When giving more than two arguments to 'setq', it becomes hard
+	to figure out what is assigned to what.  As the number of
+	argument increases, the readablity of code decreases.  This is
+	also true for 'setq-local'.  For 'setf', the problem is even
+	greater, unlike 'setq', all arguments to 'setf' look the same.
+
+	* eat.el (eat--t-reset, eat--t-write, eat--t-save-cur)
+	(eat--t-restore-cur, eat--t-enable-alt-disp)
+	(eat--t-disable-alt-disp, eat--t-change-scroll-region)
+	(eat--t-set-sgr-params, eat--t-manipulate-selection)
+	(eat--t-resize, eat--blink-start-timers, eat-blink-mode)
+	(eat--cursor-blink-mode, eat--set-cursor, eat-self-input)
+	(eat-mode, eat-exec, eat--eshell-setup-proc-and-term)
+	(eat--eshell-cleanup, eat--eshell-adjust-make-process-args)
+	(eat--eshell-local-mode, eat--eshell-exec-visual)
+	(eat--trace-exec, eat--trace-eshell-adjust-make-process-args)
+	(eat--trace-replay-eval, eat-trace-replay, eat-trace--cleanup):
+	Break combined 'setq'/'setf'/'setq-local's.
+
+2022-12-08  Akib Azmain Turja  <akib@disroot.org>
+
+	Don't 'cd' as root when using 'sudo' from Tramp
+
+	* eat.el (eat--eshell-setup-proc-and-term): Don't set
+	'eat--eshell-invocation-directory'.
+	* eat.el (eat--eshell-update-cwd): New function.
+	* eat.el (eat--eshell-local-mode): Call
+	'eat--eshell-update-cwd' when enabling the mode and add it to
+	'eshell-directory-change-hook' to keep track of Eshell's
+	working directory.
+
+2022-12-08  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix prompt annotation bug trigger when shell exits
+
+	* eat.el (eat--correct-shell-prompt-mark-overlays): Make sure
+	'eat--terminal' is non-nil.
+	* eat.el (eat--sentinel): Cancel timers, correct shell prompt
+	annotations for the final time, reset shell prompt annotation
+	related local variables.
+
+2022-12-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Synchronize scrolling only when point is on cursor
+
+	* eat.el (eat--adjust-process-window-size): Synchronize
+	scrolling only when point is on cursor.
+
+2022-12-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Escape control characters in trace output
+
+	* eat.el (eat--trace-log): Escape control
+	characters (codepoints from 0 to 31) in trace output.
+
+2022-12-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Auto update 'eat-term-shell-integration-directory'
+
+	* eat.el: Auto update 'eat-term-shell-integration-directory' if
+	not modified.
+
+2022-12-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Move Bash global variables to function
+
+	* integration/bash (__eat_current_command, __eat_exit_status)
+	(__eat_inhibit_preexec): Move to '__eat_enable_integration'.
+	* integration/bash (__eat_prompt_start, __eat_prompt_end)
+	(__eat_continuation_start, __eat_continuation_end): Move to
+	'__eat_enable_integration' and make local there.
+
+2022-12-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Document annotation correction delay user option
+
+	* eat.texi (Performance Tuning): Document the purpose and the
+	use of 'eat-shell-prompt-annotation-correction-delay' user
+	option.
+
+2022-12-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Don't accept 'nil' as annotation correction delay
+
+	* eat.el (eat-shell-prompt-annotation-correction-delay): Don't
+	accept 'nil'.
+	* eat.el (eat--process-output-queue): Don't accept value 'nil'
+	for 'eat-shell-prompt-annotation-correction-delay'.
+
+2022-12-07  Akib Azmain Turja  <akib@disroot.org>
+
+	Rename some symbols to reflect their purposes
+
+	* eat.el (eat-shell-prompt-annotation-delay): Rename to
+	'eat-shell-prompt-annotation-correction-delay'.
+	* eat.el (eat--update-shell-prompt-mark-overlays): Rename to
+	'eat--correct-shell-prompt-mark-overlays'.
+	* eat.el (eat--shell-prompt-annotation-update-timer): Rename to
+	'eat--shell-prompt-annotation-correction-timer'.
+	* eat.el (eat-mode, eat--process-output-queue, eat--filter):
+	Update references to renamed symbols.
+
+2022-12-07  Akib Azmain Turja  <akib@disroot.org>
+
+	* README.org: Add shell integration instructions
+
+	* eat-tests.el (eat-test-set-cwd): Update test
+
+	* eat.el (eat--t-term): Fix initial value of 'cwd'
+
+2022-12-06  Akib Azmain Turja  <akib@disroot.org>
+
+	Document everything about shell integration
+
+	* eat.texi (Shell Integration): Move to be the first chapter of
+	Part III.  Document everything about shell integration.
+	* eat.texi (Directory Tracking): Merge with the node 'Shell
+	Integration'.
+
+2022-12-06  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix prompt navigation when annotation is disabled
+
+	* eat.el (eat--pre-prompt): Always set
+	'eat--shell-prompt-begin'.
+	* eat.el (eat--post-prompt): Always put special prompt end
+	marking text property.
+
+2022-12-06  Akib Azmain Turja  <akib@disroot.org>
+
+	Add shell prompt navigation commands
+
+	* eat.el (eat--post-prompt): Add special text property on the
+	last character of shell prompt.
+	* eat.el (eat-previous-shell-prompt, eat-next-shell-prompt):
+	New command.
+	* eat.el (eat-mode-map): Bind 'eat-previous-shell-prompt' and
+	'eat-next-shell-prompt' to 'C-c C-p' and 'C-c C-n'
+	respectively.
+
+2022-12-06  Akib Azmain Turja  <akib@disroot.org>
+
+	Annotate shell prompts
+
+	* eat.el (eat-enable-shell-prompt-annotation)
+	(eat-shell-prompt-annotation-position)
+	(eat-shell-prompt-annotation-running-margin-indicator)
+	(eat-shell-prompt-annotation-success-margin-indicator)
+	(eat-shell-prompt-annotation-failure-margin-indicator)
+	(eat-shell-prompt-annotation-delay): New user option.
+	* eat.el (eat-shell-prompt-annotation-running)
+	(eat-shell-prompt-annotation-success)
+	(eat-shell-prompt-annotation-failure): New face.
+	* eat.el (eat--shell-command-status, eat--shell-prompt-begin)
+	(eat--shell-prompt-mark, eat--shell-prompt-mark-overlays): New
+	variable.
+	* eat.el (eat--pre-prompt, eat--post-prompt)
+	(eat--update-shell-prompt-mark-overlays, eat--pre-cmd)
+	(eat--set-cmd-status): New function.
+	* eat.el (eat-mode): Make 'eat--shell-command-status',
+	'eat--shell-prompt-begin', 'eat--shell-prompt-mark',
+	'eat--shell-prompt-mark-overlays' and
+	'eat--shell-prompt-annotation-update-timer' local.  Set margin
+	width if shell prompt annotation is enabled.
+	* eat.el (eat--shell-prompt-annotation-update-timer): New
+	variable.
+	* eat.el (eat--process-output-queue): Call or schedule
+	'eat--update-shell-prompt-mark-overlays' call.
+	* eat.el (eat--filter): Cancel timer
+	'eat--shell-prompt-annotation-update-timer'.
+	* eat.el (eat-exec): Set prompt start & end and command start &
+	end functions.
+
+2022-12-06  Akib Azmain Turja  <akib@disroot.org>
+
+	Add shell commands run in Eat to Emacs history
+
+	* eat.el (eat-enable-shell-command-history): New user option.
+	* eat.el (eat--set-cmd): New function.
+	* eat.el (eat-exec, eat--eshell-setup-proc-and-term): Call
+	'eat--set-cmd' when the shell reports the command being run.
+
+2022-12-06  Akib Azmain Turja  <akib@disroot.org>
+
+	Tighter shell integration
+
+	* eat.el (eat--t-term): New slots: 'prompt-start-fn',
+	'prompt-end-fn', 'cont-prompt-start-fn', 'cont-prompt-end-fn',
+	'set-cmd-fn', 'cmd-start-fn', 'cmd-finish-fn'
+	* eat.el (eat--t-set-cwd): Accept three arguments in two
+	different formats.
+	* eat.el (eat--t-prompt-start, eat--t-prompt-end)
+	(eat--t-cont-prompt-start, eat--t-cont-prompt-end)
+	(eat--t-set-cmd, eat--t-cmd-start, eat--t-cmd-finish): New
+	function.
+	* eat.el (eat--t-handle-output): Accept Eat's own
+	OSC 51 ; e ; ... ST sequences.
+	* eat.el (eat-term-prompt-start-function)
+	(eat-term-prompt-end-function)
+	(eat-term-continuation-prompt-start-function)
+	(eat-term-continuation-prompt-end-function)
+	(eat-term-set-cmd-function, eat-term-cmd-start-function)
+	(eat-term-cmd-finish-function): New generalized variable.
+	* integration/bash (__eat_current_command, __eat_exit_status):
+	New variable.
+	* integration/bash (__eat_prompt_command): Send exit status of
+	last command, if applicable.  Use Eat specific sequence to
+	report working directory.  Set title.
+	* integration/bash (__eat_preexec): Report current command and
+	execution start.
+	* integration/bash (__eat_before_prompt_command): Set
+	'__eat_exit_status' to the exit status of the last command.
+	* integration/bash (__eat_prompt_start, __eat_prompt_end)
+	(__eat_continuation_start, __eat_continuation_end): New
+	variable, used as constant only to make the code more readable.
+	* integration/bash (__eat_enable_integration): Wrap 'PS1' and
+	'PS2'.  Don't set title from 'PS1'.
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	Calculate the number of lines on window properly
+
+	* eat.el (eat-exec, eat--eshell-setup-proc-and-term)
+	(eat--eshell-adjust-make-process-args)
+	(eat--eshell-synchronize-scroll): Calculate the number of
+	available lines on window properly.
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	Remap 'insert-char' to read and input a character
+
+	* eat.el (eat-input-char): New function.
+	* eat.el (eat-semi-char-mode-map)
+	(eat-eshell-semi-char-mode-map): Remap 'insert-char' to
+	'eat-input-char'.
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	Use full command as title in shell integration
+
+	* integration/bash (__eat_in_prompt_command): Rename to
+	'__eat_inhibit_preexec'.
+	* integration/bash (__eat_before_exec): Inhibit further
+	'__eat_preexec' calls until next prompt.
+	* integration/bash (__eat_preexec): Use 'history' to get the
+	real command typed by the user.
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix Bash integration
+
+	* integration/bash (__eat_enable_integration): Fix moving
+	'PROMPT_COMMAND' array elements.
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	* eat.el: Fix bright faces face definitions
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	Refactor shell integration enabling code
+
+	* integration/bash (__eat_enable_integration): New function.
+	* integration/bash: Move enabling code to dedicated function.
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	Update title automatically in shell integration
+
+	* integration/bash (__eat_prompt_command): Remove extra '\'s.
+	* integration/bash (__eat_in_prompt_command): New variable.
+	* integration/bash (__eat_preexec, __eat_before_prompt_command)
+	(__eat_after_prompt_command, __eat_before_exec): New function.
+	* integration/bash: Modify PS1 to update terminal title when
+	displaying prompt.  Add '__eat_before_exec' as 'DEBUG' trap
+	handler to update terminal title just before executing a
+	command.  Prepend and append '__eat_before_prompt_command' and
+	'__eat_after_prompt_command' to 'PROMPT_COMMAND' to avoid
+	getting trapped in 'DEBUG' trap.
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	* README.org (Quelpa): Update recipe.
+
+	* term/eat.el: New file.
+
+2022-12-04  Akib Azmain Turja  <akib@disroot.org>
+
+	Refer to NonGNU ELPA in README
+
+	* README.org (NonGNU ELPA Devel): Rename to NonGNU ELPA.
+	Change the code-snippet to use NonGNU ELPA (stable).
+
+2022-12-03  Akib Azmain Turja  <akib@disroot.org>
+
+	* integration/bash: Add copyright notice.
+
+	* integration/bash: Use '__' prefix
+
+	* integration/bash: Append to array more cleanly
+
+	* integration/bash: Don't setup again on reload
+
+2022-12-03  Akib Azmain Turja  <akib@disroot.org>
+
+	Use more uniform names for tracer functions
+
+	* eat.el: Rename 'eat--eshell-trace-...' symbols to
+	'eat--trace-eshell-...'.
+
+2022-12-03  Akib Azmain Turja  <akib@disroot.org>
+
+	Add shell integration script for GNU Bash
+
+	* integration/bash: New file.
+	* eat.el (eat-term-shell-integration-directory): New variable.
+	Contains path to the directory containing the scripts,
+	automatically updated when Eat is updated.
+	* eat.el (eat-exec, eat-eshell-mode): New enviroment variable
+	'EAT_SHELL_INTEGRATION_DIR'.
+	* eat.texi (Shell Integration): New chapter.
+	* eat.texi (Directory Tracking): Refer to 'Shell Integration'.
+
+2022-12-01  Akib Azmain Turja  <akib@disroot.org>
+
+	Check terminal contents while testing bell
+
+	* eat-tests.el (eat-test-character-sets): Check terminal
+	contents.
+
+2022-12-01  Akib Azmain Turja  <akib@disroot.org>
+
+	Refer to Info manual to setup directory tracking
+
+	* eat.el (eat-enable-directory-tracking): Refer to Info manual.
+
+2022-12-01  Akib Azmain Turja  <akib@disroot.org>
+
+	Support directory tracking with OSC 7
+
+	* eat.el: Require 'url'.
+	* eat.el (eat-enable-directory-tracking): New user option.
+	* eat.el (eat--t-term): New slots: 'cwd' and 'set-cwd-fn'.
+	* eat.el (eat--t-set-cwd, eat-term-cwd): New function.
+	* eat.el (eat-term-set-cwd-function): New function and
+	generalized variable.
+	* eat.el (eat--t-handle-output): Handle OSC 7.
+	* eat.el (eat--set-cwd): New function.
+	* eat.el (eat-exec): Use 'eat--set-cwd' to change current
+	working directory.
+	* eat.el (eat--eshell-invocation-directory): New variable,
+	local in Eshell buffers when 'eat-eshell-mode' is enabled.
+	* eat.el (eat--eshell-setup-proc-and-term): Save the invocation
+	directory of process.
+	* eat.el (eat--eshell-cleanup): Revert working directory to
+	invocation directory.
+	* eat.el (eat--eshell-local-mode): When enabling, make
+	'eat--eshell-invocation-directory' local variable and kill when
+	disabling.
+	* eat-tests.el (eat-test-set-cwd): New test.
+	* eat.texi (Directory Tracking): New chapter.
+
+2022-11-30  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix byte-compilation warnings on Emacs 28
+
+	* eat.el (eat-term-input-event): Fix byte-compilation warnings
+	on Emacs 28, caused by calling 'posn-col-row' with two
+	arguments on Emacs >= 29, which is not available on Emacs 28.
+
+2022-11-30  Akib Azmain Turja  <akib@disroot.org>
+
+	* eat.el: Use loop to define color and font faces
+
 2022-11-30  Akib Azmain Turja  <akib@disroot.org>
 
 	Document eat-eshell-visual-command-mode in manual
