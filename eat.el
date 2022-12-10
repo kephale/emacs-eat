@@ -5567,6 +5567,7 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
       ;; Make sure glyphless character don't display a huge box glyph,
       ;; that would break the display.
       (eat--setup-glyphless-chars)
+      (eat--eshell-update-cwd)
       (when eat-enable-blinking-text
         (eat-blink-mode +1)))
      (t
@@ -5659,7 +5660,6 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
           (eat--eshell-local-mode +1))))
     (add-hook 'eshell-mode-hook #'eat--eshell-local-mode)
     (add-hook 'eshell-directory-change-hook #'eat--eshell-update-cwd)
-    (eat--eshell-update-cwd)
     (setq eshell-variable-aliases-list
           `(("TERM" eat--eshell-term-name t)
             ("TERMINFO" eat-term-terminfo-directory t)
