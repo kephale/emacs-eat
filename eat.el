@@ -832,7 +832,7 @@ Nil when not in alternative display mode.")
   (cut-buffers
    (1value (make-vector 10 nil))
    :documentation "Cut buffers.")
-  (params nil :documentation "Hash table of terminal parameters."))
+  (params nil :documentation "Alist of terminal parameters."))
 
 (defvar eat--t-term nil
   "The current terminal.
