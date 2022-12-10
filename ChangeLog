@@ -1,3 +1,22 @@
+2022-12-11  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix invoking commands with eshell/sudo from Tramp
+
+	* eat.el (eat--eshell-adjust-make-process-args): Override
+	'start-file-process' on Emacs 28, used by Eshell on Emacs 28.
+	Don't override 'make-process' on Emacs 28, Eshell doesn't use
+	that on Emacs 28.  Set process filter and sentinel in
+	'eshell-exec-hook' instead of 'make-process' advice.
+
+2022-12-11  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix Eshell working directory tracking
+
+	* eat.el (eat--eshell-local-mode): Call
+	'eat--eshell-update-cwd'.
+	* eat.el (eat-eshell-mode): Don't call
+	'eat--eshell-update-cwd'.
+
 2022-12-10  Akib Azmain Turja  <akib@disroot.org>
 
 	Fix yanking text into terminal
