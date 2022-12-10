@@ -4580,44 +4580,27 @@ ARG is passed to `yank', which see."
   (interactive "*P")
   (when eat--terminal
     (funcall eat--synchronize-scroll-function)
-    (cl-letf* ((inhibit-read-only t)
-               (insert-for-yank (symbol-function #'insert-for-yank))
-               ((symbol-function #'insert-for-yank)
-                (lambda (&rest args)
-                  (cl-letf (((symbol-function #'insert)
-                             (lambda (&rest args)
-                               (eat-send-string-as-yank
-                                eat--terminal
-                                (mapconcat (lambda (arg)
-                                             (if (stringp arg)
-                                                 arg
-                                               (string arg)))
-                                           args "")))))
-                    (apply insert-for-yank args)))))
-      (yank arg))))
+    (eat-send-string-as-yank
+     eat--terminal (let ((yank-hook yank-transform-functions))
+                     (with-temp-buffer
+                       (setq-local yank-transform-functions yank-hook)
+                       (yank arg)
+                       (buffer-string))))))
 
-(defun eat-yank-pop (&optional arg)
-  "Same as `yank-pop', but for Eat.
+(defun eat-yank-from-kill-ring (string &optional arg)
+  "Same as `yank-from-kill-ring', but for Eat.
 
-ARG is passed to `yank-pop', which see."
-  (interactive "p")
+STRING and ARG are passed to `yank-pop', which see."
+  (interactive (list (read-from-kill-ring "Yank from kill-ring: ")
+                     current-prefix-arg))
   (when eat--terminal
     (funcall eat--synchronize-scroll-function)
-    (cl-letf* ((inhibit-read-only t)
-               (insert-for-yank (symbol-function #'insert-for-yank))
-               ((symbol-function #'insert-for-yank)
-                (lambda (&rest args)
-                  (cl-letf (((symbol-function #'insert)
-                             (lambda (&rest args)
-                               (eat-send-string-as-yank
-                                eat--terminal
-                                (mapconcat (lambda (arg)
-                                             (if (stringp arg)
-                                                 arg
-                                               (string arg)))
-                                           args "")))))
-                    (apply insert-for-yank args)))))
-      (yank-pop arg))))
+    (eat-send-string-as-yank
+     eat--terminal (let ((yank-hook yank-transform-functions))
+                     (with-temp-buffer
+                       (setq-local yank-transform-functions yank-hook)
+                       (yank-from-kill-ring string arg)
+                       (buffer-string))))))
 
 ;; When changing these keymaps, be sure to update the manual, README
 ;; and commentary.
@@ -4640,7 +4623,7 @@ ARG is passed to `yank-pop', which see."
                  [?\e ?!] [?\e ?&] [?\C-y] [?\e ?y]))))
     (define-key map [?\C-q] #'eat-quoted-input)
     (define-key map [?\C-y] #'eat-yank)
-    (define-key map [?\M-y] #'eat-yank-pop)
+    (define-key map [?\M-y] #'eat-yank-from-kill-ring)
     (define-key map [?\C-c ?\C-c] #'eat-self-input)
     (define-key map [?\C-c ?\C-e] #'eat-emacs-mode)
     (define-key map [remap insert-char] #'eat-input-char)
@@ -5260,7 +5243,7 @@ PROGRAM can be a shell command."
                  [?\e ?!] [?\e ?&] [?\C-y] [?\e ?y]))))
     (define-key map [?\C-q] #'eat-quoted-input)
     (define-key map [?\C-y] #'eat-yank)
-    (define-key map [?\M-y] #'eat-yank-pop)
+    (define-key map [?\M-y] #'eat-yank-from-kill-ring)
     (define-key map [?\C-c ?\C-e] #'eat-eshell-emacs-mode)
     (define-key map [remap insert-char] #'eat-input-char)
     map)
