@@ -5233,6 +5233,7 @@ PROGRAM can be a shell command."
     (define-key map [?\C-c ?\C-j] #'eat-eshell-semi-char-mode)
     (define-key map [remap eshell-toggle-direct-send] ; C-c M-d
                 #'eat-eshell-char-mode)
+    (define-key map [remap undo] #'undefined) ; Disable `undo'.
     map)
   "Keymap for Eat Eshell \"emacs\" mode.")
 
