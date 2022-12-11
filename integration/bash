@@ -105,7 +105,9 @@ __eat_enable_integration ()
 }
 
 # Enable.
-test -z "$__eat_integration_enabled" && __eat_enable_integration
+test -z "$__eat_integration_enabled" && \
+  test "${TERM:0:4}" = "eat-" && \
+  __eat_enable_integration
 
 # Local Variables:
 # mode: sh
