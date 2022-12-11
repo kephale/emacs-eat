@@ -4756,7 +4756,9 @@ MODE should one of:
   "Synchronize scrolling and point between terminal and window."
   (when-let* ((window (get-buffer-window (current-buffer))))
     (set-window-start
-     window (eat-term-display-beginning eat--terminal)))
+     window (eat-term-display-beginning eat--terminal))
+    (set-window-point
+     window (eat-term-display-cursor eat--terminal)))
   (goto-char (eat-term-display-cursor eat--terminal)))
 
 (defun eat--setup-glyphless-chars ()
@@ -5539,7 +5541,9 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
            (if (<= start-line 0)
                (eat-term-display-beginning eat--terminal)
              (vertical-motion (- start-line))
-             (point)))))))
+             (point))))))
+    (set-window-point
+     window (eat-term-display-cursor eat--terminal)))
   (goto-char (eat-term-display-cursor eat--terminal)))
 
 (defun eat--eshell-update-cwd ()
