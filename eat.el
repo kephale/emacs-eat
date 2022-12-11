@@ -4581,11 +4581,12 @@ ARG is passed to `yank', which see."
   (when eat--terminal
     (funcall eat--synchronize-scroll-function)
     (eat-send-string-as-yank
-     eat--terminal (let ((yank-hook yank-transform-functions))
-                     (with-temp-buffer
-                       (setq-local yank-transform-functions yank-hook)
-                       (yank arg)
-                       (buffer-string))))))
+     eat--terminal
+     (let ((yank-hook (bound-and-true-p yank-transform-functions)))
+       (with-temp-buffer
+         (setq-local yank-transform-functions yank-hook)
+         (yank arg)
+         (buffer-string))))))
 
 (defun eat-yank-from-kill-ring (string &optional arg)
   "Same as `yank-from-kill-ring', but for Eat.
@@ -4596,11 +4597,12 @@ STRING and ARG are passed to `yank-pop', which see."
   (when eat--terminal
     (funcall eat--synchronize-scroll-function)
     (eat-send-string-as-yank
-     eat--terminal (let ((yank-hook yank-transform-functions))
-                     (with-temp-buffer
-                       (setq-local yank-transform-functions yank-hook)
-                       (yank-from-kill-ring string arg)
-                       (buffer-string))))))
+     eat--terminal
+     (let ((yank-hook (bound-and-true-p yank-transform-functions)))
+       (with-temp-buffer
+         (setq-local yank-transform-functions yank-hook)
+         (yank-from-kill-ring string arg)
+         (buffer-string))))))
 
 ;; When changing these keymaps, be sure to update the manual, README
 ;; and commentary.
