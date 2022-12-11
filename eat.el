@@ -5234,7 +5234,7 @@ PROGRAM can be a shell command."
     (define-key map [remap eshell-toggle-direct-send] ; C-c M-d
                 #'eat-eshell-char-mode)
     map)
-  "Keymap for Eat Eshell when no process is running.")
+  "Keymap for Eat Eshell \"emacs\" mode.")
 
 (defvar eat-eshell-semi-char-mode-map
   (let ((map (eat-term-make-keymap
@@ -5259,6 +5259,11 @@ PROGRAM can be a shell command."
     (define-key map [?\C-\M-m] #'eat-eshell-semi-char-mode)
     map)
   "Keymap for Eat Eshell char mode.")
+
+(define-minor-mode eat--eshell-process-running-mode
+  "Minor mode for \"emacs\" mode keymap when process is running."
+  :interactive nil
+  :keymap eat-eshell-emacs-mode-map)
 
 (define-minor-mode eat--eshell-semi-char-mode
   "Minor mode for semi-char mode keymap."
@@ -5381,6 +5386,7 @@ PROGRAM can be a shell command."
     (eat-term-redisplay eat--terminal)
     (setq-local eshell-output-filter-functions
                 '(eat--eshell-output-filter))
+    (eat--eshell-process-running-mode +1)
     (eat-eshell-semi-char-mode)))
 
 (defun eat--eshell-cleanup ()
@@ -5403,6 +5409,7 @@ PROGRAM can be a shell command."
       (kill-local-variable 'eshell-output-filter-functions)
       (eat--eshell-semi-char-mode -1)
       (eat--eshell-char-mode -1)
+      (eat--eshell-process-running-mode -1)
       (setq buffer-read-only nil))))
 
 (declare-function eshell-output-filter "esh-mode" (process string))
@@ -5553,7 +5560,6 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
 (define-minor-mode eat--eshell-local-mode
   "Toggle Eat terminal emulation is Eshell."
   :interactive nil
-  :keymap eat-eshell-emacs-mode-map
   (let ((locals '(cursor-type
                   glyphless-char-display
                   track-mouse
