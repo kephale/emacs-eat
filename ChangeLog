@@ -1,5 +1,41 @@
 2022-12-11  Akib Azmain Turja  <akib@disroot.org>
 
+	Check whether 'yank-transform-functions' is bound
+
+	* eat.el (eat-yank, eat-yank-from-kill-ring): Check whether
+	'yank-transform-functions' is bound before using it's value.
+	The variable is not available in Emacs 28.
+
+2022-12-11  Akib Azmain Turja  <akib@disroot.org>
+
+	* integration/bash: Check TERM before enabling
+
+	* eat.el (eat-eshell-emacs-mode-map): Disable undo
+
+2022-12-11  Akib Azmain Turja  <akib@disroot.org>
+
+	Use Eshell "emacs" mode map when process is live
+
+	* eat.el (eat-eshell-emacs-mode-map): Update docstring.
+	* eat.el (eat--eshell-process-running-mode): New
+	non-interactive minor mode.
+	* eat.el (eat--eshell-setup-proc-and-term): Enable
+	'eat--eshell-process-running-mode'.
+	* eat.el (eat--eshell-cleanup): Disable
+	'eat--eshell-process-running-mode'.
+	* eat.le (eat--eshell-local-mode): Don't use
+	'eat-eshell-emacs-mode-map' as the mode keymap.
+
+2022-12-11  Akib Azmain Turja  <akib@disroot.org>
+
+	Synchronize scrolling and point properly
+
+	* eat.el (eat--synchronize-scroll)
+	(eat--eshell-synchronize-scroll): Call 'set-window-point' in
+	addition to 'goto-char'.
+
+2022-12-11  Akib Azmain Turja  <akib@disroot.org>
+
 	Fix invoking commands with eshell/sudo from Tramp
 
 	* eat.el (eat--eshell-adjust-make-process-args): Override
