@@ -4476,7 +4476,8 @@ event."
     (select-window (posn-window (event-start e))))
   (when eat--terminal
     (unless (mouse-movement-p e)
-      (funcall eat--synchronize-scroll-function))
+      (funcall eat--synchronize-scroll-function
+               (eat--synchronize-scroll-windows 'force-selected)))
     (if (memq (event-basic-type e)
               '( mouse-1 mouse-2 mouse-3 mouse-4 mouse-5 mouse-6
                  mouse-7 mouse-8 mouse-9 mouse-10 mouse-11
@@ -4579,7 +4580,8 @@ argument COUNT specifies how many times to insert CHARACTER."
 ARG is passed to `yank', which see."
   (interactive "*P")
   (when eat--terminal
-    (funcall eat--synchronize-scroll-function)
+    (funcall eat--synchronize-scroll-function
+             (eat--synchronize-scroll-windows 'force-selected))
     (eat-send-string-as-yank
      eat--terminal
      (let ((yank-hook (bound-and-true-p yank-transform-functions)))
@@ -4595,7 +4597,8 @@ STRING and ARG are passed to `yank-pop', which see."
   (interactive (list (read-from-kill-ring "Yank from kill-ring: ")
                      current-prefix-arg))
   (when eat--terminal
-    (funcall eat--synchronize-scroll-function)
+    (funcall eat--synchronize-scroll-function
+             (eat--synchronize-scroll-windows 'force-selected))
     (eat-send-string-as-yank
      eat--terminal
      (let ((yank-hook (bound-and-true-p yank-transform-functions)))
@@ -4754,14 +4757,35 @@ MODE should one of:
 
 ;;;;; Major Mode.
 
-(defun eat--synchronize-scroll ()
-  "Synchronize scrolling and point between terminal and window."
-  (when-let* ((window (get-buffer-window (current-buffer))))
-    (set-window-start
-     window (eat-term-display-beginning eat--terminal))
-    (set-window-point
-     window (eat-term-display-cursor eat--terminal)))
-  (goto-char (eat-term-display-cursor eat--terminal)))
+(defun eat--synchronize-scroll-windows (&optional force-selected)
+  "Return the list of windows whose scrolling should be synchronized.
+
+When FORCE-SELECTED is non-nil, always include `buffer' and the
+selected window in the list if the window is showing the current
+buffer."
+  `(,@(and (or force-selected
+               eat--char-mode
+               (= (eat-term-display-cursor eat--terminal) (point)))
+           '(buffer))
+    ,@(seq-filter
+       (lambda (window)
+         (or (and force-selected (eq window (selected-window)))
+             (= (eat-term-display-cursor eat--terminal)
+                (window-point window))))
+       (get-buffer-window-list))))
+
+(defun eat--synchronize-scroll (windows)
+  "Synchronize scrolling and point between terminal and WINDOWS.
+
+WINDOWS is a list of windows.  WINDOWS may also contain the special
+symbol `buffer', in which case the point of current buffer is set."
+  (dolist (window windows)
+    (if (eq window 'buffer)
+        (goto-char (eat-term-display-cursor eat--terminal))
+      (set-window-start
+       window (eat-term-display-beginning eat--terminal))
+      (set-window-point
+       window (eat-term-display-cursor eat--terminal)))))
 
 (defun eat--setup-glyphless-chars ()
   "Setup the display of glyphless characters."
@@ -4956,9 +4980,7 @@ OS's."
       (let ((inhibit-quit t)            ; Don't disturb!
             (inhibit-read-only t)
             (inhibit-modification-hooks t)
-            (synchronize-scroll
-             (or (= (eat-term-display-cursor eat--terminal) (point))
-                 eat--char-mode)))
+            (sync-windows (eat--synchronize-scroll-windows)))
         (when eat--process-output-queue-timer
           (cancel-timer eat--process-output-queue-timer))
         (setq eat--output-queue-first-chunk-time nil)
@@ -4981,8 +5003,7 @@ OS's."
                eat-shell-prompt-annotation-correction-delay
                nil #'eat--correct-shell-prompt-mark-overlays
                buffer))
-        (when synchronize-scroll
-          (funcall eat--synchronize-scroll-function))))))
+        (funcall eat--synchronize-scroll-function sync-windows)))))
 
 (defun eat--filter (process output)
   "Handle OUTPUT from PROCESS."
@@ -5058,13 +5079,10 @@ of window displaying PROCESS's buffer."
       (let ((width (max (car size) 1))
             (height (max (cdr size) 1))
             (inhibit-read-only t)
-            (synchronize-scroll
-             (or (= (eat-term-display-cursor eat--terminal) (point))
-                 eat--char-mode)))
+            (sync-windows (eat--synchronize-scroll-windows)))
         (eat-term-resize eat--terminal width height)
         (eat-term-redisplay eat--terminal)
-        (when synchronize-scroll
-          (funcall eat--synchronize-scroll-function))))
+        (funcall eat--synchronize-scroll-function sync-windows)))
     size))
 
 ;; Adapted from Term.
@@ -5351,13 +5369,10 @@ PROGRAM can be a shell command."
               eshell-last-output-start
               eshell-last-output-end)))
     (delete-region eshell-last-output-start eshell-last-output-end)
-    (let ((synchronize-scroll
-           (or (= (eat-term-display-cursor eat--terminal) (point))
-               eat--eshell-char-mode)))
+    (let ((sync-windows (eat--synchronize-scroll-windows)))
       (eat-term-process-output eat--terminal str)
       (eat-term-redisplay eat--terminal)
-      (when synchronize-scroll
-        (funcall eat--synchronize-scroll-function)))
+      (funcall eat--synchronize-scroll-function sync-windows))
     (let ((end (eat-term-end eat--terminal)))
       (set-marker eshell-last-output-start end)
       (set-marker eshell-last-output-end end)
@@ -5536,29 +5551,33 @@ sane 2>%s ; if [ $1 = .. ]; then shift; fi; exec \"$@\""
 
 ;;;;; Minor Modes.
 
-(defun eat--eshell-synchronize-scroll ()
-  "Synchronize scrolling and point between terminal and window."
-  (when-let* ((window (get-buffer-window (current-buffer))))
-    (set-window-start
-     window
-     (if (or (eat-term-in-alternative-display-p eat--terminal)
-             eat--eshell-char-mode)
-         (eat-term-display-beginning eat--terminal)
-       (save-restriction
-         (narrow-to-region
-          (eat-term-beginning eat--terminal)
-          (eat-term-end eat--terminal))
-         (let ((start-line (- (floor (window-screen-lines))
-                              (line-number-at-pos (point-max)))))
-           (goto-char (point-min))
-           (widen)
-           (if (<= start-line 0)
-               (eat-term-display-beginning eat--terminal)
-             (vertical-motion (- start-line))
-             (point))))))
-    (set-window-point
-     window (eat-term-display-cursor eat--terminal)))
-  (goto-char (eat-term-display-cursor eat--terminal)))
+(defun eat--eshell-synchronize-scroll (windows)
+  "Synchronize scrolling and point between terminal and WINDOWS.
+
+WINDOWS is a list of windows.  WINDOWS may also contain the special
+symbol `buffer', in which case the point of current buffer is set."
+  (dolist (window windows)
+    (if (eq window 'buffer)
+        (goto-char (eat-term-display-cursor eat--terminal))
+      (set-window-start
+       window
+       (if (or (eat-term-in-alternative-display-p eat--terminal)
+               eat--eshell-char-mode)
+           (eat-term-display-beginning eat--terminal)
+         (save-restriction
+           (narrow-to-region
+            (eat-term-beginning eat--terminal)
+            (eat-term-end eat--terminal))
+           (let ((start-line (- (floor (window-screen-lines))
+                                (line-number-at-pos (point-max)))))
+             (goto-char (point-min))
+             (widen)
+             (if (<= start-line 0)
+                 (eat-term-display-beginning eat--terminal)
+               (vertical-motion (- start-line))
+               (point))))))
+      (set-window-point
+       window (eat-term-display-cursor eat--terminal)))))
 
 (defun eat--eshell-update-cwd ()
   "Update the current working directory."
@@ -6141,7 +6160,7 @@ FN is the original definition of `eat--eshell-cleanup', which see."
        (eat-term-reset eat--terminal))
       (`(,_time finish)
        (eat-term-delete eat--terminal)))
-    (eat--synchronize-scroll)))
+    (eat--synchronize-scroll (get-buffer-window-list))))
 
 (defun eat--trace-replay-eval-next ()
   "Evaluate next sexp in trace output."
