@@ -4317,13 +4317,13 @@ If HOST isn't the host Emacs is running on, don't do anything."
              (list 'eat--before-string before-str
                    'eat--shell-prompt-mark-id identifier
                    'eat--shell-prompt-mark-overlay ov))
-            (push ov eat--shell-prompt-mark-overlays)))
-        (setq eat--shell-prompt-begin nil))))
+            (push ov eat--shell-prompt-mark-overlays))))))
   (when eat--shell-prompt-begin
     (when (< eat--shell-prompt-begin (point))
       ;; Put a text property to allow previous or next prompts.
       (put-text-property (1- (point)) (point)
-                         'eat--shell-prompt-end t))))
+                         'eat--shell-prompt-end t)))
+  (setq eat--shell-prompt-begin nil))
 
 (defun eat--correct-shell-prompt-mark-overlays (buffer)
   "Correct all overlays used to add mark before shell prompt.
