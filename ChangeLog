@@ -1,3 +1,40 @@
+2022-12-12  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix shell prompt navigation
+
+	* eat.el (eat--post-prompt): Set 'eat--shell-prompt-begin' to
+	nil at the very end to ensure prompt end text properties are
+	put.
+
+2022-12-12  Akib Azmain Turja  <akib@disroot.org>
+
+	Synchronize scroll on all windows showing terminal
+
+	* eat.el (eat--synchronize-scroll-windows): New function.
+	* eat.el (eat--synchronize-scroll)
+	(eat--eshell-synchronize-scroll): Take a single argument,
+	WINDOWS, list of windows to synchronize.  The special value
+	'buffer' can also be included, to synchronize the point in
+	buffer.
+	* eat.el (eat-self-input, eat-yank, eat-yank-from-kill-ring):
+	Pass the return value of 'eat--synchronize-scroll-windows' to
+	the function in 'eat--synchronize-scroll-function'.
+	* eat.el (eat--process-output-queue)
+	(eat--adjust-process-window-size, eat--eshell-output-filter)
+	Call 'eat--synchronize-scroll-windows' before doing anything,
+	save the result, and pass it as the first argument to the
+	function in 'eat--synchronize-scroll-function'.
+	* eat.el (eat--trace-replay-eval): Pass the return value of
+	'get-buffer-window-list' to 'eat--synchronize-scroll'.
+
+2022-12-12  Akib Azmain Turja  <akib@disroot.org>
+
+	Don't intercept background processes in Eshell
+
+	* eat.el (eat--eshell-adjust-make-process-args): Don't do any
+	change to the environment if 'eshell-current-subjob-p' is
+	non-nil.
+
 2022-12-11  Akib Azmain Turja  <akib@disroot.org>
 
 	Check whether 'yank-transform-functions' is bound
