@@ -140,6 +140,23 @@ This is left disabled for security reasons."
   :group 'eat-ui
   :group 'eat-eshell)
 
+(defcustom eat-eshell-fallback-if-stty-not-available 'ask
+  "What to do if `stty' is unavailable.
+
+`stty' is a dependency to setup terminal.  If `stty' is unavailable,
+Eat won't be able to setup terminal, so any input won't be visible.
+
+The value should be any of the following:
+
+nil           Do nothing.
+t             Fallback to plain Eshell if `stty' is not available.
+`ask'           Ask what to do.
+FUNCTION      Call FUNCTION with the command and arguments (using
+                `apply') and fallback to plain Eshell if it returns
+                nil."
+  :type 'boolean
+  :group 'eat-eshell)
+
 (defcustom eat-enable-directory-tracking t
   "Non-nil means do directory tracking.
 
@@ -5489,6 +5506,7 @@ PROGRAM can be a shell command."
         (eat--eshell-cleanup))))
   (eshell-sentinel process message))
 
+(declare-function eshell-search-path "esh-ext" (name))
 (defvar eshell-current-subjob-p) ; In `esh-proc'.
 
 ;; HACK: This is a dirty hack, it can break easily.
@@ -5498,7 +5516,16 @@ PROGRAM can be a shell command."
 Call FN with COMMAND and ARGS, and whenever `make-process' is called,
 modify its argument to change the filter, the sentinel and invoke
 `stty' from the new process."
-  (if eshell-current-subjob-p
+  (if (or eshell-current-subjob-p
+          (and (not (eshell-search-path "stty"))
+               (pcase eat-eshell-fallback-if-stty-not-available
+                 ('nil nil)
+                 ('t t)
+                 ('ask (not (y-or-n-p "The program stty can't be \
+found, input won't be shown if terminal emulation is enabled.  \
+Disable terminal emulation?")))
+                 ((and (pred functionp) function)
+                  (apply function command args)))))
       (funcall fn command args)
     (cl-letf*
         (;; For Emacs 29 and above.
