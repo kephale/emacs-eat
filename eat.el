@@ -5522,6 +5522,8 @@ PROGRAM can be a shell command."
   (eshell-sentinel process message))
 
 (declare-function eshell-search-path "esh-ext" (name))
+(declare-function eshell-interactive-output-p "esh-io"
+                  (&optional index handles))
 (defvar eshell-current-subjob-p) ; In `esh-proc'.
 
 ;; HACK: This is a dirty hack, it can break easily.
@@ -5532,6 +5534,7 @@ Call FN with COMMAND and ARGS, and whenever `make-process' is called,
 modify its argument to change the filter, the sentinel and invoke
 `stty' from the new process."
   (if (or eshell-current-subjob-p
+          (not (eshell-interactive-output-p))
           (and (not (eshell-search-path "stty"))
                (pcase eat-eshell-fallback-if-stty-not-available
                  ('nil nil)
