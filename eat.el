@@ -686,7 +686,7 @@ where `*' indicates point."
   ;; Are we already at the end a part of a long line?
   (unless (get-char-property (point) 'eat--t-wrap-line)
     ;; Find the next end of a part of a long line.
-    (goto-char (next-single-char-property-change
+    (goto-char (next-single-property-change
                 (point) 'eat--t-wrap-line nil limit)))
   ;; Remove the newline.
   (when (< (point) (or limit (point-max)))
@@ -1214,7 +1214,7 @@ character or its the internal invisible spaces."
     (if (get-text-property (point) 'eat--t-invisible-space)
         (let ((start-pos (point))
               (count nil))
-          (goto-char (next-single-char-property-change
+          (goto-char (next-single-property-change
                       (point) 'eat--t-invisible-space))
           (setq count (- (1+ (point)) start-pos))
           ;; Make sure we really overwrote the character
@@ -4054,9 +4054,21 @@ return \"eat-color\", otherwise return \"eat-mono\"."
   "Filter Eat's special text properties from STRING."
   (with-temp-buffer
     (insert string)
+    ;; Join long lines.
     (goto-char (point-min))
     (while (not (eobp))
       (eat--t-join-long-line))
+    ;; Remove the invisible spaces used with multi-column characters.
+    (goto-char (point-min))
+    (while (not (eobp))
+      (let ((invisible-p (get-text-property
+                          (point) 'eat--t-invisible-space))
+            (next-change (or (next-single-property-change
+                              (point) 'eat--t-invisible-space)
+                             (point-max))))
+        (when invisible-p
+          (delete-region (point) next-change))
+        (goto-char next-change)))
     (buffer-string)))
 
 
