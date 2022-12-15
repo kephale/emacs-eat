@@ -684,10 +684,11 @@ Assume all characters occupy a single column."
 For example: \"*foo\\nbar\\nbaz\" is converted to \"foo*bar\\nbaz\",
 where `*' indicates point."
   ;; Are we already at the end a part of a long line?
-  (unless (get-char-property (point) 'eat--t-wrap-line)
+  (unless (get-text-property (point) 'eat--t-wrap-line)
     ;; Find the next end of a part of a long line.
-    (goto-char (next-single-property-change
-                (point) 'eat--t-wrap-line nil limit)))
+    (goto-char (or (next-single-property-change
+                    (point) 'eat--t-wrap-line nil limit)
+                   limit (point-max))))
   ;; Remove the newline.
   (when (< (point) (or limit (point-max)))
     (1value (cl-assert (1value (= (1value (char-after)) ?\n))))
@@ -1185,8 +1186,9 @@ character or its the internal invisible spaces."
            (get-text-property (1- (point)) 'eat--t-invisible-space))
       (let ((start-pos (point)))
         ;; Move to the safe position.
-        (goto-char (previous-single-char-property-change
-                    (point) 'eat--t-invisible-space))
+        (goto-char (or (previous-single-property-change
+                        (point) 'eat--t-invisible-space)
+                       (point-min)))
         (cl-assert
          (1value (or (bobp)
                      (null (get-text-property
@@ -1214,8 +1216,9 @@ character or its the internal invisible spaces."
     (if (get-text-property (point) 'eat--t-invisible-space)
         (let ((start-pos (point))
               (count nil))
-          (goto-char (next-single-property-change
-                      (point) 'eat--t-invisible-space))
+          (goto-char (or (next-single-property-change
+                          (point) 'eat--t-invisible-space)
+                         (point-max)))
           (setq count (- (1+ (point)) start-pos))
           ;; Make sure we really overwrote the character
           ;; partially.
