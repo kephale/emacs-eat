@@ -2609,27 +2609,20 @@ DATA is the selection data encoded in base64."
 (defun eat--t-handle-output (output)
   "Parse and evaluate OUTPUT."
   (let ((index 0))
-    (while (< index (length output))
+    (while (/= index (length output))
       (pcase-exhaustive (eat--t-term-parser-state eat--t-term)
         ('nil
-         ;; Regular expression to find the end of plain text.
-         (let ((match (string-match
-                       (1value (rx (or ?\0 ?\a ?\b ?\t ?\n ?\v
-                                       ?\f ?\r ?\C-n ?\C-o ?\e
-                                       #x7f)))
-                       output index)))
-           (if (not match)
-               ;; The regex didn't match, so everything left to handle
-               ;; is just plain text.
-               (progn
-                 (eat--t-write output index)
-                 (setq index (length output)))
-             (when (/= match index)
-               ;; The regex matched, and the position is after the
-               ;; current position.  Process the plain text between
-               ;; them and advance to the control sequence.
-               (eat--t-write output index match)
-               (setq index match))
+         (let ((ins-beg index))
+           (while (and (/= index (length output))
+                       (not (memq (aref output index)
+                                  '( ?\0 ?\a ?\b ?\t ?\n ?\v ?\f ?\r
+                                     ;; TODO: Why #x7f?
+                                     ?\C-n ?\C-o ?\e #x7f))))
+             (cl-incf index))
+           (when (/= ins-beg index)
+             ;; Insert.
+             (eat--t-write output ins-beg index))
+           (when (/= index (length output))
              ;; Dispatch control sequence.
              (cl-incf index)
              (pcase-exhaustive (aref output (1- index))
@@ -2719,7 +2712,7 @@ DATA is the selection data encoded in base64."
              ;; ESC [, or CSI.
              (?\[
               (1value (setf (eat--t-term-parser-state eat--t-term)
-                            '(read-csi ""))))
+                            '(read-csi-format))))
              ;; ESC ], or OSC.
              (?\]
               (1value (setf (eat--t-term-parser-state eat--t-term)
@@ -2741,151 +2734,196 @@ DATA is the selection data encoded in base64."
              ;; ESC o.
              (?o
               (eat--t-change-charset 'g3)))))
-        (`(read-csi ,buf)
-         (let ((match (string-match (rx (any (#x40 . #x7e)))
-                                    output index)))
-           (if (not match)
-               (progn
-                 (setf (eat--t-term-parser-state eat--t-term)
-                       `(read-csi ,(concat buf (substring output
-                                                          index))))
-                 (setq index (length output)))
-             (setf (eat--t-term-parser-state eat--t-term) nil)
-             (pcase
-                 (let ((str (concat buf (substring output index
-                                                   match)))
-                       (format nil)
-                       (intermediate-bytes ""))
-                   (save-match-data
-                     (when (string-match
-                            (rx (zero-or-more (any (?\s . ?/)))
-                                string-end)
-                            str)
-                       (setq str (substring
-                                  str 0 (match-beginning 0))
-                             intermediate-bytes
-                             (match-string 0 str))))
-                   (when (and (not (string-empty-p str))
-                              (= (aref str 0) ??))
-                     (setq format ?? str (substring str 1)))
-                   (when (and (not (string-empty-p str))
-                              (= (aref str 0) ?>))
-                     (setq format ?> str (substring str 1)))
-                   (when (and (not (string-empty-p str))
-                              (= (aref str 0) ?=))
-                     (setq format ?= str (substring str 1)))
-                   (setq index (match-end 0))
-                   (list
-                    (concat intermediate-bytes
-                            (match-string 0 output))
-                    format
-                    (cond
-                     ((string-empty-p str) '((nil)))
-                     ((<= #x30 (aref str 0) #x3b)
-                      (mapcar (lambda (p)
-                                (mapcar (lambda (s)
-                                          (unless (string-empty-p s)
-                                            (string-to-number s)))
-                                        (split-string p ":")))
-                              (split-string str ";")))
-                     (t str))))
-               ;; CSI <n> @.
-               (`("@" nil ,(and (pred listp) params))
-                (eat--t-insert-char (caar params)))
-               ;; CSI <n> A.
-               ;; CSI <n> k.
-               (`(,(or "A" "k") nil ,(and (pred listp) params))
-                (eat--t-cur-up (caar params)))
-               ;; CSI <n> B.
-               ;; CSI <n> e.
-               (`(,(or "B" "e") nil ,(and (pred listp) params))
-                (eat--t-cur-down (caar params)))
-               ;; CSI <n> C.
-               ;; CSI <n> a.
-               (`(,(or "C" "a") nil ,(and (pred listp) params))
-                (eat--t-cur-right (caar params)))
-               ;; CSI <n> D.
-               ;; CSI <n> j.
-               (`(,(or "D" "j") nil ,(and (pred listp) params))
-                (eat--t-cur-left (caar params)))
-               ;; CSI <n> E.
-               (`("E" nil ,(and (pred listp) params))
-                (eat--t-beg-of-prev-line (caar params)))
-               ;; CSI <n> F.
-               (`("F" nil ,(and (pred listp) params))
-                (eat--t-beg-of-next-line (caar params)))
-               ;; CSI <n> G.
-               ;; CSI <n> `.
-               (`(,(or "G" "`") nil ,(and (pred listp) params))
-                (eat--t-cur-horizontal-abs (caar params)))
-               ;; CSI <n> ; <m> H
-               ;; CSI <n> ; <m> f
-               (`(,(or "H" "f") nil ,(and (pred listp) params))
-                (eat--t-goto (caar params) (caadr params)))
-               ;; CSI <n> I.
-               (`("I" nil ,(and (pred listp) params))
-                (eat--t-horizontal-tab (caar params)))
-               ;; CSI <n> J.
-               (`("J" nil ,(and (pred listp) params))
-                (eat--t-erase-in-disp (caar params)))
-               ;; CSI <n> K.
-               (`("K" nil ,(and (pred listp) params))
-                (eat--t-erase-in-line (caar params)))
-               ;; CSI <n> L.
-               (`("L" nil ,(and (pred listp) params))
-                (eat--t-insert-line (caar params)))
-               ;; CSI <n> M.
-               (`("M" nil ,(and (pred listp) params))
-                (eat--t-delete-line (caar params)))
-               ;; CSI <n> P.
-               (`("P" nil ,(and (pred listp) params))
-                (eat--t-delete-char (caar params)))
-               ;; CSI <n> S.
-               (`("S" nil ,(and (pred listp) params))
-                (eat--t-scroll-up (caar params)))
-               ;; CSI <n> T.
-               (`("T" nil ,(and (pred listp) params))
-                (eat--t-scroll-down (caar params)))
-               ;; CSI <n> X.
-               (`("X" nil ,(and (pred listp) params))
-                (eat--t-erase-char (caar params)))
-               ;; CSI <n> Z.
-               (`("Z" nil ,(and (pred listp) params))
-                (eat--t-horizontal-backtab (caar params)))
-               ;; CSI <n> b.
-               (`("b" nil ,(and (pred listp) params))
-                (eat--t-repeat-last-char (caar params)))
-               ;; CSI <n> c.
-               ;; CSI > <n> c.
-               (`("c" ,format ,(and (pred listp) params))
-                (eat--t-send-device-attrs params format))
-               ;; CSI <n> d.
-               (`("d" nil ,(and (pred listp) params))
-                (eat--t-cur-vertical-abs (caar params)))
-               ;; CSI ... h.
-               ;; CSI ? ... h.
-               (`("h" ,format ,(and (pred listp) params))
-                (eat--t-set-modes params format))
-               ;; CSI ... l.
-               ;; CSI ? ... l.
-               (`("l" ,format ,(and (pred listp) params))
-                (eat--t-reset-modes params format))
-               ;; CSI ... m.
-               (`("m" nil ,(and (pred listp) params))
-                (eat--t-set-sgr-params params))
-               ;; CSI 6 n.
-               ('("n" nil ((6)))
-                (eat--t-device-status-report))
-               ;; CSI <n> ; <n> r.
-               (`("r" nil ,(and (pred listp) params))
-                (eat--t-change-scroll-region (caar params)
-                                             (caadr params)))
-               ;; CSI s.
-               (`("s" nil nil)
-                (eat--t-save-cur))
-               ;; CSI u.
-               (`("u" nil nil)
-                (eat--t-restore-cur))))))
+        ('(read-csi-format)
+         (let ((format nil))
+           (pcase (aref output index)
+             (??
+              (setq format ??)
+              (cl-incf index))
+             (?>
+              (setq format ?>)
+              (cl-incf index))
+             (?=
+              (setq format ?=)
+              (cl-incf index)))
+           (setf (eat--t-term-parser-state eat--t-term)
+                 `(read-csi-params ,format ,(list (list nil))))))
+        (`(read-csi-params ,format ,params)
+         ;; Interpretion of the parameter depends on `format' and
+         ;; other things (including things we haven't got yet)
+         ;; according to the standard.  We don't recognize any other
+         ;; format of parameters, so we can skip any checks.
+         (let ((loop t))
+           (while loop
+             (cond
+              ((= index (length output))
+               ;; Output exhausted.  We need to wait for more.
+               (setf (eat--t-term-parser-state eat--t-term)
+                     `(read-csi-params ,format ,params))
+               (setq loop nil))
+              ((not (<= ?0 (aref output index) ?\;))
+               ;; End of parameters.
+               ;; NOTE: All parameter and their parts are in reverse
+               ;; order!
+               (setf (eat--t-term-parser-state eat--t-term)
+                     `(read-csi-function ,format ,params nil))
+               (setq loop nil))
+              (t
+               (cond
+                ((= (aref output index) ?:)
+                 ;; New parameter substring.
+                 (push nil (car params)))
+                ((= (aref output index) ?\;)
+                 ;; New parameter.
+                 (push (list nil) params))
+                (t                    ; (<= ?0 (aref output index) ?9)
+                 ;; Number, save it.
+                 (setf (caar params)
+                       (+ (* (or (caar params) 0) 10)
+                          (- (aref output index) #x30)))))
+               (cl-incf index))))))
+        (`(read-csi-function ,format ,params ,function)
+         (let ((loop t))
+           (while loop
+             (cond
+              ((= index (length output))
+               (setf (eat--t-term-parser-state eat--t-term)
+                     `(read-csi-function ,format ,params ,function))
+               (setq loop nil)))
+             (push (aref output index) function)
+             (cl-incf index)
+             (when (<= ?@ (car function) ?~)
+               ;; Now we have enough information to execute it!
+               (setq loop nil)
+               (setf (eat--t-term-parser-state eat--t-term) nil)
+               ;; NOTE: `function' and `params' are in reverse order!
+               (pcase (list function format params)
+                 ;; CSI <n> @.
+                 (`((?@) nil ((,n)))
+                  (eat--t-insert-char n))
+                 ;; CSI <n> A.
+                 ;; CSI <n> k.
+                 (`((,(or ?A ?k)) nil ((,n)))
+                  (eat--t-cur-up n))
+                 ;; CSI <n> B.
+                 ;; CSI <n> e.
+                 (`((,(or ?B ?e)) nil ((,n)))
+                  (eat--t-cur-down n))
+                 ;; CSI <n> C.
+                 ;; CSI <n> a.
+                 (`((,(or ?C ?a)) nil ((,n)))
+                  (eat--t-cur-right n))
+                 ;; CSI <n> D.
+                 ;; CSI <n> j.
+                 (`((,(or ?D ?j)) nil ((,n)))
+                  (eat--t-cur-left n))
+                 ;; CSI <n> E.
+                 (`((?E) nil ((,n)))
+                  (eat--t-beg-of-prev-line n))
+                 ;; CSI <n> F.
+                 (`((?F) nil ((,n)))
+                  (eat--t-beg-of-next-line n))
+                 ;; CSI <n> G.
+                 ;; CSI <n> `.
+                 (`((,(or ?G ?`)) nil ((,n)))
+                  (eat--t-cur-horizontal-abs n))
+                 ;; CSI <n> ; <m> H
+                 ;; CSI <n> ; <m> f
+                 (`((,(or ?H ?f)) nil ,(and (pred listp) params))
+                  (eat--t-goto (caadr params) (caar params)))
+                 ;; CSI <n> I.
+                 (`((?I) nil ((,n)))
+                  (eat--t-horizontal-tab n))
+                 ;; CSI <n> J.
+                 (`((?J) nil ((,n)))
+                  (eat--t-erase-in-disp n))
+                 ;; CSI <n> K.
+                 (`((?K) nil ((,n)))
+                  (eat--t-erase-in-line n))
+                 ;; CSI <n> L.
+                 (`((?L) nil ((,n)))
+                  (eat--t-insert-line n))
+                 ;; CSI <n> M.
+                 (`((?M) nil ((,n)))
+                  (eat--t-delete-line n))
+                 ;; CSI <n> P.
+                 (`((?P) nil ((,n)))
+                  (eat--t-delete-char n))
+                 ;; CSI <n> S.
+                 (`((?S) nil ((,n)))
+                  (eat--t-scroll-up n))
+                 ;; CSI <n> T.
+                 (`((?T) nil ((,n)))
+                  (eat--t-scroll-down n))
+                 ;; CSI <n> X.
+                 (`((?X) nil ((,n)))
+                  (eat--t-erase-char n))
+                 ;; CSI <n> Z.
+                 (`((?Z) nil ((,n)))
+                  (eat--t-horizontal-backtab n))
+                 ;; CSI <n> b.
+                 (`((?b) nil ((,n)))
+                  (eat--t-repeat-last-char n))
+                 ;; CSI <n> c.
+                 ;; CSI > <n> c.
+                 (`((?c) ,format ,(and (pred listp) params))
+                  ;; Reverse `params' to get it into the correct
+                  ;; order.
+                  (setq params (nreverse params))
+                  (let ((p params))
+                    (while p
+                      (setf (car p) (nreverse (car p)))
+                      (setq p (cdr p))))
+                  ;; TODO: This function kinda a HACK.
+                  (eat--t-send-device-attrs params format))
+                 ;; CSI <n> d.
+                 (`((?d) nil ((,n)))
+                  (eat--t-cur-vertical-abs n))
+                 ;; CSI ... h.
+                 ;; CSI ? ... h.
+                 (`((?h) ,format ,(and (pred listp) params))
+                  ;; Reverse `params' to get it into the correct
+                  ;; order.
+                  (setq params (nreverse params))
+                  (let ((p params))
+                    (while p
+                      (setf (car p) (nreverse (car p)))
+                      (setq p (cdr p))))
+                  (eat--t-set-modes params format))
+                 ;; CSI ... l.
+                 ;; CSI ? ... l.
+                 (`((?l) ,format ,(and (pred listp) params))
+                  ;; Reverse `params' to get it into the correct
+                  ;; order.
+                  (setq params (nreverse params))
+                  (let ((p params))
+                    (while p
+                      (setf (car p) (nreverse (car p)))
+                      (setq p (cdr p))))
+                  (eat--t-reset-modes params format))
+                 ;; CSI ... m.
+                 (`((?m) nil ,(and (pred listp) params))
+                  ;; Reverse `params' to get it into the correct
+                  ;; order.
+                  (setq params (nreverse params))
+                  (let ((p params))
+                    (while p
+                      (setf (car p) (nreverse (car p)))
+                      (setq p (cdr p))))
+                  (eat--t-set-sgr-params params))
+                 ;; CSI 6 n.
+                 ('((?n) nil ((6)))
+                  (eat--t-device-status-report))
+                 ;; CSI <n> ; <n> r.
+                 (`((?r) nil ,(and (pred listp) params))
+                  (eat--t-change-scroll-region (caadr params)
+                                               (caar params)))
+                 ;; CSI s.
+                 (`((?s) nil nil)
+                  (eat--t-save-cur))
+                 ;; CSI u.
+                 (`((?u) nil nil)
+                  (eat--t-restore-cur)))))))
         (`(,(and (or 'read-dcs 'read-sos 'read-osc 'read-pm 'read-apc)
                  state)
            ,buf)
@@ -3023,13 +3061,10 @@ DATA is the selection data encoded in base64."
                   ;; ESC + B.
                   ("B" 'us-ascii)))))))
         (`(read-charset-vt300 ,_slot)
-         (let ((_charset (aref output index)))
-           (cl-incf index)
-           (setf (eat--t-term-parser-state eat--t-term) nil)
-           (pcase charset
-             ;; TODO: Currently ignored.  It is here just to recognize
-             ;; the control sequence.
-             )))))))
+         (cl-incf index)
+         (setf (eat--t-term-parser-state eat--t-term) nil)
+         ;; Nothing.  This is here to just recognize the sequence.
+         )))))
 
 (defun eat--t-resize (width height)
   "Resize terminal to WIDTH x HEIGHT."
