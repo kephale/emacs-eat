@@ -3,8 +3,8 @@
 @comment %**start of header
 @setfilename eat.info
 @set UPDATED 10 December 2022
-@set EDITION 0.2.3
-@set VERSION 0.2.3
+@set EDITION 0.3
+@set VERSION 0.3
 @documentencoding UTF-8
 @codequotebacktick on
 @codequoteundirected on

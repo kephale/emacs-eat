@@ -1,3 +1,99 @@
+2022-12-16  Akib Azmain Turja  <akib@disroot.org>
+
+	Allow changing terminal faces terminal-locally
+
+	* eat.el (eat--t-term): New slots: bold-face, faint-face,
+	italic-face, slow-blink-face, fast-blink-face, color-0-face,
+	color-faces, font-faces.  Use hash table for 'params' slot.
+	* eat.el (eat--t-set-sgr-params): Use new slot instead using
+	the faces directly.
+	* eat.el (eat-term-parameter): Update to work with 'params'
+	hash table.
+	* eat.el (eat-term-set-parameter): Update to work with 'params'
+	hash table.  Handle the following parameters specially:
+	bold-face, faint-face, italic-face, slow-blink-face,
+	fast-blink-face, color-0-face, color-1-face, ...,
+	color-255-face, font-0-face, font-1-face, ..., font-9-face.
+
+2022-12-16  Akib Azmain Turja  <akib@disroot.org>
+
+	Decoding UTF-8 encoded strings encoded as base64
+
+	* eat.el (eat--t-set-cwd): Decoding UTF-8 encoded strings encoded as
+	base64.
+	* eat.el (eat--t-manipulate-selection): Use 'ignore-errors'
+	instead of '(ignore-error ...)', since both macro expand to the
+	same code.
+	* eat.el (eat--t-set-cmd): Decoding UTF-8 encoded strings encoded as
+	base64.  Use 'when-let*' instead of 'when' nested in 'let'.
+
+2022-12-15  Akib Azmain Turja  <akib@disroot.org>
+
+	Decrease regexp usage while parsing output
+
+	* eat.el (eat--t-handle-output): Don't use regular expressions
+	while parsing plain text and CSI sequences.  Remove useless
+	code from VT300-specific charset set sequence parser.
+
+2022-12-15  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix handling non-interactive processes in Eshell
+
+	* eat.el (eat--eshell-adjust-make-process-args): Check whether
+	the process going to be run will be interactive process.
+	* eat.el: Declare function 'eshell-interactive-output-p'.a
+
+2022-12-15  Akib Azmain Turja  <akib@disroot.org>
+
+	Don't use '.*-char-property-.*' functions
+
+	* eat.el (eat--t-move-before-to-safe): Use
+	'previous-single-property-change' instead of
+	'(previous-single-char-property-change'.
+	* eat.el (eat--t-join-long-line): Use 'get-text-property'
+	instead of 'get-char-property'.  Handle properly the case where
+	'next-single-property-change' returns nil.
+	* eat.el (eat--t-fix-partial-multi-col-char): Handle properly
+	the case where 'next-single-property-change' returns nil.
+
+2022-12-15  Akib Azmain Turja  <akib@disroot.org>
+
+	Refactor 'eat--eshell-adjust-make-process-args'
+
+	* eat.el (eat--eshell-adjust-make-process-args): Move the
+	'add-hook' out of 'unwind-protect'.
+
+2022-12-15  Akib Azmain Turja  <akib@disroot.org>
+
+	Remove invisible spaces when killing text
+
+	* eat.el (eat-term-filter-string): Remove invisible spaces
+	preceding multi-column width characters.
+	* eat.el (eat--t-join-long-line)
+	(eat--t-fix-partial-multi-col-char): Use
+	'next-single-property-change' instead of
+	'next-single-char-property-change'.
+
+2022-12-14  Akib Azmain Turja  <akib@disroot.org>
+
+	Refactor 'eat--eshell-adjust-make-process-args'
+
+	* eat.el (eat--eshell-adjust-make-process-args): Avoid
+	unnecessary function overrides.  Overriding functions with
+	'cl-letf*' is not well documented, and self-overriding a
+	function (override a function with its own definition) may not
+	a nop.
+
+2022-12-14  Akib Azmain Turja  <akib@disroot.org>
+
+	Ask if 'stty' is unavailable in Eshell
+
+	* eat.el (eat-eshell-fallback-if-stty-not-available): New user
+	option.
+	* eat.el (eat--eshell-adjust-make-process-args): If 'stty' is
+	not available, use 'eat-eshell-fallback-if-stty-not-available'
+	to determine whether to continue terminal emulation or not.
+
 2022-12-12  Akib Azmain Turja  <akib@disroot.org>
 
 	Fix shell prompt navigation
