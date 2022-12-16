@@ -850,7 +850,45 @@ Nil when not in alternative display mode.")
   (cut-buffers
    (1value (make-vector 10 nil))
    :documentation "Cut buffers.")
-  (params nil :documentation "Alist of terminal parameters."))
+  ;; NOTE: Change the default value of parameters when changing this.
+  (bold-face 'eat-term-bold :documentation "Face for bold text.")
+  (faint-face 'eat-term-faint :documentation "Face for faint text.")
+  (italic-face 'eat-term-italic :documentation "Face for slant text.")
+  (slow-blink-face 'eat-term-slow-blink :documentation "Slow blink.")
+  (fast-blink-face 'eat-term-fast-blink :documentation "Fast blink.")
+  (color-faces
+   (copy-sequence
+    (eval-when-compile
+      (vconcat
+       (cl-loop for i from 0 to 255
+                collect (intern (format "eat-term-color-%i" i))))))
+   :documentation "Faces for colors.")
+  (font-faces
+   (copy-sequence
+    (eval-when-compile
+      (vconcat
+       (cl-loop for i from 0 to 9
+                collect (intern (format "eat-term-font-%i" i))))))
+   :documentation "Faces for fonts.")
+  (params
+   (copy-hash-table
+    (eval-when-compile
+      (let ((tbl (make-hash-table :test 'eq)))
+        (puthash 'bold-face 'eat-term-bold tbl)
+        (puthash 'faint-face 'eat-term-faint tbl)
+        (puthash 'italic-face 'eat-term-italic tbl)
+        (puthash 'slow-blink-face 'eat-term-slow-blink tbl)
+        (puthash 'fast-blink-face 'eat-term-fast-blink tbl)
+        (cl-loop
+         for i from 0 to 255
+         do (puthash (intern (format "color-%i-face" i))
+                     (intern (format "eat-term-color-%i" i)) tbl))
+        (cl-loop
+         for i from 0 to 9
+         do (puthash (intern (format "font-%i-face" i))
+                     (intern (format "eat-term-font-%i" i)) tbl))
+        tbl)))
+   :documentation "Alist of terminal parameters."))
 
 (defvar eat--t-term nil
   "The current terminal.
@@ -2092,13 +2130,17 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
          (1value (setf (eat--t-face-conceal face) nil))
          (1value (setf (eat--t-face-inverse face) nil))
          (1value (setf (eat--t-face-blink face) nil))
-         (1value (setf (eat--t-face-font face) 'eat-term-font-0)))
+         (setf (eat--t-face-font face)
+               (aref (eat--t-term-font-faces eat--t-term) 0)))
         ('(1)
-         (1value (setf (eat--t-face-intensity face) 'eat-term-bold)))
+         (setf (eat--t-face-intensity face)
+               (eat--t-term-bold-face eat--t-term)))
         ('(2)
-         (1value (setf (eat--t-face-intensity face) 'eat-term-faint)))
+         (setf (eat--t-face-intensity face)
+               (eat--t-term-faint-face eat--t-term)))
         ('(3)
-         (1value (setf (eat--t-face-italic face) 'eat-term-italic)))
+         (setf (eat--t-face-italic face)
+               (eat--t-term-italic-face eat--t-term)))
         ('(4)
          (1value (setf (eat--t-face-underline face) 'line)))
         ('(4 0)
@@ -2114,11 +2156,13 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
         ('(4 5)
          (1value (setf (eat--t-face-underline face) 'wave)))
         ('(5)
-         (1value (setf (eat--t-face-blink face) 'eat-term-slow-blink)))
+         (setf (eat--t-face-blink face)
+               (eat--t-term-slow-blink-face eat--t-term)))
         ('(6)
-         (setf (eat--t-face-blink face) 'eat-term-fast-blink))
+         (setf (eat--t-face-blink face)
+               (eat--t-term-fast-blink-face eat--t-term)))
         ('(7)
-         (1value (1value (setf (eat--t-face-inverse face) t))))
+         (1value (setf (eat--t-face-inverse face) t)))
         ('(8)
          (1value (setf (eat--t-face-conceal face) t)))
         ('(9)
@@ -2126,7 +2170,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
         (`(,(and (pred (lambda (font) (<= 10 font 19)))
                  font))
          (setf (eat--t-face-font face)
-               (intern (format "eat-term-font-%i" (- font 10)))))
+               (aref (eat--t-term-font-faces eat--t-term)
+                     (- font 10))))
         ('(21)
          (1value (setf (eat--t-face-underline face) 'line)))
         ('(22)
@@ -2147,7 +2192,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                  color))
          (setf (eat--t-face-fg face)
                (face-foreground
-                (intern (format "eat-term-color-%i" (- color 30)))
+                (aref (eat--t-term-color-faces eat--t-term)
+                      (- color 30))
                 nil t)))
         ('(38)
          (pcase (pop params)
@@ -2165,7 +2211,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
               (setf (eat--t-face-fg face)
                     (when (and color (<= 0 color 255))
                       (face-foreground
-                       (intern (format "eat-term-color-%i" color))
+                       (aref (eat--t-term-color-faces eat--t-term)
+                             color)
                        nil t)))))))
         ('(39)
          (1value (setf (eat--t-face-fg face) nil)))
@@ -2173,7 +2220,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                  color))
          (setf (eat--t-face-bg face)
                (face-foreground
-                (intern (format "eat-term-color-%i" (- color 40)))
+                (aref (eat--t-term-color-faces eat--t-term)
+                      (- color 40))
                 nil t)))
         ('(48)
          (setf (eat--t-face-bg face)
@@ -2190,7 +2238,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                   (let ((color (car (pop params))))
                     (when (and color (<= 0 color 255))
                       (face-foreground
-                       (intern (format "eat-term-color-%i" color))
+                       (aref (eat--t-term-color-faces eat--t-term)
+                             color)
                        nil t)))))))
         ('(49)
          (1value (setf (eat--t-face-bg face) nil)))
@@ -2209,7 +2258,8 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                   (let ((color (car (pop params))))
                     (when (and color (<= 0 color 255))
                       (face-foreground
-                       (intern (format "eat-term-color-%i" color))
+                       (aref (eat--t-term-color-faces eat--t-term)
+                             color)
                        nil t)))))))
         ('(59)
          (1value (setf (eat--t-face-underline-color face) nil)))
@@ -2217,13 +2267,15 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
                  color))
          (setf (eat--t-face-fg face)
                (face-foreground
-                (intern (format "eat-term-color-%i" (- color 82)))
+                (aref (eat--t-term-color-faces eat--t-term)
+                      (- color 82))
                 nil t)))
         (`(,(and (pred (lambda (color) (<= 100 color 107)))
                  color))
          (setf (eat--t-face-bg face)
                (face-foreground
-                (intern (format "eat-term-color-%i" (- color 92)))
+                (aref (eat--t-term-color-faces eat--t-term)
+                      (- color 92))
                 nil t)))))
     ;; Update face according to the attributes.
     (setf (eat--t-face-face face)
@@ -2260,9 +2312,7 @@ TOP defaults to 1 and BOTTOM defaults to the height of the display."
             (,@(and-let* ((intensity (eat--t-face-intensity face)))
                  (list intensity))
              ,@(and-let* ((italic (eat--t-face-italic face)))
-                 (cl-assert (1value (eq (1value italic)
-                                        'eat-term-italic)))
-                 (list (1value italic)))
+                 (list italic))
              ,@(and-let* ((blink (eat--t-face-blink face)))
                  (list blink))
              ,(eat--t-face-font face))))))
@@ -3220,14 +3270,60 @@ DATA is the selection data encoded in base64."
 
 (defun eat-term-parameter (terminal parameter)
   "Return the value of parameter PARAMETER of TERMINAL."
-  (cdr (assq parameter (eat--t-term-params terminal))))
+  (gethash parameter (eat--t-term-params terminal)))
 
 (defun eat-term-set-parameter (terminal parameter value)
   "Set the value of parameter PARAMETER of TERMINAL to VALUE."
-  (let ((pair (assq parameter (eat--t-term-params terminal))))
-    (if pair
-        (setcdr pair value)
-      (push (cons parameter value) (eat--t-term-params terminal)))))
+  ;; Handle special parameters, and reject invalid values.
+  (pcase parameter
+    ('bold-face
+     (unless (facep value)
+       (signal 'wrong-type-argument (list 'facep value)))
+     (setf (eat--t-term-bold-face terminal) value))
+    ('faint-face
+     (unless (facep value)
+       (signal 'wrong-type-argument (list 'facep value)))
+     (setf (eat--t-term-faint-face terminal) value))
+    ('italic-face
+     (unless (facep value)
+       (signal 'wrong-type-argument (list 'facep value)))
+     (setf (eat--t-term-italic-face terminal) value))
+    ('slow-blink-face
+     (unless (facep value)
+       (signal 'wrong-type-argument (list 'facep value)))
+     (setf (eat--t-term-slow-blink-face terminal) value))
+    ('fast-blink-face
+     (unless (facep value)
+       (signal 'wrong-type-argument (list 'facep value)))
+     (setf (eat--t-term-fast-blink-face terminal) value))
+    ((and (pred symbolp)
+          (let (rx string-start "color-"
+                   (let number (one-or-more (any (?0 . ?9))))
+                   "-face" string-end)
+            (symbol-name parameter))
+          (let (and (pred (<= 0))
+                    (pred (>= 255))
+                    index)
+            (string-to-number number)))
+     (unless (facep value)
+       (signal 'wrong-type-argument (list 'facep value)))
+     (setf (aref (eat--t-term-color-faces terminal) index)
+           value))
+    ((and (pred symbolp)
+          (let (rx string-start "font-"
+                   (let number (one-or-more (any (?0 . ?9))))
+                   "-face" string-end)
+            (symbol-name parameter))
+          (let (and (pred (<= 0))
+                    (pred (>= 255))
+                    index)
+            (string-to-number number)))
+     (unless (facep value)
+       (signal 'wrong-type-argument (list 'facep value)))
+     (setf (aref (eat--t-term-font-faces terminal) index)
+           value)))
+  ;; Set the parameter.
+  (puthash parameter value (eat--t-term-params terminal)))
 
 (gv-define-setter eat-term-parameter (value terminal parameter)
   `(eat-term-set-parameter ,terminal ,parameter ,value))
@@ -4361,10 +4457,10 @@ If HOST isn't the host Emacs is running on, don't do anything."
            (if (zerop eat--shell-command-status)
                (propertize
                 eat-shell-prompt-annotation-success-margin-indicator
-                'face 'eat-shell-prompt-annotation-success)
+                'face '(eat-shell-prompt-annotation-success default))
              (propertize
               eat-shell-prompt-annotation-failure-margin-indicator
-              'face 'eat-shell-prompt-annotation-failure))))
+              'face '(eat-shell-prompt-annotation-failure default)))))
       ;; Update previous prompt's indicator using side-effect.
       (when eat--shell-prompt-mark
         (setf (cadr eat--shell-prompt-mark) indicator)
@@ -4459,7 +4555,7 @@ BUFFER is the terminal buffer."
     (setf (cadr eat--shell-prompt-mark)
           (propertize
            eat-shell-prompt-annotation-running-margin-indicator
-           'face 'eat-shell-prompt-annotation-running))))
+           'face '(eat-shell-prompt-annotation-running default)))))
 
 (defun eat--set-cmd-status (_ code)
   "Set CODE as the current shell command's exit status."
