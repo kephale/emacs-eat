@@ -2357,8 +2357,12 @@ the format \"file://HOST/CWD/\"; HOST can be empty."
     ('base64
      (let ((dir (ignore-errors (expand-file-name
                                 (file-name-as-directory
-                                 (base64-decode-string path)))))
-           (hostname (ignore-errors (base64-decode-string host))))
+                                 (decode-coding-string
+                                  (base64-decode-string path)
+                                  locale-coding-system)))))
+           (hostname (ignore-errors (decode-coding-string
+                                     (base64-decode-string host)
+                                     locale-coding-system))))
        (when (and dir hostname)
          ;; Update working directory.
          (setf (eat--t-term-cwd eat--t-term) (cons hostname dir))
@@ -2474,7 +2478,7 @@ DATA is the selection data encoded in base64."
                  (base64-encode-string str))))
     ;; The client is requesting to set clipboard content, let's try to
     ;; fulfill the request.
-    (let ((str (ignore-error error
+    (let ((str (ignore-errors
                  (decode-coding-string (base64-decode-string data)
                                        locale-coding-system))))
       (seq-doseq (target targets)
@@ -2519,9 +2523,10 @@ DATA is the selection data encoded in base64."
 
 (defun eat--t-set-cmd (cmd)
   "Set the command being executed to CMD."
-  (let ((c (ignore-errors (base64-decode-string cmd))))
-    (when c
-      (funcall (eat--t-term-set-cmd-fn eat--t-term) eat--t-term c))))
+  (when-let* ((c (ignore-errors (decode-coding-string
+                                 (base64-decode-string cmd)
+                                 locale-coding-system))))
+    (funcall (eat--t-term-set-cmd-fn eat--t-term) eat--t-term c)))
 
 (defun eat--t-cmd-start ()
   "Call shell command start hook."
