@@ -1100,7 +1100,8 @@ accordingly."
             (insert ?\n))
           (set-marker (eat--t-disp-begin disp) (point)))
         ;; Is the last line on display in scroll region?
-        (when (< scroll-begin (eat--t-disp-width disp))
+        (when (< scroll-end (eat--t-disp-width disp))
+          ;; No, it isn't.
           ;; Go to the end of scroll region (before deleting or moving
           ;; texts).
           (eat--t-goto-bol (- (1+ (- scroll-end scroll-begin)) n))
