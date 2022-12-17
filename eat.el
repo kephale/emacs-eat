@@ -3277,24 +3277,24 @@ DATA is the selection data encoded in base64."
   ;; Handle special parameters, and reject invalid values.
   (pcase parameter
     ('bold-face
-     (unless (facep value)
-       (signal 'wrong-type-argument (list 'facep value)))
+     (unless (and (symbolp value) (facep value))
+       (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (eat--t-term-bold-face terminal) value))
     ('faint-face
-     (unless (facep value)
-       (signal 'wrong-type-argument (list 'facep value)))
+     (unless (and (symbolp value) (facep value))
+       (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (eat--t-term-faint-face terminal) value))
     ('italic-face
-     (unless (facep value)
-       (signal 'wrong-type-argument (list 'facep value)))
+     (unless (and (symbolp value) (facep value))
+       (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (eat--t-term-italic-face terminal) value))
     ('slow-blink-face
-     (unless (facep value)
-       (signal 'wrong-type-argument (list 'facep value)))
+     (unless (and (symbolp value) (facep value))
+       (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (eat--t-term-slow-blink-face terminal) value))
     ('fast-blink-face
-     (unless (facep value)
-       (signal 'wrong-type-argument (list 'facep value)))
+     (unless (and (symbolp value) (facep value))
+       (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (eat--t-term-fast-blink-face terminal) value))
     ((and (pred symbolp)
           (let (rx string-start "color-"
@@ -3305,8 +3305,8 @@ DATA is the selection data encoded in base64."
                     (pred (>= 255))
                     index)
             (string-to-number number)))
-     (unless (facep value)
-       (signal 'wrong-type-argument (list 'facep value)))
+     (unless (and (symbolp value) (facep value))
+       (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (aref (eat--t-term-color-faces terminal) index)
            value))
     ((and (pred symbolp)
@@ -3318,8 +3318,8 @@ DATA is the selection data encoded in base64."
                     (pred (>= 255))
                     index)
             (string-to-number number)))
-     (unless (facep value)
-       (signal 'wrong-type-argument (list 'facep value)))
+     (unless (and (symbolp value) (facep value))
+       (signal 'wrong-type-argument (list '(symbolp facep) value)))
      (setf (aref (eat--t-term-font-faces terminal) index)
            value)))
   ;; Set the parameter.
