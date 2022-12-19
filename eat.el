@@ -5806,7 +5806,7 @@ symbol `buffer', in which case the point of current buffer is set."
 
 ;;;###autoload
 (define-minor-mode eat-eshell-mode
-  "Toggle Eat terminal emulation is Eshell."
+  "Toggle Eat terminal emulation in Eshell."
   :global t
   :lighter (eat--eshell-local-mode
             (" Eat-Eshell"
