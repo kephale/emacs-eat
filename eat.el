@@ -2672,7 +2672,6 @@ DATA is the selection data encoded in base64."
            (while (and (/= index (length output))
                        (not (memq (aref output index)
                                   '( ?\0 ?\a ?\b ?\t ?\n ?\v ?\f ?\r
-                                     ;; TODO: Why #x7f?
                                      ?\C-n ?\C-o ?\e #x7f))))
              (cl-incf index))
            (when (/= ins-beg index)
@@ -2681,7 +2680,7 @@ DATA is the selection data encoded in base64."
            (when (/= index (length output))
              ;; Dispatch control sequence.
              (cl-incf index)
-             (pcase-exhaustive (aref output (1- index))
+             (pcase (aref output (1- index))
                (?\a
                 (eat--t-bell))
                (?\b
@@ -2707,7 +2706,9 @@ DATA is the selection data encoded in base64."
                 (eat--t-change-charset 'g0))
                (?\e
                 (1value (setf (eat--t-term-parser-state eat--t-term)
-                              '(read-esc))))))))
+                              '(read-esc))))
+               ;; Others are ignored.
+               ))))
         ('(read-esc)
          (let ((type (aref output index)))
            (cl-incf index)
