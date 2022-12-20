@@ -88,7 +88,7 @@ put something like the following in your init file:
 
 #+begin_src emacs-lisp
 (quelpa '(eat :fetcher git
-              :url "/home/akib/projects/emacs-eat"
+              :url "https://codeberg.org/akib/emacs-eat"
               :files ("*.el" ("term" "term/*.el") "*.texi"
                       "*.ti" ("terminfo/e" "terminfo/e/*")
                       ("terminfo/65" "terminfo/65/*")
