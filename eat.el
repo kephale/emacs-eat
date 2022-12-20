@@ -339,28 +339,32 @@ This value is used by terminal programs to identify the terminal."
 (defvar eat--install-path nil
   "Path to directory where Eat is installed.")
 
+(defvar eat--terminfo-path nil
+  "Path to directory where Terminfo databases are installed.")
+
 (defvar eat--shell-integration-path nil
   "Path to directory where shell integration scripts are installed.")
 
+(setq eat--install-path
+      (copy-sequence (file-name-directory
+                      (or load-file-name buffer-file-name))))
+
 (defvar eat-term-terminfo-directory)
 (defvar eat-term-shell-integration-directory)
-(let ((old-install-path eat--install-path)
+(let ((old-terminfo-path eat--terminfo-path)
       (old-shell-integration-path eat--shell-integration-path))
-  (setq eat--install-path
-        (copy-sequence (file-name-directory
-                        (or load-file-name buffer-file-name))))
+  (setq eat--terminfo-path
+        (expand-file-name "terminfo" eat--install-path))
   (setq eat--shell-integration-path
         (expand-file-name "integration" eat--install-path))
 
-  (defcustom eat-term-terminfo-directory eat--install-path
+  (defcustom eat-term-terminfo-directory eat--terminfo-path
     "Directory where required terminfo databases can be found.
 
 This value is used by terminal programs to find the terminfo databases
 that describe the capabilities of the terminal."
     :type 'directory
     :group 'eat-term)
-
-  (defvar eat--term-shell-integration-directory)
 
   (defcustom eat-term-shell-integration-directory
     eat--shell-integration-path
@@ -372,8 +376,8 @@ This value is exposed to terminal programs as
     :group 'eat-ui
     :group 'eat-eshell)
 
-  (when (eq eat-term-terminfo-directory old-install-path)
-    (setq eat-term-terminfo-directory eat--install-path))
+  (when (eq eat-term-terminfo-directory old-terminfo-path)
+    (setq eat-term-terminfo-directory eat--terminfo-path))
   (when (eq eat-term-shell-integration-directory
             old-shell-integration-path)
     (setq eat-term-shell-integration-directory

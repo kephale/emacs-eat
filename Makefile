@@ -35,7 +35,23 @@ html: eat.html
 
 pdf: eat.pdf
 
-terminfo: e/eat-mono e/eat-color eat-256color e/eat-truecolor
+terminfo: eat.ti
+	test -d terminfo || mkdir terminfo
+	env TERMINFO=./terminfo $(TIC) -x eat.ti
+# We don't know which directory was created, it depend on the
+# case-sensitivity of the file-system.  So make sure both are created.
+	test -d terminfo/e || mkdir terminfo/e
+	test -d terminfo/65 || mkdir terminfo/65
+	if test terminfo/e/eat-mono -nt terminfo/65/eat-mono ; \
+		then \
+		cp terminfo/e/eat-mono terminfo/e/eat-color \
+		terminfo/e/eat-256color terminfo/e/eat-truecolor \
+		terminfo/65 ; \
+		else \
+		cp terminfo/65/eat-mono terminfo/65/eat-color \
+		terminfo/65/eat-256color terminfo/65/eat-truecolor \
+		terminfo/e ; \
+		fi
 
 check: eat.el
 	$(EMACS) -batch -l eat.el -l eat-tests.el \
@@ -48,9 +64,6 @@ changelog:
 
 eat.elc: eat.el
 	$(EMACS) -batch --eval '(byte-compile-file "eat.el")'
-
-e/eat-mono e/eat-color eat-256color e/eat-truecolor: eat.ti
-	env TERMINFO=. $(TIC) -x eat.ti
 
 eat.info: eat.texi gpl.texi fdl.texi
 	$(TEXI2INFO) eat.texi
