@@ -1,3 +1,37 @@
+2022-12-21  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix terminfo path on case-insensitive filesystems
+
+	* eat.el (eat--terminfo-path): New variable.
+	* eat.el (eat-term-terminfo-directory): Change default value to
+	'PACKAGE-ROOT/terminfo/'.
+	* Makefile (terminfo): Don't depend on other targets.  Make
+	directory 'terminfo'.  Write terminfo to both 'e' and
+	'65' (hexadecimal number of ASCII 'e') directories.
+	* Makefile (e/eat-mono e/eat-color eat-256color e/eat-truecolor):
+	Remove target.
+	* README.org (Quelpa): Update recipe.
+
+2022-12-20  Akib Azmain Turja  <akib@disroot.org>
+
+	* eat.el (eat--t-handle-output): Fix NULL handling
+
+2022-12-17  Akib Azmain Turja  <akib@disroot.org>
+
+	Fix typo in 'eat--t-scroll-up'
+
+	* eat.el (eat--t-scroll-up): Replace 'scroll-begin' with
+	'scroll-end' in '(< scroll-end (eat--t-disp-width disp))',
+	since this will always evaluate to t, and thus it was most
+	probably a typo.
+
+2022-12-17  Akib Azmain Turja  <akib@disroot.org>
+
+	Make sure symbol is used as face parameter value
+
+	* eat.el (eat-term-set-parameter): Make sure face parameter
+	values are symbols.
+
 2022-12-16  Akib Azmain Turja  <akib@disroot.org>
 
 	Allow changing terminal faces terminal-locally
