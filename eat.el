@@ -678,6 +678,7 @@ Assume all characters occupy a single column."
   (insert (if face
               (let ((str (make-string n c)))
                 (put-text-property 0 n 'face face str)
+                (put-text-property 0 n 'font-lock-face face str)
                 str)
             ;; Avoid the `let'.
             (make-string n c))))
@@ -1278,7 +1279,7 @@ character or its the internal invisible spaces."
         ;; `delete-char' also works, but it does more checks, so
         ;; hopefully this will be faster.
         (delete-region (point) (1+ (point)))
-        (insert (propertize " " 'face face))
+        (insert (propertize " " 'face face 'font-lock-face face))
         (backward-char)))))
 
 (defconst eat--t-dec-line-drawing-chars
@@ -1397,6 +1398,8 @@ character to actually show.")
                           (aset s i r)))))
                    ;; Add face.
                    (put-text-property 0 (length s) 'face face s)
+                   (put-text-property
+                    0 (length s) 'font-lock-face face s)
                    (insert s))
                  (setq inserted-till e)
                  (if (or (null next-multi-col)
@@ -1415,14 +1418,14 @@ character to actually show.")
                       ;; its width.
                       (propertize
                        (make-string (1- (cdr next-multi-col)) ?\s)
-                       'invisible t 'face face
+                       'invisible t 'face face 'font-lock-face face
                        'eat--t-invisible-space t
                        'eat--t-char-width (cdr next-multi-col))
                       ;; Now insert the multi-column character.
                       (propertize
                        (substring str inserted-till
                                   (cl-incf inserted-till))
-                       'face face
+                       'face face 'font-lock-face face
                        'eat--t-char-width (cdr next-multi-col))))
                    (setf multi-col-char-indices
                          (cdr multi-col-char-indices))
