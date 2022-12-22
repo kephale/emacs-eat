@@ -96,6 +96,20 @@ put something like the following in your init file:
                       (:exclude ".dir-locals.el" "*-tests.el"))))
 #+end_src
 
+** Straight.el
+
+#+begin_src emacs-lisp
+(straight-use-package
+ '(eat :type git
+       :host codeberg
+       :repo "akib/emacs-eat"
+       :files ("*.el" ("term" "term/*.el") "*.texi"
+               "*.ti" ("terminfo/e" "terminfo/e/*")
+               ("terminfo/65" "terminfo/65/*")
+               ("integration" "integration/*")
+               (:exclude ".dir-locals.el" "*-tests.el"))))
+#+end_src
+
 ** Manual
 
 Clone the repository and put it in your ~load-path~.
