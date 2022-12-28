@@ -5424,8 +5424,8 @@ PROGRAM can be a shell command."
         (eat-mode))
       (pop-to-buffer-same-window buffer)
       (unless eat--process
-        (eat-exec buffer "eat" "/usr/bin/env" nil
-                  `("sh" "-c" ,program)))
+        (eat-exec buffer (buffer-name) "/usr/bin/env" nil
+                  (list "sh" "-c" program)))
       buffer)))
 
 
