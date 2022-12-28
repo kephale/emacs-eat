@@ -1,3 +1,38 @@
+2022-12-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Don't error while handling the sequence '\e[>c'
+
+	* eat.el (eat--t-send-device-attrs): Accept '((nil))' as the
+	value of the parameter PARAMS, but don't accept 'nil'.
+
+2022-12-28  Akib Azmain Turja  <akib@disroot.org>
+
+	* eat.el (eat): Use buffer name for process name
+
+	* eat.el (eat-eshell-exec-hook): Make customizable
+
+	* eat.el (eat-exec-hook): Make customizable
+
+2022-12-28  Akib Azmain Turja  <akib@disroot.org>
+
+	Run eat-eshell-exec-hook as Eshell process is run
+
+	* eat.el (eat--eshell-setup-proc-and-term): Run
+	'eat-eshell-exec-hook' at the very end.
+
+2022-12-22  Akib Azmain Turja  <akib@disroot.org>
+
+	* README.org (Straight.el): New section
+
+2022-12-22  Akib Azmain Turja  <akib@disroot.org>
+
+	Don't let font-lock to mess up text face
+
+	* eat.el (eat--t-repeated-insert, eat--t-write)
+	(eat--t-fix-partial-multi-col-char): Add 'font-lock-face' text
+	property along with 'face' to stop font-lock from removing the
+	face.
+
 2022-12-21  Akib Azmain Turja  <akib@disroot.org>
 
 	Fix terminfo path on case-insensitive filesystems
