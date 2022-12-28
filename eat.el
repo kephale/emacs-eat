@@ -240,6 +240,11 @@ prompt annotation."
   :type 'hook
   :group 'eat-ui)
 
+(defcustom eat-eshell-exec-hook nil
+  "Hook run after `eat' executes a commamnd."
+  :type 'hook
+  :group 'eat-eshell)
+
 (defconst eat--cursor-type-value-type
   (let ((cur-type
          '(choice
