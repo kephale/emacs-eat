@@ -5582,7 +5582,8 @@ PROGRAM can be a shell command."
     (setq-local eshell-output-filter-functions
                 '(eat--eshell-output-filter))
     (eat--eshell-process-running-mode +1)
-    (eat-eshell-semi-char-mode)))
+    (eat-eshell-semi-char-mode)
+    (run-hooks 'eat-eshell-exec-hook)))
 
 (defun eat--eshell-cleanup ()
   "Cleanup everything."
