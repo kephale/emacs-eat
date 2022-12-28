@@ -2455,14 +2455,13 @@ the format \"file://HOST/CWD/\"; HOST can be empty."
 
 PARAMS is the parameter list and FORMAT is the format of parameters in
 output."
-  (setq params (or params '((0))))
   (pcase-exhaustive format
     ('nil
-     (when (= (caar params) 0)
+     (when (= (or (caar params) 1) 0)
        (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
                 "\e[?1;2c")))
     (?>
-     (when (= (caar params) 0)
+     (when (= (or (caar params) 1) 0)
        (funcall (eat--t-term-input-fn eat--t-term) eat--t-term
                 "\e[>0;242;0c")))))
 
