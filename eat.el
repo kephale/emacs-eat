@@ -4793,6 +4793,20 @@ STRING and ARG are passed to `yank-pop', which see."
          (yank-from-kill-ring string arg)
          (buffer-string))))))
 
+(defun eat-xterm-paste (event)
+  "Handle paste operation EVENT from XTerm."
+  (interactive "e")
+  (unless (eq (car-safe event) 'xterm-paste)
+    (error "xterm-paste must be found to xterm-paste event"))
+  (let ((pasted-text (nth 1 event)))
+    (if (bound-and-true-p xterm-store-paste-on-kill-ring)
+        ;; Put the text onto the kill ring and then insert it into the
+        ;; buffer.
+        (let ((interprogram-paste-function (lambda () pasted-text)))
+          (eat-yank))
+      ;; Insert the text without putting it onto the kill ring.
+      (eat-send-string-as-yank eat--terminal pasted-text))))
+
 ;; When changing these keymaps, be sure to update the manual, README
 ;; and commentary.
 (defvar eat-mode-map
@@ -4802,6 +4816,7 @@ STRING and ARG are passed to `yank-pop', which see."
     (define-key map [?\C-c ?\C-k] #'eat-kill-process)
     (define-key map [?\C-c ?\C-p] #'eat-previous-shell-prompt)
     (define-key map [?\C-c ?\C-n] #'eat-next-shell-prompt)
+    (define-key map [xterm-paste] #'ignore)
     map)
   "Keymap for Eat mode.")
 
@@ -4818,6 +4833,7 @@ STRING and ARG are passed to `yank-pop', which see."
     (define-key map [?\C-c ?\C-c] #'eat-self-input)
     (define-key map [?\C-c ?\C-e] #'eat-emacs-mode)
     (define-key map [remap insert-char] #'eat-input-char)
+    (define-key map [xterm-paste] #'eat-xterm-paste)
     map)
   "Keymap for Eat semi-char mode.")
 
@@ -4827,6 +4843,7 @@ STRING and ARG are passed to `yank-pop', which see."
               '(:ascii :arrow :navigation :function)
               '([?\e ?\C-m]))))
     (define-key map [?\C-\M-m] #'eat-semi-char-mode)
+    (define-key map [xterm-paste] #'eat-xterm-paste)
     map)
   "Keymap for Eat char mode.")
 
@@ -5440,6 +5457,7 @@ PROGRAM can be a shell command."
     (define-key map [remap eshell-toggle-direct-send] ; C-c M-d
                 #'eat-eshell-char-mode)
     (define-key map [remap undo] #'undefined) ; Disable `undo'.
+    (define-key map [xterm-paste] #'ignore)
     map)
   "Keymap for Eat Eshell \"emacs\" mode.")
 
@@ -5455,6 +5473,7 @@ PROGRAM can be a shell command."
     (define-key map [?\M-y] #'eat-yank-from-kill-ring)
     (define-key map [?\C-c ?\C-e] #'eat-eshell-emacs-mode)
     (define-key map [remap insert-char] #'eat-input-char)
+    (define-key map [xterm-paste] #'eat-xterm-paste)
     map)
   "Keymap for Eat Eshell semi-char mode.")
 
@@ -5464,6 +5483,7 @@ PROGRAM can be a shell command."
               '(:ascii :arrow :navigation :function)
               '([?\e ?\C-m]))))
     (define-key map [?\C-\M-m] #'eat-eshell-semi-char-mode)
+    (define-key map [xterm-paste] #'eat-xterm-paste)
     map)
   "Keymap for Eat Eshell char mode.")
 
