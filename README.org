@@ -1,5 +1,7 @@
 #+title: Eat: Emulate A Terminal
 
+* Please note that this is a GH mirror of the original emacs-eat project: https://codeberg.org/akib/emacs-eat
+
 Eat's name self-explainary, it stands for "Emulate A Terminal".  Eat
 is a terminal emulator.  It can run most (if not all) full-screen
 terminal programs, including Emacs.
