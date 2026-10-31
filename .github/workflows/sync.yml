@@ -20,6 +20,19 @@ jobs:
         run: |
           git fetch --tags https://codeberg.org/akib/emacs-eat master
           git push origin FETCH_HEAD:refs/heads/master --tags
+          git rev-parse FETCH_HEAD > "$RUNNER_TEMP/synced"
+      - name: Show the synced commit on the landing page
+        run: |
+          sha=$(cat "$RUNNER_TEMP/synced")
+          short=$(git rev-parse --short=7 "$sha")
+          date=$(git log -1 --format=%cs "$sha")
+          line="\`master\` is at [\`$short\`](https://codeberg.org/akib/emacs-eat/commit/$sha), committed $date."
+          sed -i "/<!-- synced -->/,/<!-- \/synced -->/c\\<!-- synced -->\n$line\n<!-- /synced -->" README.md
+          git diff --quiet README.md && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Record the synced Codeberg commit" README.md
+          git push origin HEAD:refs/heads/github-mirror
       - name: Keep the schedule enabled during quiet periods
         env:
           GH_TOKEN: ${{ github.token }}
