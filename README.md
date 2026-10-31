@@ -15,7 +15,7 @@ the sync workflow. The `master` branch is an exact copy of Codeberg's `master`,
 checked every Monday. Tags are copied too.
 
 <!-- synced -->
-Status pending first sync.
+`master` is at [`c8d54d6`](https://codeberg.org/akib/emacs-eat/commit/c8d54d649872bfe7b2b9f49ae5c2addbf12d3b99), committed 2025-02-06.
 <!-- /synced -->
 
 - [Browse the code on `master`](https://github.com/kephale/emacs-eat/tree/master)
