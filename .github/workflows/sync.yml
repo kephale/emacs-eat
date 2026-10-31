@@ -1,0 +1,26 @@
+name: Sync from Codeberg
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Fast-forward master and add new tags
+        run: |
+          git fetch --tags https://codeberg.org/akib/emacs-eat master
+          git push origin FETCH_HEAD:refs/heads/master --tags
+      - name: Keep the schedule enabled during quiet periods
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable sync.yml --repo "$GITHUB_REPOSITORY"
